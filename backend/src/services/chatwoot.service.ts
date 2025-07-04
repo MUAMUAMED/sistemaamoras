@@ -89,9 +89,9 @@ export class ChatwootService {
       // Log do webhook
       await prisma.webhookLog.create({
         data: {
-          event: payload.event,
-          payload: payload as any,
           source: 'chatwoot',
+          event: payload.event,
+          data: payload as any,
           processed: false
         }
       });
@@ -277,9 +277,10 @@ export class ChatwootService {
     if (leadStatus && leadStatus !== lead.status) {
       await prisma.lead.update({
         where: { id: lead.id },
-        data: { 
-          status: leadStatus,
-          lastInteraction: new Date()
+        data: {
+          status: leadStatus as any,
+          lastInteraction: new Date(),
+          updatedAt: new Date()
         }
       });
 

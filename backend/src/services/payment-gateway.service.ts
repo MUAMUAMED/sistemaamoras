@@ -56,9 +56,9 @@ export class PaymentGatewayService {
       // Log do webhook
       await prisma.webhookLog.create({
         data: {
-          event: `payment_webhook`,
-          payload,
           source: gateway,
+          event: `payment_webhook`,
+          data: payload,
           processed: true
         }
       });
@@ -285,9 +285,10 @@ export class PaymentGatewayService {
         await prisma.sale.update({
           where: { id: sale.id },
           data: {
-            paymentStatus: saleStatus,
-            status: saleStatus,
-            paymentReference: paymentData.id
+            status: saleStatus === 'CANCELLED' ? 'CANCELED' : saleStatus as any,
+            paymentReference: paymentData.id,
+            gatewayResponse: paymentData,
+            updatedAt: new Date()
           }
         });
 

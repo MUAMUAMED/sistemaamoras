@@ -76,13 +76,13 @@ router.post('/generate', authenticateToken, async (req, res) => {
       patternId
     });
 
-    res.json(codes);
+    return res.json(codes);
   } catch (error) {
     console.error('Erro ao gerar códigos:', error);
     if (error instanceof Error && error.message.includes('não encontrados')) {
       return res.status(404).json({ error: error.message });
     }
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -154,13 +154,13 @@ router.post('/scan', authenticateToken, async (req, res) => {
     // Validar código de barras se for um EAN-13
     const isValid = code.length === 13 ? BarcodeService.validateBarcode(code) : true;
 
-    res.json({
+    return res.json({
       product,
       isValid
     });
   } catch (error) {
     console.error('Erro ao escanear código:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -208,13 +208,13 @@ router.post('/validate', authenticateToken, async (req, res) => {
     const isValid = BarcodeService.validateBarcode(barcode);
     const checkDigit = barcode.length === 13 ? barcode.slice(12) : null;
 
-    res.json({
+    return res.json({
       isValid,
       checkDigit
     });
   } catch (error) {
     console.error('Erro ao validar código:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

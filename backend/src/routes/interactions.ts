@@ -185,7 +185,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { leadId, type, title, description, outcome, nextAction, scheduledAt } = req.body;
-    const userId = req.user?.id;
+    const userId = (req as any).user?.id;
 
     // Validar dados obrigatórios
     if (!leadId || !type || !title || !description) {
@@ -230,10 +230,10 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     });
 
-    res.status(201).json(interaction);
+    return res.status(201).json(interaction);
   } catch (error) {
     console.error('Erro ao criar interação:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -282,10 +282,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Interação não encontrada' });
     }
 
-    res.json(interaction);
+    return res.json(interaction);
   } catch (error) {
     console.error('Erro ao buscar interação:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -368,10 +368,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
       }
     });
 
-    res.json(interaction);
+    return res.json(interaction);
   } catch (error) {
     console.error('Erro ao atualizar interação:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

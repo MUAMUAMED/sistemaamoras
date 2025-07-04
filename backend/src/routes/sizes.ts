@@ -104,10 +104,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Tamanho não encontrado' });
     }
 
-    res.json(size);
+    return res.json(size);
   } catch (error) {
     console.error('Erro ao buscar tamanho:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -187,10 +187,10 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     });
 
-    res.status(201).json(size);
+    return res.status(201).json(size);
   } catch (error) {
     console.error('Erro ao criar tamanho:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -277,10 +277,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
       }
     });
 
-    res.json(size);
+    return res.json(size);
   } catch (error) {
     console.error('Erro ao atualizar tamanho:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

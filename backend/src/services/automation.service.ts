@@ -62,9 +62,9 @@ export class AutomationService {
         await prisma.stockMovement.create({
           data: {
             productId: item.productId,
-            type: 'OUT',
+            type: 'EXIT',
             quantity: item.quantity,
-            description: `Venda #${sale.saleNumber}`,
+            reason: 'Automação: Venda realizada',
             userId: sale.sellerId
           }
         });
@@ -279,9 +279,9 @@ export class AutomationService {
         await prisma.stockMovement.create({
           data: {
             productId: item.productId,
-            type: 'OUT',
+            type: 'EXIT',
             quantity: item.quantity,
-            description: `Venda #${sale.saleNumber}`,
+            reason: 'Automação: Venda realizada',
             userId: sale.sellerId
           }
         });

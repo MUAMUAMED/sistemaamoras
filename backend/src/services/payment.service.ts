@@ -133,10 +133,10 @@ export class PaymentService {
         // Log do webhook
         await prisma.webhookLog.create({
           data: {
-            event: `payment_${webhookData.status}`,
-            payload: webhookData.raw_data,
-            source: gateway,
-            processed: true
+            source: 'mercadopago',
+            event: 'payment_webhook',
+            data: webhookData.raw_data,
+            processed: false
           }
         });
 
@@ -153,10 +153,10 @@ export class PaymentService {
       // Log do erro
       await prisma.webhookLog.create({
         data: {
-          event: 'webhook_error',
-          payload,
-          source: gateway,
-          processed: false
+          source: 'mercadopago',
+          event: 'payment_webhook',
+          data: payload,
+          processed: true
         }
       });
 
@@ -614,9 +614,10 @@ export class PaymentService {
         await prisma.sale.update({
           where: { id: sale.id },
           data: {
-            paymentStatus,
-            status: paymentStatus,
-            paymentReference: webhookData.id
+            status: paymentStatus === 'CANCELLED' ? 'CANCELED' : paymentStatus as any,
+            paymentReference: webhookData.id,
+            gatewayResponse: webhookData.raw_data,
+            updatedAt: new Date()
           }
         });
 

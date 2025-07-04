@@ -12,9 +12,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
       orderBy: { name: 'asc' },
     });
 
-    res.json(categories);
+    return res.json(categories);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -61,9 +61,9 @@ router.post('/', authenticateToken, async (req, res, next) => {
       data: { name, code, description },
     });
 
-    res.status(201).json(category);
+    return res.status(201).json(category);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

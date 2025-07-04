@@ -13,7 +13,7 @@ const client = new MercadoPagoConfig({
 const payment = new Payment(client);
 
 // Rota para criar pagamento Pix
-router.post('/pay', authenticateToken, async (req, res) => {
+router.post('/pay', authenticateToken, async (req: any, res: any) => {
   try {
     const { valor, descricao, email } = req.body;
     
@@ -34,4 +34,4 @@ router.post('/pay', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = router; 
+export default router; 
