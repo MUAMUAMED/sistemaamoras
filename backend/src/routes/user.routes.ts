@@ -19,9 +19,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
       orderBy: { name: 'asc' },
     });
 
-    res.json(users);
+    return res.json(users);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

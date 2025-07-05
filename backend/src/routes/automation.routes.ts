@@ -45,6 +45,7 @@ router.post('/process', authenticateToken, async (req, res) => {
     console.error('Erro ao processar automação:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 // Atualizar score de um lead
@@ -62,6 +63,7 @@ router.post('/lead-score', authenticateToken, async (req, res) => {
     console.error('Erro ao atualizar score do lead:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 // Criar interação automática
@@ -79,6 +81,7 @@ router.post('/interaction', authenticateToken, async (req, res) => {
     console.error('Erro ao criar interação automática:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 // Reativar leads frios
@@ -90,6 +93,7 @@ router.post('/reactivate-cold-leads', authenticateToken, async (req, res) => {
     console.error('Erro ao reativar leads frios:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 // Detectar leads abandonados
@@ -101,6 +105,7 @@ router.post('/detect-abandoned-leads', authenticateToken, async (req, res) => {
     console.error('Erro ao detectar leads abandonados:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 // Detectar produtos com estoque baixo
@@ -124,6 +129,7 @@ router.get('/low-stock-products', authenticateToken, async (req, res) => {
     console.error('Erro ao buscar produtos com estoque baixo:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 // Estatísticas das automações
@@ -196,6 +202,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
     console.error('Erro ao buscar estatísticas de automações:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 // Atualizar tags de um lead
@@ -209,11 +216,12 @@ router.put('/lead-tags/:leadId', authenticateToken, async (req, res) => {
     }
 
     // await AutomationService.updateLeadTags(leadId, tag); // Função não existe, ajuste necessário
-    res.json({ message: 'Tags do lead atualizadas com sucesso' });
+    return res.json({ message: 'Tags do lead atualizadas com sucesso' });
   } catch (error) {
     console.error('Erro ao atualizar tags do lead:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 export default router; 

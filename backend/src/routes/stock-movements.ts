@@ -138,6 +138,7 @@ router.get('/', authenticateToken, async (req, res) => {
     console.error('Erro ao listar movimentações:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -237,11 +238,12 @@ router.post('/', authenticateToken, async (req, res) => {
       return movement;
     });
 
-    res.status(201).json(result);
+    return res.status(201).json(result);
   } catch (error) {
     console.error('Erro ao criar movimentação:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -327,7 +329,7 @@ router.get('/product/:productId', authenticateToken, async (req, res) => {
       prisma.stockMovement.count({ where: { productId } })
     ]);
 
-    res.json({
+    return res.json({
       data: movements,
       product,
       pagination: {
@@ -339,8 +341,9 @@ router.get('/product/:productId', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao obter histórico:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -434,11 +437,12 @@ router.post('/adjust', authenticateToken, async (req, res) => {
       return { movement, product: updatedProduct };
     });
 
-    res.json(result);
+    return res.json(result);
   } catch (error) {
     console.error('Erro ao ajustar estoque:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 export default router; 

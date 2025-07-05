@@ -39,7 +39,7 @@ router.get('/metrics', authenticateToken, async (req, res, next) => {
       }),
     ]);
 
-    res.json({
+    return res.json({
       totalLeads,
       totalProducts,
       totalSales,
@@ -48,7 +48,7 @@ router.get('/metrics', authenticateToken, async (req, res, next) => {
       leadsThisMonth,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

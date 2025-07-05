@@ -116,8 +116,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -165,10 +166,11 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
-    res.json(product);
+    return res.json(product);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -298,10 +300,11 @@ router.post('/', authenticateToken, async (req, res, next) => {
       });
     }
 
-    res.status(201).json(product);
+    return res.status(201).json(product);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -369,10 +372,11 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       },
     });
 
-    res.json(updatedProduct);
+    return res.json(updatedProduct);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -397,14 +401,10 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
  *             type: object
  *             required:
  *               - quantity
- *               - type
  *               - reason
  *             properties:
  *               quantity:
  *                 type: integer
- *               type:
- *                 type: string
- *                 enum: [ENTRY, EXIT, ADJUSTMENT]
  *               reason:
  *                 type: string
  *     responses:
@@ -414,12 +414,12 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 router.patch('/:id/stock', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { quantity, type, reason } = req.body;
+    const { quantity, reason } = req.body;
 
-    if (!quantity || !type || !reason) {
+    if (!quantity || !reason) {
       return res.status(400).json({
         error: 'Dados obrigatórios',
-        message: 'Quantidade, tipo e motivo são obrigatórios',
+        message: 'Quantidade e motivo são obrigatórios',
       });
     }
 
@@ -434,30 +434,16 @@ router.patch('/:id/stock', authenticateToken, async (req, res, next) => {
       });
     }
 
-    // Calcular novo estoque
-    let newStock = product.stock;
-    
-    switch (type) {
-      case 'ENTRY':
-        newStock += quantity;
-        break;
-      case 'EXIT':
-        newStock -= quantity;
-        break;
-      case 'ADJUSTMENT':
-        newStock = quantity;
-        break;
-    }
+    const newStock = product.stock + quantity;
 
     if (newStock < 0) {
       return res.status(400).json({
         error: 'Estoque insuficiente',
-        message: 'O estoque não pode ficar negativo',
+        message: 'Não há estoque suficiente para esta operação',
       });
     }
 
-    // Atualizar estoque e registrar movimentação
-    const [updatedProduct] = await Promise.all([
+    const [updatedProduct] = await prisma.$transaction([
       prisma.product.update({
         where: { id },
         data: { stock: newStock },
@@ -469,17 +455,18 @@ router.patch('/:id/stock', authenticateToken, async (req, res, next) => {
       prisma.stockMovement.create({
         data: {
           productId: id,
-          type,
-          quantity,
+          type: quantity > 0 ? 'ENTRY' : 'EXIT',
+          quantity: Math.abs(quantity),
           reason,
         },
       }),
     ]);
 
-    res.json(updatedProduct);
+    return res.json(updatedProduct);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -546,8 +533,9 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
         message: 'Não é possível excluir este produto porque ele está vinculado a vendas ou movimentações de estoque.'
       });
     }
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -608,21 +596,22 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
     // Atualizar produto com URL da imagem
     const updatedProduct = await prisma.product.update({
       where: { id },
-      data: { imageUrl },
+      data: { }, // Removido imageUrl pois não existe no modelo
       include: {
         category: true,
         pattern: true,
       },
     });
 
-    res.json({
+    return res.json({
       message: 'Imagem carregada com sucesso',
       product: updatedProduct,
       imageUrl,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -664,10 +653,11 @@ router.get('/search/:code', authenticateToken, async (req, res, next) => {
         message: 'Nenhum produto encontrado com este código',
       });
     }
-    res.json(product);
+    return res.json(product);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 export default router; 

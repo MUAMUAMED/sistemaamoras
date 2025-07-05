@@ -132,6 +132,7 @@ router.get('/', authenticateToken, async (req, res) => {
     console.error('Erro ao listar interações:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -235,6 +236,7 @@ router.post('/', authenticateToken, async (req, res) => {
     console.error('Erro ao criar interação:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -287,6 +289,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     console.error('Erro ao buscar interação:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -373,6 +376,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     console.error('Erro ao atualizar interação:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -453,7 +457,7 @@ router.get('/lead/:leadId', authenticateToken, async (req, res) => {
       prisma.interaction.count({ where: { leadId } })
     ]);
 
-    res.json({
+    return res.json({
       interactions,
       lead,
       pagination: {
@@ -465,8 +469,9 @@ router.get('/lead/:leadId', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao obter histórico:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -537,11 +542,12 @@ router.get('/scheduled', authenticateToken, async (req, res) => {
       orderBy: { scheduledAt: 'asc' }
     });
 
-    res.json(interactions);
+    return res.json(interactions);
   } catch (error) {
     console.error('Erro ao obter interações agendadas:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 export default router; 

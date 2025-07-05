@@ -75,10 +75,10 @@ router.get('/', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json(config);
+    return res.json(config);
   } catch (error) {
     console.error('Erro ao obter configurações:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -183,10 +183,10 @@ router.put('/', authenticateToken, async (req, res) => {
       });
     }
 
-    res.json(config);
+    return res.json(config);
   } catch (error) {
     console.error('Erro ao atualizar configurações:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 
@@ -235,13 +235,13 @@ router.post('/next-sale-number', authenticateToken, async (req, res) => {
       }
     });
 
-    res.json({
+    return res.json({
       saleNumber,
       nextNumber: config.nextSaleNumber + 1
     });
   } catch (error) {
     console.error('Erro ao obter próximo número de venda:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
 });
 

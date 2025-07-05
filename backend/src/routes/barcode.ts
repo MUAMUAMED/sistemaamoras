@@ -84,6 +84,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
     }
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -162,6 +163,7 @@ router.post('/scan', authenticateToken, async (req, res) => {
     console.error('Erro ao escanear código:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -216,6 +218,7 @@ router.post('/validate', authenticateToken, async (req, res) => {
     console.error('Erro ao validar código:', error);
     return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -288,7 +291,7 @@ router.post('/parse-sku', authenticateToken, async (req, res) => {
       prisma.pattern.findFirst({ where: { code: skuInfo.patternCode } })
     ]);
 
-    res.json({
+    return res.json({
       skuInfo,
       details: {
         size,
@@ -298,8 +301,9 @@ router.post('/parse-sku', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao analisar SKU:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -364,11 +368,12 @@ router.post('/generate-sale-qr', authenticateToken, async (req, res) => {
 
     const qrcodeUrl = await BarcodeService.generateSaleQRCode(sale);
 
-    res.json({ qrcodeUrl });
+    return res.json({ qrcodeUrl });
   } catch (error) {
     console.error('Erro ao gerar QR Code da venda:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -411,7 +416,7 @@ router.get('/test', authenticateToken, async (req, res) => {
       patternId: pattern.id
     });
 
-    res.json({
+    return res.json({
       codes,
       example: {
         size: { id: size.id, name: size.name, code: size.code },
@@ -421,8 +426,9 @@ router.get('/test', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao gerar códigos de teste:', error);
-    res.status(500).json({ error: 'Erro interno do servidor' });
+    return res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -518,6 +524,7 @@ router.get('/codes', authenticateToken, async (req, res) => {
     console.error('Erro ao listar códigos:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 /**
@@ -614,6 +621,7 @@ router.get('/validate-codes', authenticateToken, async (req, res) => {
     console.error('Erro ao validar códigos:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
+  return;
 });
 
 export default router; 

@@ -33,10 +33,10 @@ router.post('/chatwoot', async (req, res, next) => {
       }
     }
 
-    res.status(200).json({ message: 'Webhook processado' });
+    return res.status(200).json({ message: 'Webhook processado' });
   } catch (error) {
     logger.error('Erro no webhook Chatwoot:', error);
-    next(error);
+    return next(error);
   }
 });
 
@@ -64,10 +64,10 @@ router.post('/payment', async (req, res, next) => {
       }
     }
 
-    res.status(200).json({ message: 'Webhook processado' });
+    return res.status(200).json({ message: 'Webhook processado' });
   } catch (error) {
     logger.error('Erro no webhook de pagamento:', error);
-    next(error);
+    return next(error);
   }
 });
 

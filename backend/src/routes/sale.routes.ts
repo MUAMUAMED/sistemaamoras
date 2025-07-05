@@ -129,8 +129,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
       },
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -188,10 +189,11 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
-    res.json(sale);
+    return res.json(sale);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -361,10 +363,11 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       await processSalePayment(sale.id);
     }
 
-    res.status(201).json(sale);
+    return res.status(201).json(sale);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -440,10 +443,11 @@ router.post('/:id/payment', authenticateToken, async (req, res, next) => {
       },
     });
 
-    res.json(updatedSale);
+    return res.json(updatedSale);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 /**
@@ -517,10 +521,11 @@ router.patch('/:id/confirm', authenticateToken, async (req, res, next) => {
       },
     });
 
-    res.json(updatedSale);
+    return res.json(updatedSale);
   } catch (error) {
-    next(error);
+    return next(error);
   }
+  return;
 });
 
 // Função auxiliar para processar pagamento
