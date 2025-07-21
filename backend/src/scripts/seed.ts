@@ -1,226 +1,189 @@
-import { PrismaClient, LeadStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+type LeadStatus = 'NEW_LEAD' | 'IN_SERVICE' | 'INTERESTED' | 'NEGOTIATING' | 'SALE_COMPLETED' | 'COLD_LEAD' | 'NO_RESPONSE' | 'REACTIVATE';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
 
-  // Limpar dados existentes
-  await prisma.webhookLog.deleteMany();
-  await prisma.systemConfig.deleteMany();
-  await prisma.stockMovement.deleteMany();
-  await prisma.saleItem.deleteMany();
-  await prisma.sale.deleteMany();
-  await prisma.interaction.deleteMany();
-  await prisma.lead.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.pattern.deleteMany();
-  await prisma.category.deleteMany();
-  await prisma.size.deleteMany();
-  await prisma.user.deleteMany();
-
   // 1. Criar usuários
   console.log('👥 Criando usuários...');
   
-  const adminUser = await prisma.user.create({
-    data: {
-      name: 'Admin Sistema',
+  const hashedPassword = await bcrypt.hash('admin123', 10);
+  
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@amorascapital.com' },
+    update: {},
+    create: {
+      name: 'Administrador',
       email: 'admin@amorascapital.com',
-      password: await bcrypt.hash('admin123', 10),
-      role: 'ADMIN'
+      password: hashedPassword,
+      role: 'ADMIN',
+      active: true
     }
   });
 
-  const managerUser = await prisma.user.create({
-    data: {
-      name: 'Gerente Vendas',
-      email: 'gerente@amorascapital.com',
-      password: await bcrypt.hash('gerente123', 10),
-      role: 'MANAGER'
-    }
-  });
-
-  const attendantUser = await prisma.user.create({
-    data: {
+  const attendantUser = await prisma.user.upsert({
+    where: { email: 'atendente@amorascapital.com' },
+    update: {},
+    create: {
       name: 'Atendente',
       email: 'atendente@amorascapital.com',
-      password: await bcrypt.hash('atendente123', 10),
-      role: 'ATTENDANT'
+      password: hashedPassword,
+      role: 'ATTENDANT',
+      active: true
     }
   });
 
-  // 2. Criar configuração do sistema
-  console.log('⚙️ Criando configuração do sistema...');
-  
-  await prisma.systemConfig.create({
-    data: {
-      companyName: 'Amoras Capital',
-      companyPhone: '(11) 99999-9999',
-      companyEmail: 'contato@amorascapital.com',
-      companyAddress: 'Rua das Amoras, 123 - São Paulo/SP',
-      saleNumberPrefix: 'AC',
-      nextSaleNumber: 1,
-      paymentGateway: 'mercadopago'
-    }
-  });
-
-  // 3. Criar tamanhos
-  console.log('📏 Criando tamanhos...');
-  
-  const sizes = [
-    { name: 'PP', code: '01' },
-    { name: 'P', code: '02' },
-    { name: 'M', code: '03' },
-    { name: 'G', code: '04' },
-    { name: 'GG', code: '05' },
-    { name: 'XG', code: '06' },
-    { name: 'XGG', code: '07' }
-  ];
-
-  for (const size of sizes) {
-    await prisma.size.create({ data: size });
-  }
-
-  // 4. Criar categorias
+  // 2. Criar categorias
   console.log('📂 Criando categorias...');
   
-  const categories = [
-    { name: 'Vestidos', code: '10', description: 'Vestidos femininos' },
-    { name: 'Blusas', code: '20', description: 'Blusas e camisetas' },
-    { name: 'Calças', code: '30', description: 'Calças e leggings' },
-    { name: 'Saias', code: '40', description: 'Saias e shorts-saias' },
-    { name: 'Conjuntos', code: '50', description: 'Conjuntos femininos' },
-    { name: 'Acessórios', code: '60', description: 'Acessórios e bijuterias' }
-  ];
+  const vestidosCategory = await prisma.category.upsert({
+    where: { code: 'VEST' },
+    update: {},
+    create: {
+      name: 'Vestidos',
+      code: 'VEST',
+      description: 'Vestidos para todas as ocasiões',
+      active: true
+    }
+  });
 
-  for (const category of categories) {
-    await prisma.category.create({ data: category });
-  }
+  const blusasCategory = await prisma.category.upsert({
+    where: { code: 'BLUS' },
+    update: {},
+    create: {
+      name: 'Blusas',
+      code: 'BLUS',
+      description: 'Blusas e camisetas',
+      active: true
+    }
+  });
 
-  // 5. Criar estampas
+  const calcasCategory = await prisma.category.upsert({
+    where: { code: 'CALC' },
+    update: {},
+    create: {
+      name: 'Calças',
+      code: 'CALC',
+      description: 'Calças e bermudas',
+      active: true
+    }
+  });
+
+  // 3. Criar estampas/padrões
   console.log('🎨 Criando estampas...');
   
-  const patterns = [
-    { name: 'Liso Preto', code: '0001', description: 'Tecido liso na cor preta' },
-    { name: 'Liso Branco', code: '0002', description: 'Tecido liso na cor branca' },
-    { name: 'Liso Vermelho', code: '0003', description: 'Tecido liso na cor vermelha' },
-    { name: 'Liso Azul', code: '0004', description: 'Tecido liso na cor azul' },
-    { name: 'Liso Rosa', code: '0005', description: 'Tecido liso na cor rosa' },
-    { name: 'Floral Rosa', code: '0010', description: 'Estampa floral em tons de rosa' },
-    { name: 'Floral Azul', code: '0011', description: 'Estampa floral em tons de azul' },
-    { name: 'Poá Preto', code: '0020', description: 'Estampa de poá preto e branco' },
-    { name: 'Listras Marinhas', code: '0030', description: 'Listras azul marinho e branco' },
-    { name: 'Animal Print', code: '0040', description: 'Estampa animal print' },
-    { name: 'Geométrica', code: '0050', description: 'Estampa geométrica moderna' },
-    { name: 'Tropical', code: '0060', description: 'Estampa tropical com folhas' }
-  ];
-
-  for (const pattern of patterns) {
-    await prisma.pattern.create({ data: pattern });
-  }
-
-  // 6. Criar produtos (usando campos atuais do schema)
-  console.log('👗 Criando produtos...');
-  
-  const vestidosCategory = await prisma.category.findFirst({ where: { name: 'Vestidos' } });
-  const blusasCategory = await prisma.category.findFirst({ where: { name: 'Blusas' } });
-  const calcasCategory = await prisma.category.findFirst({ where: { name: 'Calças' } });
-  
-  const floralRosaPattern = await prisma.pattern.findFirst({ where: { name: 'Floral Rosa' } });
-  const lisoPretoPattern = await prisma.pattern.findFirst({ where: { name: 'Liso Preto' } });
-  const lisoAzulPattern = await prisma.pattern.findFirst({ where: { name: 'Liso Azul' } });
-
-  const products = [
-    {
-      name: 'Vestido Midi Floral Rosa',
-      categoryId: vestidosCategory?.id || '',
-      size: 'M',
-      sizeCode: '03',
-      patternId: floralRosaPattern?.id || '',
-      price: 89.90,
-      stock: 15,
-      barcode: '03100010001',
-      description: 'Vestido midi com estampa floral rosa, perfeito para ocasiões especiais'
-    },
-    {
-      name: 'Blusa Básica Preta',
-      categoryId: blusasCategory?.id || '',
-      size: 'P',
-      sizeCode: '02',
-      patternId: lisoPretoPattern?.id || '',
-      price: 39.90,
-      stock: 25,
-      barcode: '02200001002',
-      description: 'Blusa básica preta, essencial no guarda-roupa feminino'
-    },
-    {
-      name: 'Calça Jeans Azul',
-      categoryId: calcasCategory?.id || '',
-      size: 'G',
-      sizeCode: '04',
-      patternId: lisoAzulPattern?.id || '',
-      price: 79.90,
-      stock: 20,
-      barcode: '04300004003',
-      description: 'Calça jeans azul clássica, modelagem skinny'
+  const floralPattern = await prisma.pattern.upsert({
+    where: { code: 'FLOR' },
+    update: {},
+    create: {
+      name: 'Floral',
+      code: 'FLOR',
+      description: 'Estampa floral',
+      active: true
     }
-  ];
+  });
 
-  for (const product of products) {
-    await prisma.product.create({ data: product });
-  }
+  const lisoPattern = await prisma.pattern.upsert({
+    where: { code: 'LISO' },
+    update: {},
+    create: {
+      name: 'Liso',
+      code: 'LISO',
+      description: 'Tecido liso',
+      active: true
+    }
+  });
 
-  // 7. Criar leads
-  console.log('🎯 Criando leads...');
+  const geometricoPattern = await prisma.pattern.upsert({
+    where: { code: 'GEOM' },
+    update: {},
+    create: {
+      name: 'Geométrico',
+      code: 'GEOM',
+      description: 'Estampa geométrica',
+      active: true
+    }
+  });
+
+  // 4. Criar tamanhos
+  console.log('📏 Criando tamanhos...');
+  
+  const tamanhoP = await prisma.size.upsert({
+    where: { code: 'P' },
+    update: {},
+    create: {
+      name: 'Pequeno',
+      code: 'P',
+      active: true
+    }
+  });
+
+  const tamanhoM = await prisma.size.upsert({
+    where: { code: 'M' },
+    update: {},
+    create: {
+      name: 'Médio',
+      code: 'M',
+      active: true
+    }
+  });
+
+  const tamanhoG = await prisma.size.upsert({
+    where: { code: 'G' },
+    update: {},
+    create: {
+      name: 'Grande',
+      code: 'G',
+      active: true
+    }
+  });
+
+  // 5. Criar produtos (temporariamente desabilitado para resolver problemas de schema)
+  console.log('👕 Criação de produtos desabilitada temporariamente...');
+
+  // 6. Criar leads
+  console.log('👤 Criando leads...');
   
   const leads = [
     {
       name: 'Maria Silva',
       phone: '11999999001',
       email: 'maria@email.com',
-      channel: 'WhatsApp',
-      source: 'Instagram - Post Vestidos',
-      status: LeadStatus.INTERESTED,
+      channel: 'WHATSAPP',
+      source: 'Instagram',
+      status: 'NEW_LEAD' as LeadStatus,
       assignedToId: attendantUser.id,
-      notes: 'Interessada em vestidos para festa',
-      leadScore: 75,
-      tags: ['vestidos', 'festa', 'instagram']
+      notes: 'Interessada em vestidos para festa de casamento',
+      leadScore: 8,
+      tags: 'novo,interessado'
     },
     {
       name: 'Ana Santos',
       phone: '11999999002',
       email: 'ana@email.com',
-      channel: 'Instagram',
-      source: 'Stories - Promoção',
-      status: LeadStatus.NEGOTIATING,
+      channel: 'WHATSAPP',
+      source: 'Facebook',
+      status: 'NEGOTIATING' as LeadStatus,
       assignedToId: attendantUser.id,
-      notes: 'Negociando desconto para compra de 3 peças',
-      leadScore: 85,
-      tags: ['promocao', 'multiplas-pecas']
-    },
-    {
-      name: 'Carla Oliveira',
-      phone: '11999999003',
-      channel: 'WhatsApp',
-      source: 'Indicação - Cliente',
-      status: LeadStatus.NEW_LEAD,
-      assignedToId: attendantUser.id,
-      notes: 'Indicada pela Maria Silva',
-      leadScore: 60,
-      tags: ['indicacao', 'novo-cliente']
+      notes: 'Quer comprar 3 peças e pediu desconto',
+      leadScore: 9,
+      tags: 'negociando,desconto'
     },
     {
       name: 'Fernanda Costa',
-      phone: '11999999004',
+      phone: '11999999003',
       email: 'fernanda@email.com',
-      channel: 'Site',
-      source: 'Formulário de Contato',
-      status: LeadStatus.SALE_COMPLETED,
+      channel: 'WHATSAPP',
+      source: 'Site',
+      status: 'SALE_COMPLETED' as LeadStatus,
       assignedToId: attendantUser.id,
-      notes: 'Cliente já realizou compra - satisfeita',
-      leadScore: 95,
-      tags: ['cliente-satisfeito', 'site'],
+      notes: 'Cliente satisfeita, primeira compra realizada',
+      leadScore: 10,
+      tags: 'cliente-satisfeito,site',
       totalPurchases: 159.80,
       purchaseCount: 1
     }
@@ -372,12 +335,12 @@ async function main() {
     data: {
       source: 'mercadopago',
       event: 'payment.approved',
-      data: {
+      data: JSON.stringify({
         id: 'MP123456789',
         status: 'approved',
         amount: 129.80,
         external_reference: 'AC0001'
-      },
+      }),
       processed: true
     }
   });
@@ -386,14 +349,14 @@ async function main() {
     data: {
       source: 'chatwoot',
       event: 'message.created',
-      data: {
+      data: JSON.stringify({
         conversation_id: 123,
         sender: {
           name: 'Cliente Novo',
           phone: '11999999005'
         },
         message: 'Oi, gostaria de saber sobre os vestidos'
-      },
+      }),
       processed: false
     }
   });
@@ -420,18 +383,18 @@ async function main() {
   console.log(`📂 Categorias: ${stats.categories}`);
   console.log(`🎨 Estampas: ${stats.patterns}`);
   console.log(`📏 Tamanhos: ${stats.sizes}`);
-  console.log(`👗 Produtos: ${stats.products}`);
-  console.log(`🎯 Leads: ${stats.leads}`);
+  console.log(`👕 Produtos: ${stats.products}`);
+  console.log(`👤 Leads: ${stats.leads}`);
   console.log(`💬 Interações: ${stats.interactions}`);
   console.log(`💰 Vendas: ${stats.sales}`);
-  console.log(`📦 Itens vendidos: ${stats.saleItems}`);
-  console.log(`📋 Movimentações: ${stats.stockMovements}`);
-  console.log(`📝 Logs webhook: ${stats.webhookLogs}`);
+  console.log(`📦 Itens de venda: ${stats.saleItems}`);
+  console.log(`📊 Movimentações de estoque: ${stats.stockMovements}`);
+  console.log(`📝 Logs de webhook: ${stats.webhookLogs}`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Erro no seed:', e);
+    console.error('❌ Erro durante o seed:', e);
     process.exit(1);
   })
   .finally(async () => {

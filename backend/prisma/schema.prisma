@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "postgresql" // Mudança para PostgreSQL em produção
   url      = env("DATABASE_URL")
 }
 
@@ -16,7 +16,7 @@ model User {
   name      String
   email     String   @unique
   password  String
-  role      UserRole @default(ATTENDANT)
+  role      String   @default("ATTENDANT") // ADMIN, MANAGER, ATTENDANT
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -69,16 +69,18 @@ model Size {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  // Relacionamentos
+  products Product[]
+
   @@map("sizes")
 }
 
-// Produtos (roupas) - TEMPORÁRIO: mantendo campos antigos por ora
+// Produtos (roupas)
 model Product {
   id            String   @id @default(cuid())
   name          String
   categoryId    String
-  size          String   // TEMPORÁRIO: campo antigo
-  sizeCode      String   // TEMPORÁRIO: campo antigo
+  sizeId        String   // Relação com o modelo Size
   patternId     String
   price         Float
   stock         Int      @default(0)
@@ -93,6 +95,7 @@ model Product {
 
   // Relacionamentos
   category       Category        @relation(fields: [categoryId], references: [id])
+  size           Size            @relation(fields: [sizeId], references: [id])
   pattern        Pattern         @relation(fields: [patternId], references: [id])
   saleItems      SaleItem[]
   stockMovements StockMovement[]
@@ -107,15 +110,15 @@ model Lead {
   phone            String     @unique
   email            String?
   channel          String     // WhatsApp, Instagram, Site, Loja Física, etc.
-  source           String?    // Origem mais específica (ex: "WhatsApp - Promoção Black Friday")
-  status           LeadStatus @default(NEW_LEAD)
+  source           String?    // Origem mais específica
+  status           String     @default("NEW_LEAD") // NEW_LEAD, IN_SERVICE, etc.
   assignedToId     String?
   notes            String?
   totalPurchases   Float      @default(0)
   purchaseCount    Int        @default(0)
   lastInteraction  DateTime?
   leadScore        Int        @default(0) // Pontuação do lead (0-100)
-  tags             String[]   // Tags para categorização
+  tags             String?    // Tags como string separada por vírgula
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
@@ -129,16 +132,16 @@ model Lead {
 
 // Interações/Histórico do lead
 model Interaction {
-  id          String          @id @default(cuid())
+  id          String   @id @default(cuid())
   leadId      String
-  userId      String?         // Usuário que fez a interação
-  type        InteractionType
-  title       String          // Título da interação
+  userId      String?  // Usuário que fez a interação
+  type        String   // CALL, WHATSAPP, EMAIL, etc.
+  title       String   // Título da interação
   description String
-  outcome     String?         // Resultado da interação
-  nextAction  String?         // Próxima ação planejada
-  scheduledAt DateTime?       // Agendamento de follow-up
-  createdAt   DateTime        @default(now())
+  outcome     String?  // Resultado da interação
+  nextAction  String?  // Próxima ação planejada
+  scheduledAt DateTime? // Agendamento de follow-up
+  createdAt   DateTime @default(now())
 
   // Relacionamentos
   lead Lead @relation(fields: [leadId], references: [id])
@@ -148,26 +151,28 @@ model Interaction {
 
 // Vendas
 model Sale {
-  id                String         @id @default(cuid())
-  saleNumber        String         @unique // Número sequencial da venda
+  id                String   @id @default(cuid())
+  saleNumber        String   @unique // Número sequencial da venda
   leadId            String?
+  leadName          String?  // Nome do cliente (para vendas sem lead cadastrado)
+  leadPhone         String?  // Telefone do cliente (para vendas sem lead cadastrado)
   sellerId          String
-  subtotal          Float          // Subtotal dos produtos
-  discount          Float          @default(0) // Desconto aplicado
-  total             Float          // Total final
-  status            SaleStatus     @default(PENDING)
-  paymentMethod     PaymentMethod
-  paymentReference  String?        // Referência do pagamento (ID do gateway)
-  paymentUrl        String?        // URL de pagamento (para Pix/Boleto)
-  gatewayResponse   Json?          // Resposta completa do gateway
+  subtotal          Float    // Subtotal dos produtos
+  discount          Float    @default(0) // Desconto aplicado
+  total             Float    // Total final
+  status            String   @default("PENDING") // PENDING, PAID, etc.
+  paymentMethod     String   // CASH, PIX, CREDIT_CARD, etc.
+  paymentReference  String?  // Referência do pagamento
+  paymentUrl        String?  // URL de pagamento (para Pix/Boleto)
+  gatewayResponse   String?  // Resposta do gateway como string
   notes             String?
-  deliveryMethod    DeliveryMethod @default(PICKUP) // Entrega ou retirada
-  deliveryAddress   String?        // Endereço de entrega
-  deliveryFee       Float          @default(0) // Taxa de entrega
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  paidAt            DateTime?      // Data do pagamento
-  deliveredAt       DateTime?      // Data da entrega
+  deliveryMethod    String   @default("PICKUP") // PICKUP, DELIVERY, etc.
+  deliveryAddress   String?  // Endereço de entrega
+  deliveryFee       Float    @default(0) // Taxa de entrega
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  paidAt            DateTime? // Data do pagamento
+  deliveredAt       DateTime? // Data da entrega
 
   // Relacionamentos
   lead      Lead?      @relation(fields: [leadId], references: [id])
@@ -196,14 +201,14 @@ model SaleItem {
 
 // Movimentações de estoque
 model StockMovement {
-  id          String            @id @default(cuid())
+  id          String   @id @default(cuid())
   productId   String
-  type        StockMovementType
-  quantity    Int               // Quantidade (positiva para entrada, negativa para saída)
+  type        String   // ENTRY, EXIT, ADJUSTMENT, etc.
+  quantity    Int
   reason      String
-  reference   String?           // Referência (ID da venda, nota fiscal, etc.)
-  userId      String?           // Usuário responsável pela movimentação
-  createdAt   DateTime          @default(now())
+  reference   String?
+  userId      String
+  createdAt   DateTime @default(now())
 
   // Relacionamentos
   product Product @relation(fields: [productId], references: [id])
@@ -213,97 +218,32 @@ model StockMovement {
 
 // Configurações do sistema
 model SystemConfig {
-  id               String   @id @default(cuid())
-  chatwootUrl      String?  // URL do Chatwoot
-  chatwootToken    String?  // Token do Chatwoot
-  n8nWebhookUrl    String?  // URL do webhook do n8n
-  paymentGateway   String?  // Gateway principal (mercadopago, pagarme, etc.)
-  gatewayConfig    Json?    // Configurações do gateway
-  companyName      String   @default("Amoras Capital")
-  companyPhone     String?
-  companyEmail     String?
-  companyAddress   String?
-  saleNumberPrefix String   @default("AC") // Prefixo do número da venda
-  nextSaleNumber   Int      @default(1)    // Próximo número de venda
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default(cuid())
+  chatwootUrl       String?
+  chatwootToken     String?
+  n8nWebhookUrl     String?
+  paymentGateway    String?  // Gateway principal
+  gatewayConfig     String?  // Configurações como string
+  companyName       String   @default("Amoras Capital")
+  companyPhone      String?
+  companyEmail      String?
+  companyAddress    String?
+  saleNumberPrefix  String   @default("VDA")
+  nextSaleNumber    Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@map("system_config")
 }
 
-// Webhooks recebidos (para auditoria)
+// Logs de webhooks
 model WebhookLog {
   id        String   @id @default(cuid())
-  source    String   // chatwoot, mercadopago, etc.
   event     String   // tipo do evento
-  data      Json     // dados recebidos
+  data      String   // dados recebidos como string
+  source    String   // origem do webhook
   processed Boolean  @default(false)
-  error     String?  // erro de processamento (se houver)
   createdAt DateTime @default(now())
 
   @@map("webhook_logs")
-}
-
-// Enums
-enum UserRole {
-  ADMIN
-  MANAGER
-  ATTENDANT
-}
-
-enum LeadStatus {
-  NEW_LEAD          // Novo Lead
-  IN_SERVICE        // Em Atendimento  
-  INTERESTED        // Interessado
-  NEGOTIATING       // Negociando
-  SALE_COMPLETED    // Venda Concluída
-  COLD_LEAD         // Lead Frio
-  NO_RESPONSE       // Sem Resposta
-  REACTIVATE        // Reativar
-}
-
-enum InteractionType {
-  CALL              // Ligação
-  WHATSAPP          // WhatsApp
-  EMAIL             // E-mail
-  MEETING           // Reunião
-  NOTE              // Anotação
-  STATUS_CHANGE     // Mudança de Status
-  SALE              // Venda
-  FOLLOW_UP         // Follow-up
-}
-
-enum SaleStatus {
-  PENDING           // Pendente (aguardando pagamento)
-  PAID              // Pago
-  PROCESSING        // Processando
-  SHIPPED           // Enviado
-  DELIVERED         // Entregue
-  CANCELED          // Cancelado
-  REFUNDED          // Reembolsado
-}
-
-enum PaymentMethod {
-  CASH              // Dinheiro
-  PIX               // Pix
-  CREDIT_CARD       // Cartão de Crédito
-  DEBIT_CARD        // Cartão de Débito
-  BANK_SLIP         // Boleto
-  BANK_TRANSFER     // Transferência
-}
-
-enum DeliveryMethod {
-  PICKUP            // Retirada na loja
-  DELIVERY          // Entrega
-  SHIPPING          // Envio pelos Correios
-}
-
-enum StockMovementType {
-  ENTRY             // Entrada
-  EXIT              // Saída
-  ADJUSTMENT        // Ajuste
-  SALE              // Venda
-  RETURN            // Devolução
-  LOSS              // Perda
-  TRANSFER          // Transferência
 } 

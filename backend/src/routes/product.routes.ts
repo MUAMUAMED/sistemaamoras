@@ -1,8 +1,17 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
 import { prisma } from '../config/database';
 import { authenticateToken } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
+
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+}
 
 const router = Router();
 
@@ -95,6 +104,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
         where,
         include: {
           category: true,
+          size: true,
           pattern: true,
         },
         skip,
@@ -149,6 +159,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       where: { id },
       include: {
         category: true,
+        size: true,
         pattern: true,
         stockMovements: {
           orderBy: {
@@ -216,13 +227,12 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
  *       201:
  *         description: Produto criado com sucesso
  */
-router.post('/', authenticateToken, async (req, res, next) => {
+router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
   try {
     const {
       name,
       categoryId,
-      size,
-      sizeCode,
+      sizeId,
       patternId,
       price,
       stock,
@@ -230,28 +240,29 @@ router.post('/', authenticateToken, async (req, res, next) => {
     } = req.body;
 
     // Validar dados obrigatórios
-    if (!name || !categoryId || !size || !sizeCode || !patternId || !price || stock === undefined) {
+    if (!name || !categoryId || !sizeId || !patternId || !price || stock === undefined) {
       return res.status(400).json({
         error: 'Dados obrigatórios',
-        message: 'Nome, categoria, tamanho, código do tamanho, estampa, preço e estoque são obrigatórios',
+        message: 'Nome, categoria, tamanho, estampa, preço e estoque são obrigatórios',
       });
     }
 
-    // Buscar categoria e estampa para gerar código de barras
-    const [category, pattern] = await Promise.all([
+    // Buscar categoria, tamanho e estampa para gerar código de barras
+    const [category, size, pattern] = await Promise.all([
       prisma.category.findUnique({ where: { id: categoryId } }),
+      prisma.size.findUnique({ where: { id: sizeId } }),
       prisma.pattern.findUnique({ where: { id: patternId } }),
     ]);
 
-    if (!category || !pattern) {
+    if (!category || !size || !pattern) {
       return res.status(400).json({
-        error: 'Categoria ou estampa inválida',
-        message: 'Categoria ou estampa não encontrada',
+        error: 'Categoria, tamanho ou estampa inválida',
+        message: 'Categoria, tamanho ou estampa não encontrada',
       });
     }
 
     // Gerar código de barras
-    const barcode = generateBarcode(sizeCode, category.code, pattern.code);
+    const barcode = generateBarcode(size.code, category.code, pattern.code);
 
     // Verificar se código de barras já existe
     const existingProduct = await prisma.product.findUnique({
@@ -273,8 +284,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
       data: {
         name,
         categoryId,
-        size,
-        sizeCode,
+        sizeId,
         patternId,
         price,
         stock,
@@ -284,6 +294,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
       },
       include: {
         category: true,
+        size: true,
         pattern: true,
       },
     });
@@ -296,6 +307,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
           type: 'ENTRY',
           quantity: stock,
           reason: 'Estoque inicial',
+          userId: req.user!.id,
         },
       });
     }
@@ -411,7 +423,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
  *       200:
  *         description: Estoque atualizado com sucesso
  */
-router.patch('/:id/stock', authenticateToken, async (req, res, next) => {
+router.patch('/:id/stock', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { id } = req.params;
     const { quantity, reason } = req.body;
@@ -458,6 +470,7 @@ router.patch('/:id/stock', authenticateToken, async (req, res, next) => {
           type: quantity > 0 ? 'ENTRY' : 'EXIT',
           quantity: Math.abs(quantity),
           reason,
+          userId: req.user!.id,
         },
       }),
     ]);
@@ -596,7 +609,7 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
     // Atualizar produto com URL da imagem
     const updatedProduct = await prisma.product.update({
       where: { id },
-      data: { }, // Removido imageUrl pois não existe no modelo
+      data: { imageUrl },
       include: {
         category: true,
         pattern: true,

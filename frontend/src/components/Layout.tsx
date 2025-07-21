@@ -11,7 +11,10 @@ import {
   ShoppingCartIcon,
   QrCodeIcon,
   UsersIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  TagIcon,
+  SwatchIcon,
+  ScaleIcon
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../stores/authStore';
 
@@ -22,6 +25,9 @@ interface LayoutProps {
 const navigationERP = [
   { name: 'Dashboard', href: '/erp/dashboard', icon: HomeIcon },
   { name: 'Produtos', href: '/erp/products', icon: ShoppingBagIcon },
+  { name: 'Categorias', href: '/erp/categories', icon: TagIcon },
+  { name: 'Estampas', href: '/erp/patterns', icon: SwatchIcon },
+  { name: 'Tamanhos', href: '/erp/sizes', icon: ScaleIcon },
   { name: 'Vendas', href: '/erp/sales', icon: ShoppingCartIcon },
   { name: 'Scanner', href: '/erp/scanner', icon: QrCodeIcon },
   { name: 'Configurações', href: '/erp/settings', icon: CogIcon },
@@ -72,7 +78,9 @@ export default function Layout({ area }: LayoutProps) {
           </div>
           <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
             <div className="flex-shrink-0 flex items-center px-4">
-              <span className="text-xl font-bold text-primary-600">Amoras Capital</span>
+              <Link to="/dashboard" className="text-xl font-bold text-primary-600 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-500">
+                Amoras Capital
+              </Link>
             </div>
             <nav className="mt-5 px-2 space-y-1">
               {navigation.map((item) => {
@@ -108,7 +116,9 @@ export default function Layout({ area }: LayoutProps) {
           <div className="flex flex-col h-0 flex-1 border-r border-gray-200 bg-white">
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
               <div className="flex items-center flex-shrink-0 px-4">
-                <span className="text-xl font-bold text-primary-600">Amoras Capital</span>
+                <Link to="/dashboard" className="text-xl font-bold text-primary-600 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  Amoras Capital
+                </Link>
               </div>
               <nav className="mt-5 flex-1 px-2 space-y-1">
                 {navigation.map((item) => {

@@ -67,4 +67,51 @@ router.post('/', authenticateToken, async (req, res, next) => {
   }
 });
 
+// Excluir padrão
+router.delete('/:id', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se o padrão existe
+    const pattern = await prisma.pattern.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            products: true
+          }
+        }
+      }
+    });
+
+    if (!pattern) {
+      return res.status(404).json({
+        error: 'Estampa não encontrada',
+        message: 'A estampa solicitada não foi encontrada'
+      });
+    }
+
+    // Verificar se há produtos usando esta estampa
+    if (pattern._count.products > 0) {
+      return res.status(409).json({
+        error: 'Estampa em uso',
+        message: `Esta estampa está sendo usada por ${pattern._count.products} produto(s). Remova os produtos primeiro.`,
+        canForce: true
+      });
+    }
+
+    // Excluir a estampa
+    await prisma.pattern.delete({
+      where: { id }
+    });
+
+    return res.status(200).json({
+      message: 'Estampa excluída com sucesso',
+      patternName: pattern.name
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 export default router; 

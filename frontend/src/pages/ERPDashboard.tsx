@@ -16,6 +16,8 @@ export default function ERPDashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: dashboardService.getMetrics,
+    staleTime: 60000, // 1 minuto de cache
+    refetchOnWindowFocus: false,
   });
 
   if (isLoading) {

@@ -14,6 +14,9 @@ import Settings from './pages/Settings';
 import ERPDashboard from './pages/ERPDashboard';
 import CRMDashboard from './pages/CRMDashboard';
 import Kanban from './pages/Kanban';
+import Categories from './pages/Categories';
+import Patterns from './pages/Patterns';
+import Sizes from './pages/Sizes';
 import { useAuthStore } from './stores/authStore';
 
 const queryClient = new QueryClient();
@@ -54,6 +57,9 @@ export default function App() {
             <Route element={<ProtectedRoute><ERPLayout /></ProtectedRoute>}>
               <Route path="/erp/dashboard" element={<ERPDashboard />} />
               <Route path="/erp/products" element={<Products />} />
+              <Route path="/erp/categories" element={<Categories />} />
+              <Route path="/erp/patterns" element={<Patterns />} />
+              <Route path="/erp/sizes" element={<Sizes />} />
               <Route path="/erp/sales" element={<Sales />} />
               <Route path="/erp/scanner" element={<Scanner />} />
               <Route path="/erp/settings" element={<Settings />} />

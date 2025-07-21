@@ -95,8 +95,18 @@ export default function Kanban() {
   });
   const leads = leadsResponse?.data || [];
 
+  const [showModal, setShowModal] = React.useState(false);
+  const [selectedLead, setSelectedLead] = React.useState<Lead | null>(null);
+
+  // Estado para guardar o update pendente
+  const [pendingUpdate, setPendingUpdate] = React.useState<{ id: string; data: Partial<Lead> } | null>(null);
+
+  // Mutation SEM argumento
   const updateLeadMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Lead> }) => leadsApi.update(id, data),
+    mutationFn: () => {
+      if (!pendingUpdate) return Promise.reject();
+      return leadsApi.update(pendingUpdate.id, pendingUpdate.data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast.success('Lead atualizado!');
@@ -122,7 +132,8 @@ export default function Kanban() {
     const sourceStatus = source.droppableId as LeadStatus;
     const destStatus = destination.droppableId as LeadStatus;
     if (sourceStatus !== destStatus) {
-      updateLeadMutation.mutate({ id: draggableId, data: { status: destStatus } });
+      setPendingUpdate({ id: draggableId, data: { status: destStatus } });
+      updateLeadMutation.mutate();
     }
   };
 
@@ -193,7 +204,10 @@ export default function Kanban() {
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
                               className={`bg-white border border-gray-200 rounded-md shadow-sm px-2 py-1 cursor-pointer hover:shadow-md transition-all text-xs sm:text-sm ${snapshot.isDragging ? 'shadow-lg scale-105' : ''}`}
-                              onClick={() => navigate(`/crm/leads/${lead.id}`)}
+                              onClick={() => {
+                                setSelectedLead(lead);
+                                setShowModal(true);
+                              }}
                               style={{ minHeight: 60, marginBottom: 2 }}
                             >
                               <div className="flex items-center justify-between mb-1">
@@ -214,7 +228,7 @@ export default function Kanban() {
                                 <UserGroupIcon className="h-3 w-3" />
                                 <span>{lead.channel}</span>
                               </div>
-                              {lead.tags && lead.tags.length > 0 && (
+                              {Array.isArray(lead.tags) && lead.tags.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   <TagIcon className="h-3 w-3" />
                                   {lead.tags.slice(0, 2).map((tag, tagIndex) => (
@@ -242,6 +256,72 @@ export default function Kanban() {
           </div>
         </DragDropContext>
       </div>
+
+      {/* Modal de detalhes/edição */}
+      {showModal && selectedLead && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Detalhes do Lead
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Nome</label>
+                  <input
+                    type="text"
+                    defaultValue={selectedLead?.name || ''}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    defaultValue={selectedLead?.email || ''}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Telefone</label>
+                  <input
+                    type="tel"
+                    defaultValue={selectedLead?.phone || ''}
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Observações</label>
+                  <textarea
+                    defaultValue={selectedLead?.notes || ''}
+                    className="input-field h-24"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    setSelectedLead(null);
+                  }}
+                  className="btn-outline"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    setSelectedLead(null);
+                  }}
+                  className="btn-primary"
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

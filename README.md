@@ -176,7 +176,7 @@ sistemaamoras/
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/amoras_capital"
 REDIS_URL="redis://localhost:6379"
 
-# JWT
+# JWT 
 JWT_SECRET="seu_jwt_secret_super_seguro"
 
 # Server

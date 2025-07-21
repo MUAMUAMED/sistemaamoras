@@ -164,6 +164,7 @@ export interface Sale {
   saleNumber: string;
   leadId?: string;
   leadName?: string;
+  leadPhone?: string;
   total: number;
   discount: number;
   subtotal: number;

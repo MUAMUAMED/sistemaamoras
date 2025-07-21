@@ -31,8 +31,12 @@ import {
 
 // Configuração base do Axios
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api',
-  timeout: 10000,
+  baseURL: process.env.REACT_APP_API_URL || (
+    process.env.NODE_ENV === 'production' 
+      ? 'https://api.exemplo.com/api'
+      : 'http://localhost:3001/api'
+  ),
+  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
 });
 
 // Interceptor para adicionar token de autenticação
@@ -130,8 +134,9 @@ export const sizesApi = {
     return response.data;
   },
   
-  delete: async (id: string): Promise<void> => {
-    await api.delete(`/sizes/${id}`);
+  delete: async (id: string, force?: boolean): Promise<void> => {
+    const params = force ? { force: 'true' } : {};
+    await api.delete(`/sizes/${id}`, { params });
   },
 };
 
@@ -157,8 +162,9 @@ export const categoriesApi = {
     return response.data;
   },
   
-  delete: async (id: string): Promise<void> => {
-    await api.delete(`/categories/${id}`);
+  delete: async (id: string, force?: boolean): Promise<void> => {
+    const params = force ? { force: 'true' } : {};
+    await api.delete(`/categories/${id}`, { params });
   },
 };
 
@@ -184,8 +190,9 @@ export const patternsApi = {
     return response.data;
   },
   
-  delete: async (id: string): Promise<void> => {
-    await api.delete(`/patterns/${id}`);
+  delete: async (id: string, force?: boolean): Promise<void> => {
+    const params = force ? { force: 'true' } : {};
+    await api.delete(`/patterns/${id}`, { params });
   },
 };
 
@@ -339,6 +346,10 @@ export const leadsApi = {
     const response = await api.get('/leads/dashboard');
     return response.data;
   },
+  
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/leads/${id}`);
+  },
 };
 
 // Serviços de interações
@@ -421,6 +432,11 @@ export const salesApi = {
     reference?: string;
   }): Promise<Sale> => {
     const response = await api.post(`/sales/${id}/process-payment`, data);
+    return response.data;
+  },
+  
+  delete: async (id: string): Promise<{ message: string; saleNumber: string }> => {
+    const response = await api.delete(`/sales/${id}`);
     return response.data;
   },
 };
@@ -550,6 +566,7 @@ export const leadService = {
   addInteraction: async (leadId: string, data: any) => {
     return interactionsApi.create({ ...data, leadId });
   },
+  delete: leadsApi.delete,
 };
 
 export const productService = {
@@ -569,6 +586,7 @@ export const saleService = {
   getById: salesApi.getById,
   create: salesApi.create,
   update: salesApi.update,
+  delete: salesApi.delete,
   cancel: salesApi.cancel,
   generatePayment: salesApi.generatePayment,
   processPayment: salesApi.processPayment,

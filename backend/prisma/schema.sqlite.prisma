@@ -1,0 +1,244 @@
+// This is your Prisma schema file for SQLite
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Usuários do sistema (atendentes, gerentes, etc.)
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("ATTENDANT") // ADMIN, MANAGER, ATTENDANT
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  leads Lead[]
+  sales Sale[]
+
+  @@map("users")
+}
+
+// Categorias de produtos (Vestidos, Blusas, etc.)
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String    @unique // Código numérico de 2 dígitos (ex: Vestido = 50)
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relacionamentos
+  products Product[]
+
+  @@map("categories")
+}
+
+// Estampas dos produtos
+model Pattern {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String    @unique // Código numérico de 4 dígitos (ex: Azul Marinho = 0032)
+  description String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relacionamentos
+  products Product[]
+
+  @@map("patterns")
+}
+
+// Tamanhos dos produtos
+model Size {
+  id        String    @id @default(cuid())
+  name      String    @unique // P, M, G, GG, etc.
+  code      String    @unique // Código numérico de 2 dígitos (ex: M = 05)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("sizes")
+}
+
+// Produtos (roupas)
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  categoryId    String
+  size          String   // Campo antigo
+  sizeCode      String   // Campo antigo
+  patternId     String
+  price         Float
+  stock         Int      @default(0)
+  minStock      Int      @default(5)
+  barcode       String   @unique
+  qrcodeUrl     String?
+  imageUrl      String?  // URL da imagem do produto
+  description   String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relacionamentos
+  category       Category        @relation(fields: [categoryId], references: [id])
+  pattern        Pattern         @relation(fields: [patternId], references: [id])
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+
+  @@map("products")
+}
+
+// Leads/Clientes
+model Lead {
+  id               String     @id @default(cuid())
+  name             String
+  phone            String     @unique
+  email            String?
+  channel          String     // WhatsApp, Instagram, Site, Loja Física, etc.
+  source           String?    // Origem mais específica
+  status           String     @default("NEW_LEAD") // NEW_LEAD, IN_SERVICE, etc.
+  assignedToId     String?
+  notes            String?
+  totalPurchases   Float      @default(0)
+  purchaseCount    Int        @default(0)
+  lastInteraction  DateTime?
+  leadScore        Int        @default(0) // Pontuação do lead (0-100)
+  tags             String?    // Tags como string separada por vírgula
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  // Relacionamentos
+  assignedTo   User?           @relation(fields: [assignedToId], references: [id])
+  interactions Interaction[]
+  sales        Sale[]
+
+  @@map("leads")
+}
+
+// Interações/Histórico do lead
+model Interaction {
+  id          String   @id @default(cuid())
+  leadId      String
+  userId      String?  // Usuário que fez a interação
+  type        String   // CALL, WHATSAPP, EMAIL, etc.
+  title       String   // Título da interação
+  description String
+  outcome     String?  // Resultado da interação
+  nextAction  String?  // Próxima ação planejada
+  scheduledAt DateTime? // Agendamento de follow-up
+  createdAt   DateTime @default(now())
+
+  // Relacionamentos
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@map("interactions")
+}
+
+// Vendas
+model Sale {
+  id                String   @id @default(cuid())
+  saleNumber        String   @unique // Número sequencial da venda
+  leadId            String?
+  sellerId          String
+  subtotal          Float    // Subtotal dos produtos
+  discount          Float    @default(0) // Desconto aplicado
+  total             Float    // Total final
+  status            String   @default("PENDING") // PENDING, PAID, etc.
+  paymentMethod     String   // CASH, PIX, CREDIT_CARD, etc.
+  paymentReference  String?  // Referência do pagamento
+  paymentUrl        String?  // URL de pagamento (para Pix/Boleto)
+  gatewayResponse   String?  // Resposta do gateway como string
+  notes             String?
+  deliveryMethod    String   @default("PICKUP") // PICKUP, DELIVERY, etc.
+  deliveryAddress   String?  // Endereço de entrega
+  deliveryFee       Float    @default(0) // Taxa de entrega
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  paidAt            DateTime? // Data do pagamento
+  deliveredAt       DateTime? // Data da entrega
+
+  // Relacionamentos
+  lead      Lead?      @relation(fields: [leadId], references: [id])
+  seller    User       @relation(fields: [sellerId], references: [id])
+  items     SaleItem[]
+
+  @@map("sales")
+}
+
+// Itens da venda
+model SaleItem {
+  id         String @id @default(cuid())
+  saleId     String
+  productId  String
+  quantity   Int
+  unitPrice  Float  // Preço unitário no momento da venda
+  discount   Float  @default(0) // Desconto específico do item
+  total      Float  // Total do item (quantidade × preço - desconto)
+
+  // Relacionamentos
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+}
+
+// Movimentações de estoque
+model StockMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  type        String   // ENTRY, EXIT, ADJUSTMENT, etc.
+  quantity    Int
+  reason      String
+  reference   String?
+  userId      String
+  createdAt   DateTime @default(now())
+
+  // Relacionamentos
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("stock_movements")
+}
+
+// Configurações do sistema
+model SystemConfig {
+  id                String   @id @default(cuid())
+  chatwootUrl       String?
+  chatwootToken     String?
+  n8nWebhookUrl     String?
+  paymentGateway    String?  // Gateway principal
+  gatewayConfig     String?  // Configurações como string
+  companyName       String   @default("Amoras Capital")
+  companyPhone      String?
+  companyEmail      String?
+  companyAddress    String?
+  saleNumberPrefix  String   @default("VDA")
+  nextSaleNumber    Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+// Logs de webhooks
+model WebhookLog {
+  id        String   @id @default(cuid())
+  event     String   // tipo do evento
+  data      String   // dados recebidos como string
+  source    String   // origem do webhook
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("webhook_logs")
+} 

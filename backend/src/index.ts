@@ -74,23 +74,37 @@ const specs = swaggerJsdoc(swaggerOptions);
 
 // Middleware de segurança
 app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https:"],
+    },
+  } : false,
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
 app.use(cors({
-  origin: [
-    process.env.CORS_ORIGIN || 'http://localhost:3000',
-    'http://localhost:3001'
-  ],
+  origin: process.env.NODE_ENV === 'production' 
+    ? (process.env.CORS_ORIGINS?.split(',') || ['https://app.exemplo.com'])
+    : true, // Permitir todas as origens em desenvolvimento
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400
 }));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
-  message: 'Muitas requisições. Tente novamente em 15 minutos.',
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000'), // 1 minuto em vez de 15 minutos
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'), // 1000 requisições em vez de 100
+  message: 'Muitas requisições. Tente novamente em 1 minuto.',
   standardHeaders: true,
   legacyHeaders: false,
+  // Excluir rate limiting em desenvolvimento
+  skip: (req) => process.env.NODE_ENV === 'development',
 });
 
 app.use('/api', limiter);
@@ -99,19 +113,26 @@ app.use('/api', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Configurar limites de cabeçalhos
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Max-Age', '86400');
+  next();
+});
+
 // Servir arquivos estáticos (imagens)
 app.use('/uploads', express.static('uploads'));
 
 // Documentação da API
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-// Rota de saúde
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    version: '1.0.0'
+    service: 'amoras-capital-api',
+    version: process.env.npm_package_version || '1.0.0',
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 

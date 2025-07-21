@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 // Schema de validação para leads
 const leadSchema = Joi.object({
   name: Joi.string().min(2).max(100).required(),
-  phone: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).required(),
+  phone: Joi.string().min(8).max(20).required(), // Aceita telefones de 8 a 20 caracteres
   email: Joi.string().email().optional(),
   channel: Joi.string().max(50).optional(),
   source: Joi.string().max(100).optional(),
@@ -525,6 +525,10 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response, next: 
 // Criar novo lead (rota existente atualizada)
 router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    console.log('[DEBUG] Iniciando criação de lead...');
+    console.log('[DEBUG] Dados recebidos:', JSON.stringify(req.body, null, 2));
+    console.log('[DEBUG] Usuário:', req.user?.name);
+
     const { 
       name, 
       phone, 
@@ -537,25 +541,32 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
       tags = [] 
     } = req.body;
 
-    if (!name || !phone) {
+    console.log('[DEBUG] Validando dados obrigatórios...');
+    const { error } = leadSchema.validate({ name, phone, email, channel, source, assignedToId, notes, leadScore, tags });
+
+    if (error) {
+      console.log('[DEBUG] Erro de validação:', error.details);
       return res.status(400).json({
-        error: 'Dados obrigatórios',
-        message: 'Nome e telefone são obrigatórios',
+        error: 'Dados inválidos',
+        message: error.details.map(detail => detail.message).join(', '),
       });
     }
 
+    console.log('[DEBUG] Verificando telefone duplicado...');
     // Verificar se telefone já existe
     const existingLead = await prisma.lead.findUnique({
       where: { phone },
     });
 
     if (existingLead) {
+      console.log('[DEBUG] Telefone já existe:', phone);
       return res.status(409).json({
         error: 'Telefone já existe',
         message: 'Já existe um lead com este telefone',
       });
     }
 
+    console.log('[DEBUG] Criando lead no banco...');
     const lead = await prisma.lead.create({
       data: {
         name,
@@ -566,7 +577,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
         assignedToId: assignedToId || req.user!.id,
         notes,
         leadScore,
-        tags
+        tags: Array.isArray(tags) ? tags.join(',') : tags || null
       },
       include: {
         assignedTo: {
@@ -579,6 +590,9 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
       },
     });
 
+    console.log('[DEBUG] Lead criado com sucesso:', lead.id);
+
+    console.log('[DEBUG] Criando interação inicial...');
     // Criar interação inicial
     await prisma.interaction.create({
       data: {
@@ -590,8 +604,12 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
       },
     });
 
+    console.log('[DEBUG] Interação criada com sucesso');
+    console.log('[DEBUG] Retornando lead criado');
+
     return res.status(201).json(lead);
   } catch (error) {
+    console.error('[ERROR] Erro ao criar lead:', error);
     return next(error);
   }
 });
@@ -747,7 +765,7 @@ router.put('/:id/tags', authenticateToken, async (req: AuthenticatedRequest, res
     const updatedLead = await prisma.lead.update({
       where: { id },
       data: {
-        tags,
+        tags: tags.join(','),
         lastInteraction: new Date(),
       },
       include: {
@@ -810,7 +828,7 @@ router.put('/:id', authenticateToken, async (req: AuthenticatedRequest, res: Res
         ...(notes && { notes }),
         ...(source && { source }),
         ...(leadScore !== undefined && { leadScore }),
-        ...(tags && { tags }),
+        ...(tags && { tags: tags.join(',') }),
         lastInteraction: new Date(),
       },
       include: {
@@ -975,6 +993,97 @@ router.post('/:id/interactions', authenticateToken, async (req: AuthenticatedReq
 
     return res.status(201).json(interaction);
   } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/leads/{id}:
+ *   delete:
+ *     summary: Excluir lead
+ *     tags: [CRM - Leads]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lead excluído com sucesso
+ *       404:
+ *         description: Lead não encontrado
+ *       409:
+ *         description: Lead possui vendas e não pode ser excluído
+ */
+router.delete('/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    console.log('[DEBUG] Iniciando exclusão de lead:', id);
+
+    // Verificar se o lead existe
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            sales: true,
+            interactions: true,
+          },
+        },
+      },
+    });
+
+    if (!lead) {
+      console.log('[DEBUG] Lead não encontrado:', id);
+      return res.status(404).json({
+        error: 'Lead não encontrado',
+        message: 'O lead solicitado não foi encontrado',
+      });
+    }
+
+    console.log('[DEBUG] Lead encontrado:', lead.name);
+    console.log('[DEBUG] Vendas vinculadas:', lead._count.sales);
+    console.log('[DEBUG] Interações vinculadas:', lead._count.interactions);
+
+    // Verificar se há vendas vinculadas ao lead
+    if (lead._count.sales > 0) {
+      console.log('[DEBUG] Lead possui vendas, não pode ser excluído');
+      return res.status(409).json({
+        error: 'Lead possui vendas',
+        message: `Este lead possui ${lead._count.sales} venda(s) vinculada(s) e não pode ser excluído.`,
+        canForce: false,
+      });
+    }
+
+    console.log('[DEBUG] Excluindo lead e interações em transação...');
+    // Excluir lead e suas interações em uma transação
+    await prisma.$transaction(async (tx) => {
+      // 1. Excluir todas as interações do lead
+      if (lead._count.interactions > 0) {
+        console.log('[DEBUG] Excluindo', lead._count.interactions, 'interações...');
+        await tx.interaction.deleteMany({
+          where: { leadId: id },
+        });
+      }
+
+      // 2. Excluir o lead
+      console.log('[DEBUG] Excluindo lead...');
+      await tx.lead.delete({
+        where: { id },
+      });
+    });
+
+    console.log('[DEBUG] Lead excluído com sucesso!');
+    return res.status(200).json({
+      message: 'Lead excluído com sucesso',
+      leadName: lead.name,
+    });
+  } catch (error) {
+    console.error('[DEBUG] Erro na exclusão do lead:', error);
     return next(error);
   }
 });

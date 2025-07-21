@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, PencilIcon, EyeIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, EyeIcon, FunnelIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { leadService } from '../services/api';
 import { Lead, LeadStatus } from '../types';
 import toast from 'react-hot-toast';
@@ -23,6 +23,38 @@ export default function Leads() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const queryClient = useQueryClient();
 
+  // Estados para novo lead
+  const [newLead, setNewLead] = useState({ name: '', email: '', phone: '', notes: '' });
+
+  // Mutation para criar lead
+  const createLeadMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; phone: string; notes: string }) => {
+      console.debug('[DEBUG] Enviando dados para criar lead:', data);
+      const result = await leadService.create({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        notes: data.notes,
+        channel: 'Manual',
+        // status: 'NEW_LEAD', // Removido pois não existe em LeadFormData
+      });
+      console.debug('[DEBUG] Resposta da API ao criar lead:', result);
+      return result;
+    },
+    onSuccess: (data) => {
+      toast.success('Lead criado com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      setShowModal(false);
+      setSelectedLead(null);
+      setNewLead({ name: '', email: '', phone: '', notes: '' });
+      console.debug('[DEBUG] Lead criado com sucesso:', data);
+    },
+    onError: (error) => {
+      toast.error('Erro ao criar lead');
+      console.error('[DEBUG] Erro ao criar lead:', error);
+    },
+  });
+
   const { data: leads, isLoading } = useQuery({
     queryKey: ['leads', selectedStatus, searchTerm],
     queryFn: () => leadService.list({ status: selectedStatus, search: searchTerm }),
@@ -40,13 +72,46 @@ export default function Leads() {
     },
   });
 
+  const deleteLeadMutation = useMutation({
+    mutationFn: (id: string) => leadService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      toast.success('Lead excluído com sucesso!');
+    },
+    onError: (error: any, id: string) => {
+      if (error?.response?.status === 404) {
+        toast.error('Lead não encontrado. Removendo da lista...');
+        queryClient.setQueryData(['leads', selectedStatus, searchTerm], (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.filter((lead: Lead) => lead.id !== id)
+          };
+        });
+      } else {
+        toast.error('Erro ao excluir lead');
+      }
+    },
+  });
+
   const handleStatusChange = (leadId: string, newStatus: LeadStatus) => {
     updateStatusMutation.mutate({ id: leadId, status: newStatus });
   };
 
   const filteredLeads = leads?.data?.filter((lead: Lead) => {
+    // Filtro para remover leads fakes: id inválido, nome vazio, só números, ou telefone inválido
+    const isFakeLead =
+      !lead.id ||
+      typeof lead.id !== 'string' ||
+      lead.id.trim() === '' ||
+      !lead.name ||
+      /^\d+$/.test(lead.name) ||
+      (lead.phone && lead.phone.replace(/\D/g, '').length < 8);
+    if (isFakeLead) return false;
+
     const matchesStatus = !selectedStatus || lead.status === selectedStatus;
-    const matchesSearch = !searchTerm || 
+    const matchesSearch =
+      !searchTerm ||
       lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       lead.phone.includes(searchTerm);
@@ -204,6 +269,16 @@ export default function Leads() {
                         >
                           <PencilIcon className="h-4 w-4" />
                         </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Tem certeza que deseja excluir este lead?')) {
+                              deleteLeadMutation.mutate(lead.id);
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -233,7 +308,8 @@ export default function Leads() {
                   <label className="block text-sm font-medium text-gray-700">Nome</label>
                   <input
                     type="text"
-                    defaultValue={selectedLead?.name || ''}
+                    value={selectedLead ? selectedLead.name : newLead.name}
+                    onChange={e => selectedLead ? setSelectedLead({ ...selectedLead, name: e.target.value }) : setNewLead({ ...newLead, name: e.target.value })}
                     className="input-field"
                   />
                 </div>
@@ -241,7 +317,8 @@ export default function Leads() {
                   <label className="block text-sm font-medium text-gray-700">Email</label>
                   <input
                     type="email"
-                    defaultValue={selectedLead?.email || ''}
+                    value={selectedLead ? selectedLead.email : newLead.email}
+                    onChange={e => selectedLead ? setSelectedLead({ ...selectedLead, email: e.target.value }) : setNewLead({ ...newLead, email: e.target.value })}
                     className="input-field"
                   />
                 </div>
@@ -249,14 +326,16 @@ export default function Leads() {
                   <label className="block text-sm font-medium text-gray-700">Telefone</label>
                   <input
                     type="tel"
-                    defaultValue={selectedLead?.phone || ''}
+                    value={selectedLead ? selectedLead.phone : newLead.phone}
+                    onChange={e => selectedLead ? setSelectedLead({ ...selectedLead, phone: e.target.value }) : setNewLead({ ...newLead, phone: e.target.value })}
                     className="input-field"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Observações</label>
                   <textarea
-                    defaultValue={selectedLead?.notes || ''}
+                    value={selectedLead ? selectedLead.notes : newLead.notes}
+                    onChange={e => selectedLead ? setSelectedLead({ ...selectedLead, notes: e.target.value }) : setNewLead({ ...newLead, notes: e.target.value })}
                     className="input-field h-24"
                   />
                 </div>
@@ -273,8 +352,14 @@ export default function Leads() {
                 </button>
                 <button
                   onClick={() => {
+                    if (!selectedLead) {
+                      // Criação de novo lead
+                      createLeadMutation.mutate(newLead);
+                    } else {
+                      // Aqui você pode implementar a edição se quiser
                     setShowModal(false);
                     setSelectedLead(null);
+                    }
                   }}
                   className="btn-primary"
                 >

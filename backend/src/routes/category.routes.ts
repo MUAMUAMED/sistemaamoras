@@ -67,4 +67,51 @@ router.post('/', authenticateToken, async (req, res, next) => {
   }
 });
 
+// Excluir categoria
+router.delete('/:id', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se a categoria existe
+    const category = await prisma.category.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            products: true
+          }
+        }
+      }
+    });
+
+    if (!category) {
+      return res.status(404).json({
+        error: 'Categoria não encontrada',
+        message: 'A categoria solicitada não foi encontrada'
+      });
+    }
+
+    // Verificar se há produtos usando esta categoria
+    if (category._count.products > 0) {
+      return res.status(409).json({
+        error: 'Categoria em uso',
+        message: `Esta categoria está sendo usada por ${category._count.products} produto(s). Remova os produtos primeiro.`,
+        canForce: true
+      });
+    }
+
+    // Excluir a categoria
+    await prisma.category.delete({
+      where: { id }
+    });
+
+    return res.status(200).json({
+      message: 'Categoria excluída com sucesso',
+      categoryName: category.name
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 export default router; 

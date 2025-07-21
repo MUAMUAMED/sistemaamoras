@@ -14,10 +14,23 @@
     "start": "npm run start:backend",
     "start:backend": "cd backend && npm start"
   },
-  "keywords": ["crm", "erp", "amoras-capital", "typescript", "react", "nodejs"],
+  "keywords": [
+    "crm",
+    "erp",
+    "amoras-capital",
+    "typescript",
+    "react",
+    "nodejs"
+  ],
   "author": "Amoras Capital",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.83.0",
+    "axios": "^1.10.0",
+    "react-scripts": "^5.0.1"
   }
-} 
+}
