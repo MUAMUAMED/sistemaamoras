@@ -13,6 +13,7 @@ import {
   UsersIcon,
   ChartBarIcon,
   TagIcon,
+  FolderIcon,
   SwatchIcon,
   ScaleIcon
 } from '@heroicons/react/24/outline';
@@ -26,6 +27,7 @@ const navigationERP = [
   { name: 'Dashboard', href: '/erp/dashboard', icon: HomeIcon },
   { name: 'Produtos', href: '/erp/products', icon: ShoppingBagIcon },
   { name: 'Categorias', href: '/erp/categories', icon: TagIcon },
+  { name: 'Subcategorias', href: '/erp/subcategories', icon: FolderIcon },
   { name: 'Estampas', href: '/erp/patterns', icon: SwatchIcon },
   { name: 'Tamanhos', href: '/erp/sizes', icon: ScaleIcon },
   { name: 'Vendas', href: '/erp/sales', icon: ShoppingCartIcon },

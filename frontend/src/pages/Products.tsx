@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Package, Barcode, QrCode, Edit3, Trash2, Eye, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Filter, Package, Barcode, QrCode, Edit3, Trash2, Eye, AlertTriangle, Minus, History, X, Printer } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { 
   Product, 
   Category, 
+  Subcategory,
   Pattern, 
   Size, 
   ProductFormData, 
@@ -14,12 +15,14 @@ import {
 import { 
   productsApi, 
   categoriesApi, 
+  subcategoriesApi,
   patternsApi, 
   sizesApi,
   barcodeApi,
   stockMovementsApi 
 } from '../services/api';
 import api from '../services/api';
+import SearchableSelect from '../components/SearchableSelect';
 
 const Products: React.FC = () => {
   const queryClient = useQueryClient();
@@ -31,6 +34,7 @@ const Products: React.FC = () => {
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -50,6 +54,11 @@ const Products: React.FC = () => {
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoriesApi.list(),
+  });
+
+  const { data: subcategories = [] } = useQuery({
+    queryKey: ['subcategories'],
+    queryFn: () => subcategoriesApi.list(),
   });
 
   const { data: patterns = [] } = useQuery({
@@ -244,15 +253,26 @@ const Products: React.FC = () => {
   };
 
   const handleGenerateCodes = (product: Product) => {
-    if (!product.categoryId || !product.patternId || !product.sizeId) {
+    if (!product.categoryId || !product.patternId || !product.size) {
       toast.error('Produto deve ter categoria, estampa e tamanho para gerar códigos');
       return;
     }
 
+    // Buscar o tamanho pelo nome para obter o ID
+    const sizeObj = sizes.find(s => s.name === product.size);
+    if (!sizeObj) {
+      toast.error('Tamanho não encontrado');
+      return;
+    }
+
+    // Definir o produto selecionado para que esteja disponível na impressão
+    setSelectedProduct(product);
+
     generateCodesMutation.mutate({
       categoryId: product.categoryId,
+      subcategoryId: product.subcategoryId || undefined,
       patternId: product.patternId,
-      sizeId: product.sizeId
+      sizeId: sizeObj.id
     });
   };
 
@@ -620,6 +640,18 @@ const Products: React.FC = () => {
                               </button>
                               
                               <button
+                                onClick={() => {
+                                  setSelectedProduct(product);
+                                  setShowStockModal(true);
+                                }}
+                                className="px-3 py-2 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                title="Gerenciar estoque"
+                              >
+                                <Package className="w-4 h-4" />
+                                Estoque
+                              </button>
+                              
+                              <button
                                 onClick={() => handleDeleteProduct(product.id)}
                                 className="px-3 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200 flex items-center justify-center gap-1"
                                 title="Excluir produto"
@@ -695,6 +727,7 @@ const Products: React.FC = () => {
         <ProductFormModal
           title="Novo Produto"
           categories={categories}
+          subcategories={subcategories}
           patterns={patterns}
           sizes={sizes}
           onSubmit={handleCreateProduct}
@@ -708,6 +741,7 @@ const Products: React.FC = () => {
           title="Editar Produto"
           product={selectedProduct}
           categories={categories}
+          subcategories={subcategories}
           patterns={patterns}
           sizes={sizes}
           onSubmit={handleUpdateProduct}
@@ -732,9 +766,10 @@ const Products: React.FC = () => {
         />
       )}
 
-      {showCodeModal && generatedCodes && (
+      {showCodeModal && generatedCodes && selectedProduct && (
         <GeneratedCodesModal
           codes={generatedCodes}
+          product={selectedProduct}
           onClose={() => {
             setShowCodeModal(false);
             setGeneratedCodes(null);
@@ -763,6 +798,19 @@ const Products: React.FC = () => {
           onSubmit={handleCreateSize}
           onClose={() => setShowSizeModal(false)}
           isLoading={createSizeMutation.isPending}
+        />
+      )}
+
+      {showStockModal && selectedProduct && (
+        <StockModal
+          product={selectedProduct}
+          onClose={() => {
+            setShowStockModal(false);
+            setSelectedProduct(null);
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+          }}
         />
       )}
 
@@ -803,7 +851,9 @@ const Products: React.FC = () => {
 // Utility function
 function normalizePrice(value: string | number): number {
   if (typeof value === 'number') return value;
-  return parseFloat(value.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+  // Remove tudo que não é dígito e converte de centavos para reais
+  const numbers = value.replace(/\D/g, '');
+  return numbers ? parseInt(numbers) / 100 : 0;
 }
 
 // Product Form Modal Component
@@ -815,6 +865,7 @@ interface ProductFormModalData {
   stock: string;
   minStock: string;
   categoryId: string;
+  subcategoryId?: string; // Opcional
   patternId: string;
   sizeId: string;
   active?: boolean;
@@ -825,6 +876,7 @@ interface ProductFormModalProps {
   title: string;
   product?: Product;
   categories: Category[];
+  subcategories: Subcategory[];
   patterns: Pattern[];
   sizes: Size[];
   onSubmit: (data: ProductFormData) => void;
@@ -836,6 +888,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   title,
   product,
   categories,
+  subcategories,
   patterns,
   sizes,
   onSubmit,
@@ -845,17 +898,51 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [formData, setFormData] = useState<ProductFormModalData>({
     name: product?.name || '',
     description: product?.description || '',
-    price: product?.price?.toString() || '',
-    cost: product?.cost?.toString() || '',
+    price: product?.price ? (product.price).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
+    cost: product?.cost ? (product.cost).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '',
     stock: product?.stock?.toString() || '0',
     minStock: product?.minStock?.toString() || '0',
     categoryId: product?.categoryId || '',
+    subcategoryId: product?.subcategoryId || '',
     patternId: product?.patternId || '',
-    sizeId: product?.sizeId || '',
+    sizeId: product?.size ? sizes.find(s => s.name === product.size)?.id || '' : '',
     imageFile: null,
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Limpar subcategoria quando categoria mudar
+  useEffect(() => {
+    if (formData.categoryId && product?.categoryId !== formData.categoryId) {
+      setFormData(prev => ({ ...prev, subcategoryId: '' }));
+    }
+  }, [formData.categoryId, product?.categoryId]);
+
+  // Função para formatar valor monetário no padrão brasileiro
+  const formatCurrency = (value: string): string => {
+    // Remove tudo que não é dígito
+    const numbers = value.replace(/\D/g, '');
+    
+    // Se vazio, retorna vazio
+    if (!numbers) return '';
+    
+    // Converte para centavos
+    const cents = parseInt(numbers);
+    
+    // Formata como moeda brasileira
+    const formatted = (cents / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    
+    return formatted;
+  };
+
+  // Função para converter valor formatado para número
+  const parseCurrency = (value: string): number => {
+    const numbers = value.replace(/\D/g, '');
+    return numbers ? parseInt(numbers) / 100 : 0;
+  };
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -864,13 +951,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       newErrors.name = 'Nome é obrigatório';
     }
 
-    if (!formData.price || parseFloat(formData.price) <= 0) {
+    if (!formData.price || parseCurrency(formData.price) <= 0) {
       newErrors.price = 'Preço deve ser maior que zero';
     }
 
     if (!formData.categoryId) {
       newErrors.categoryId = 'Categoria é obrigatória';
     }
+
+    // Subcategoria é opcional - removida validação obrigatória
 
     if (!formData.patternId) {
       newErrors.patternId = 'Estampa é obrigatória';
@@ -889,6 +978,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (validateForm()) {
       const submitData: ProductFormData = {
         ...formData,
+        subcategoryId: formData.subcategoryId || undefined,
         price: normalizePrice(formData.price),
         cost: formData.cost ? normalizePrice(formData.cost) : undefined,
         stock: parseInt(formData.stock) || 0,
@@ -942,7 +1032,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <input
                 type="text"
                 value={formData.price}
-                onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                onChange={(e) => {
+                  const formatted = formatCurrency(e.target.value);
+                  setFormData(prev => ({ ...prev, price: formatted }));
+                }}
                 className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   errors.price ? 'border-red-500' : 'border-gray-300'
                 }`}
@@ -959,8 +1052,11 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </label>
               <input
                 type="text"
-                value={formData.cost}
-                onChange={(e) => setFormData(prev => ({ ...prev, cost: e.target.value }))}
+                value={formData.cost || ''}
+                onChange={(e) => {
+                  const formatted = formatCurrency(e.target.value);
+                  setFormData(prev => ({ ...prev, cost: formatted }));
+                }}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0,00"
               />
@@ -992,74 +1088,66 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Categoria *
-              </label>
-              <select
-                value={formData.categoryId}
-                onChange={(e) => setFormData(prev => ({ ...prev, categoryId: e.target.value }))}
-                className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.categoryId ? 'border-red-500' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Selecione uma categoria</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              {errors.categoryId && (
-                <p className="text-red-500 text-xs mt-1">{errors.categoryId}</p>
-              )}
-            </div>
+            <SearchableSelect
+              label="Categoria"
+              required
+              options={categories.map(cat => ({
+                id: cat.id,
+                name: cat.name,
+                code: cat.code,
+                description: cat.description
+              }))}
+              value={formData.categoryId}
+              onChange={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
+              placeholder="Busque ou selecione uma categoria"
+              error={errors.categoryId}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estampa *
-              </label>
-              <select
-                value={formData.patternId}
-                onChange={(e) => setFormData(prev => ({ ...prev, patternId: e.target.value }))}
-                className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.patternId ? 'border-red-500' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Selecione uma estampa</option>
-                {patterns.map((pattern) => (
-                  <option key={pattern.id} value={pattern.id}>
-                    {pattern.name}
-                  </option>
-                ))}
-              </select>
-              {errors.patternId && (
-                <p className="text-red-500 text-xs mt-1">{errors.patternId}</p>
-              )}
-            </div>
+            <SearchableSelect
+              label="Subcategoria (opcional)"
+              options={subcategories
+                .filter(sub => sub.categoryId === formData.categoryId)
+                .map(sub => ({
+                  id: sub.id,
+                  name: sub.name,
+                  code: sub.code,
+                  description: sub.description
+                }))}
+              value={formData.subcategoryId || ''}
+              onChange={(value) => setFormData(prev => ({ ...prev, subcategoryId: value }))}
+              placeholder="Busque ou selecione uma subcategoria"
+              disabled={!formData.categoryId}
+              error={errors.subcategoryId}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tamanho *
-              </label>
-              <select
-                value={formData.sizeId}
-                onChange={(e) => setFormData(prev => ({ ...prev, sizeId: e.target.value }))}
-                className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.sizeId ? 'border-red-500' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Selecione um tamanho</option>
-                {sizes.map((size) => (
-                  <option key={size.id} value={size.id}>
-                    {size.name}
-                  </option>
-                ))}
-              </select>
-              {errors.sizeId && (
-                <p className="text-red-500 text-xs mt-1">{errors.sizeId}</p>
-              )}
-            </div>
+            <SearchableSelect
+              label="Estampa"
+              required
+              options={patterns.map(pattern => ({
+                id: pattern.id,
+                name: pattern.name,
+                code: pattern.code,
+                description: pattern.description
+              }))}
+              value={formData.patternId}
+              onChange={(value) => setFormData(prev => ({ ...prev, patternId: value }))}
+              placeholder="Busque ou selecione uma estampa"
+              error={errors.patternId}
+            />
+
+            <SearchableSelect
+              label="Tamanho"
+              required
+              options={sizes.map(size => ({
+                id: size.id,
+                name: size.name,
+                code: size.code
+              }))}
+              value={formData.sizeId}
+              onChange={(value) => setFormData(prev => ({ ...prev, sizeId: value }))}
+              placeholder="Busque ou selecione um tamanho"
+              error={errors.sizeId}
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1120,7 +1208,7 @@ interface ProductDetailsModalProps {
 const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, categories, patterns, sizes, onClose }) => {
   const category = categories.find(c => c.id === product.categoryId);
   const pattern = patterns.find(p => p.id === product.patternId);
-  const size = sizes.find(s => s.id === product.sizeId);
+  const size = sizes.find(s => s.name === product.size);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1265,10 +1353,11 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
 // Generated Codes Modal Component
 interface GeneratedCodesModalProps {
   codes: GeneratedCodes;
+  product: Product;
   onClose: () => void;
 }
 
-const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, onClose }) => {
+const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, product, onClose }) => {
   const handleDownloadQR = () => {
     const link = document.createElement('a');
     link.download = `qrcode-${codes.sku}.png`;
@@ -1276,12 +1365,231 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, onClos
     link.click();
   };
 
+  const handlePrintQR = async () => {
+    if (!product) {
+      toast.error('Produto não encontrado para impressão');
+      return;
+    }
+
+    // Buscar informações completas do produto
+    try {
+      const productDetails = await productsApi.getById(product.id);
+      
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Etiqueta - ${codes.sku}</title>
+              <style>
+                @page {
+                  size: 40mm 30mm;
+                  margin: 0mm;
+                  padding: 0mm;
+                }
+                * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+                }
+                body {
+                  width: 40mm;
+                  height: 30mm;
+                  font-family: 'Arial', 'Helvetica', sans-serif;
+                  font-size: 10px;
+                  line-height: 1.1;
+                  display: flex;
+                  overflow: hidden;
+                  background: white;
+                  color: black;
+                }
+                .etiqueta {
+                  width: 100%;
+                  height: 100%;
+                  display: flex;
+                  padding: 1mm;
+                  gap: 0.5mm;
+                  border: 1px solid #000;
+                }
+                .qr-section {
+                  width: 17mm;
+                  height: 100%;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: flex-start;
+                  position: relative;
+                  padding-top: 0.5mm;
+                  border: 1px solid #ff0000;
+                }
+                .qr-code {
+                  width: 11mm;
+                  height: 11mm;
+                  object-fit: contain;
+                  image-rendering: -webkit-optimize-contrast;
+                  image-rendering: pixelated;
+                  /* Sem padding para ficar igual à imagem */
+                  padding: 0;
+                  box-sizing: border-box;
+                  /* Centralizar o QR Code dentro da área */
+                  margin: 0 auto;
+                }
+                .sku-code {
+                  font-size: 9px;
+                  font-weight: bold;
+                  text-align: center;
+                  margin-top: 0.4mm;
+                  word-break: break-all;
+                  line-height: 1;
+                  font-family: 'Arial', sans-serif;
+                  /* Centralizar o código SKU */
+                  width: 100%;
+                  padding: 0;
+                  box-sizing: border-box;
+                }
+
+                .left-info {
+                  font-size: 10px;
+                  text-align: center;
+                  margin-top: 0.3mm;
+                  line-height: 1.1;
+                  width: 100%;
+                  padding: 0;
+                  box-sizing: border-box;
+                  border: 1px solid #0000ff;
+                }
+
+                .left-info-line {
+                  margin-bottom: 0.4mm;
+                  white-space: normal;
+                  overflow: visible;
+                  word-wrap: break-word;
+                  font-weight: 500;
+                  padding: 0;
+                  line-height: 1.1;
+                }
+                .info-section {
+                  flex: 1;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: space-between;
+                  overflow: hidden;
+                  /* Padding mínimo como na imagem */
+                  padding: 0.3mm 0;
+                  box-sizing: border-box;
+                  border: 1px solid #00ff00;
+                }
+                .product-name {
+                  font-weight: bold;
+                  font-size: 11px;
+                  line-height: 1.1;
+                  margin-bottom: 0.7mm;
+                  word-wrap: break-word;
+                  overflow: hidden;
+                  display: -webkit-box;
+                  -webkit-line-clamp: 2;
+                  -webkit-box-orient: vertical;
+                  text-transform: uppercase;
+                  /* Alinhar à esquerda como na imagem */
+                  text-align: left;
+                  padding: 0;
+                }
+                .product-details {
+                  font-size: 10px;
+                  line-height: 1.1;
+                  flex-grow: 1;
+                  border: 1px solid #ff00ff;
+                }
+                .detail-line {
+                  margin-bottom: 0.4mm;
+                  white-space: normal;
+                  overflow: visible;
+                  word-wrap: break-word;
+                  font-weight: 500;
+                  /* Alinhar à esquerda como na imagem */
+                  text-align: left;
+                  padding: 0;
+                  line-height: 1.1;
+                }
+                .price {
+                  font-weight: bold;
+                  font-size: 10px;
+                  margin-top: auto;
+                  text-align: right;
+                  background: #f0f0f0;
+                  padding: 0.3mm 0.6mm;
+                  border-radius: 1mm;
+                  /* Alinhar à direita como na imagem */
+                  margin-left: auto;
+                  margin-right: 0;
+                  width: fit-content;
+                }
+                @media print {
+                  body {
+                    print-color-adjust: exact;
+                    -webkit-print-color-adjust: exact;
+                  }
+                  .price {
+                    background: #f0f0f0 !important;
+                  }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="etiqueta">
+                <div class="qr-section">
+                  <img src="${codes.qrcodeUrl}" alt="QR Code" class="qr-code" />
+                  <div class="sku-code">${codes.sku}</div>
+                  <div class="left-info">
+                    ${productDetails.subcategory ? `<div class="left-info-line">SUB: ${productDetails.subcategory.name}</div>` : ''}
+                    <div class="left-info-line">EST: ${productDetails.pattern?.name || 'N/A'}</div>
+                  </div>
+                </div>
+                <div class="info-section">
+                  <div class="product-name">${productDetails.name}</div>
+                  <div class="product-details">
+                    <div class="detail-line">TAM: ${productDetails.size}</div>
+                    <div class="detail-line">CAT: ${productDetails.category?.name || 'N/A'}</div>
+                  </div>
+                  <div class="price">R$ ${productDetails.price.toFixed(2).replace('.', ',')}</div>
+                </div>
+              </div>
+              <script>
+                window.onload = function() {
+                  setTimeout(() => {
+                    window.print();
+                    window.onafterprint = function() {
+                      window.close();
+                    };
+                  }, 100);
+                };
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      }
+    } catch (error) {
+      console.error('Erro ao buscar detalhes do produto:', error);
+      toast.error('Erro ao buscar informações do produto');
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success('Código copiado para a área de transferência!');
+    }).catch(() => {
+      toast.error('Erro ao copiar código');
+    });
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900">Códigos Gerados</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl">
             ×
           </button>
         </div>
@@ -1289,8 +1597,17 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, onClos
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
-            <div className="p-2 bg-gray-50 rounded border font-mono text-center">
-              {codes.sku}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 p-2 bg-gray-50 rounded border font-mono text-center">
+                {codes.sku}
+              </div>
+              <button
+                onClick={() => copyToClipboard(codes.sku)}
+                className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                title="Copiar SKU"
+              >
+                Copiar
+              </button>
             </div>
           </div>
 
@@ -1298,8 +1615,17 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, onClos
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Código de Barras
             </label>
-            <div className="p-2 bg-gray-50 rounded border font-mono text-center">
-              {codes.barcode}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 p-2 bg-gray-50 rounded border font-mono text-center">
+                {codes.barcode}
+              </div>
+              <button
+                onClick={() => copyToClipboard(codes.barcode)}
+                className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                title="Copiar código de barras"
+              >
+                Copiar
+              </button>
             </div>
           </div>
 
@@ -1308,10 +1634,20 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, onClos
             <div className="flex justify-center p-4 bg-gray-50 rounded border">
               <img src={codes.qrcodeUrl} alt="QR Code" className="w-32 h-32" />
             </div>
+            <div className="text-center text-sm text-gray-600 mt-2">
+              O QR Code contém apenas o código: <strong>{codes.sku}</strong>
+            </div>
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-4">
+          <button
+            onClick={handlePrintQR}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+          >
+            <Printer className="w-4 h-4" />
+            Imprimir QR
+          </button>
           <button
             onClick={handleDownloadQR}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -1721,6 +2057,243 @@ const SizeFormModal: React.FC<SizeFormModalProps> = ({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+};
+
+// Modal de gestão de estoque
+interface StockModalProps {
+  product: Product;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) => {
+  const [operation, setOperation] = useState<'add' | 'remove' | 'history'>('add');
+  const [quantity, setQuantity] = useState<number>(1);
+  const [reason, setReason] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleStockOperation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (quantity <= 0) {
+      toast.error('Quantidade deve ser maior que zero');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (operation === 'add') {
+        const result = await productsApi.addStock(product.id, quantity, reason);
+        toast.success(result.message);
+      } else if (operation === 'remove') {
+        const result = await productsApi.removeStock(product.id, quantity, reason);
+        toast.success(result.message);
+      }
+      
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Erro ao atualizar estoque';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const [stockHistory, setStockHistory] = useState<any>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const loadStockHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const history = await productsApi.getStockHistory(product.id);
+      setStockHistory(history);
+    } catch (error) {
+      toast.error('Erro ao carregar histórico');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (operation === 'history') {
+      loadStockHistory();
+    }
+  }, [operation]);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Gerenciar Estoque
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Informações do produto */}
+          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="flex items-center gap-3">
+              <Package className="w-8 h-8 text-blue-600" />
+              <div>
+                <h3 className="font-medium text-gray-900">{product.name}</h3>
+                <p className="text-sm text-gray-600">
+                  Estoque atual: <span className="font-semibold text-blue-600">{product.stock} unidades</span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  {product.category?.name} • {product.pattern?.name} • {product.size}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Abas de operação */}
+          <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setOperation('add')}
+              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                operation === 'add'
+                  ? 'bg-white text-green-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Plus className="w-4 h-4 inline-block mr-2" />
+              Adicionar
+            </button>
+            <button
+              onClick={() => setOperation('remove')}
+              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                operation === 'remove'
+                  ? 'bg-white text-red-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Minus className="w-4 h-4 inline-block mr-2" />
+              Retirar
+            </button>
+            <button
+              onClick={() => setOperation('history')}
+              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
+                operation === 'history'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <History className="w-4 h-4 inline-block mr-2" />
+              Histórico
+            </button>
+          </div>
+
+          {/* Formulário de operação */}
+          {operation !== 'history' && (
+            <form onSubmit={handleStockOperation} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quantidade
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Digite a quantidade"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Motivo
+                </label>
+                <input
+                  type="text"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={operation === 'add' ? 'Ex: Recebimento de fornecedor' : 'Ex: Produto danificado'}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                    operation === 'add'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  {isLoading ? 'Processando...' : operation === 'add' ? 'Adicionar' : 'Retirar'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Histórico de movimentações */}
+          {operation === 'history' && (
+            <div className="space-y-4">
+              {loadingHistory ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="text-sm text-gray-600 mt-2">Carregando histórico...</p>
+                </div>
+              ) : stockHistory && stockHistory.movements.length > 0 ? (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {stockHistory.movements.map((movement: any, index: number) => (
+                    <div key={index} className="bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {movement.type === 'ENTRY' ? (
+                            <Plus className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <Minus className="w-4 h-4 text-red-600" />
+                          )}
+                          <span className={`text-sm font-medium ${
+                            movement.type === 'ENTRY' ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {movement.type === 'ENTRY' ? '+' : '-'}{movement.quantity}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {new Date(movement.createdAt).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 mt-1">{movement.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <History className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600">Nenhuma movimentação encontrada</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

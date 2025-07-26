@@ -41,6 +41,22 @@ export interface Category {
   updatedAt: string;
 }
 
+// Tipos de subcategoria
+export interface Subcategory {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  active: boolean;
+  categoryId: string;
+  category?: Category;
+  createdAt: string;
+  updatedAt: string;
+  _count?: {
+    products: number;
+  };
+}
+
 // Tipos de estampa/padrão
 export interface Pattern {
   id: string;
@@ -75,16 +91,18 @@ export interface Product {
   qrcodeUrl?: string;
   imageUrl?: string;
   categoryId: string;
+  subcategoryId?: string; // Opcional
   patternId: string;
-  sizeId: string;
+  size: string; // Campo string para compatibilidade com SQLite
+  sizeCode: string; // Campo string para compatibilidade com SQLite
   active: boolean;
   createdAt: string;
   updatedAt: string;
   
   // Relações
   category?: Category;
+  subcategory?: Subcategory;
   pattern?: Pattern;
-  size?: Size;
 }
 
 // Tipos de movimentação de estoque
@@ -263,6 +281,7 @@ export interface GeneratedCodes {
 export interface ProductCodeData {
   sizeId: string;
   categoryId: string;
+  subcategoryId?: string;
   patternId: string;
 }
 
@@ -295,10 +314,19 @@ export interface ProductFormData {
   stock: number;
   minStock: number;
   categoryId: string;
+  subcategoryId?: string; // Opcional
   patternId: string;
-  sizeId: string;
+  sizeId: string; // ID do tamanho para buscar dados
   active?: boolean;
   imageFile?: File;
+}
+
+export interface SubcategoryFormData {
+  name: string;
+  code: string;
+  description?: string;
+  categoryId: string;
+  active?: boolean;
 }
 
 export interface LeadFormData {

@@ -4,6 +4,7 @@ import {
   Lead,
   Product,
   Category,
+  Subcategory,
   Pattern,
   Size,
   Sale,
@@ -19,6 +20,7 @@ import {
   LoginData,
   LoginResponse,
   ProductFormData,
+  SubcategoryFormData,
   LeadFormData,
   InteractionFormData,
   SaleFormData,
@@ -168,6 +170,39 @@ export const categoriesApi = {
   },
 };
 
+// Serviços de subcategorias
+export const subcategoriesApi = {
+  list: async (filters?: { categoryId?: string; active?: boolean }): Promise<Subcategory[]> => {
+    const response = await api.get('/subcategories', { params: filters });
+    return response.data;
+  },
+  
+  getById: async (id: string): Promise<Subcategory> => {
+    const response = await api.get(`/subcategories/${id}`);
+    return response.data;
+  },
+  
+  create: async (data: SubcategoryFormData): Promise<Subcategory> => {
+    const response = await api.post('/subcategories', data);
+    return response.data;
+  },
+  
+  update: async (id: string, data: Partial<SubcategoryFormData>): Promise<Subcategory> => {
+    const response = await api.put(`/subcategories/${id}`, data);
+    return response.data;
+  },
+  
+  delete: async (id: string, force?: boolean): Promise<void> => {
+    const params = force ? { force: 'true' } : {};
+    await api.delete(`/subcategories/${id}`, { params });
+  },
+  
+  getByCategory: async (categoryId: string): Promise<Subcategory[]> => {
+    const response = await api.get(`/subcategories/category/${categoryId}`);
+    return response.data;
+  },
+};
+
 // Serviços de padrões/estampas
 export const patternsApi = {
   list: async (): Promise<Pattern[]> => {
@@ -242,6 +277,43 @@ export const productsApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+  
+  addStock: async (id: string, quantity: number, reason?: string): Promise<{
+    message: string;
+    product: Product;
+    stockAdded: number;
+    previousStock: number;
+    newStock: number;
+  }> => {
+    const response = await api.put(`/products/${id}/stock/add`, {
+      quantity,
+      reason: reason || 'Adição manual de estoque'
+    });
+    return response.data;
+  },
+  
+  removeStock: async (id: string, quantity: number, reason?: string): Promise<{
+    message: string;
+    product: Product;
+    stockRemoved: number;
+    previousStock: number;
+    newStock: number;
+  }> => {
+    const response = await api.put(`/products/${id}/stock/remove`, {
+      quantity,
+      reason: reason || 'Retirada manual de estoque'
+    });
+    return response.data;
+  },
+  
+  getStockHistory: async (id: string): Promise<{
+    product: { id: string; name: string; stock: number };
+    movements: StockMovement[];
+    totalMovements: number;
+  }> => {
+    const response = await api.get(`/products/${id}/stock/history`);
     return response.data;
   },
 };
@@ -593,6 +665,7 @@ export const saleService = {
 };
 
 export const categoryService = categoriesApi;
+export const subcategoryService = subcategoriesApi;
 export const patternService = patternsApi;
 export const userService = usersApi;
 export const dashboardService = {

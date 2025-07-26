@@ -15,6 +15,7 @@ import ERPDashboard from './pages/ERPDashboard';
 import CRMDashboard from './pages/CRMDashboard';
 import Kanban from './pages/Kanban';
 import Categories from './pages/Categories';
+import Subcategories from './pages/Subcategories';
 import Patterns from './pages/Patterns';
 import Sizes from './pages/Sizes';
 import { useAuthStore } from './stores/authStore';
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="/erp/dashboard" element={<ERPDashboard />} />
               <Route path="/erp/products" element={<Products />} />
               <Route path="/erp/categories" element={<Categories />} />
+              <Route path="/erp/subcategories" element={<Subcategories />} />
               <Route path="/erp/patterns" element={<Patterns />} />
               <Route path="/erp/sizes" element={<Sizes />} />
               <Route path="/erp/sales" element={<Sales />} />
