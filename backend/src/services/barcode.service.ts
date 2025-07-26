@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 export interface ProductCodeData {
   sizeId: string;
   categoryId: string;
+  subcategoryId?: string;
   patternId: string;
 }
 
@@ -27,24 +28,40 @@ export class BarcodeService {
    */
   static async generateProductCodes(data: ProductCodeData): Promise<GeneratedCodes> {
     try {
-      // Buscar códigos do tamanho, categoria e estampa
-      const [size, category, pattern] = await Promise.all([
+      // Buscar códigos do tamanho, categoria, subcategoria (se informada) e estampa
+      const promises = [
         prisma.size.findUnique({ where: { id: data.sizeId }, select: { code: true } }),
         prisma.category.findUnique({ where: { id: data.categoryId }, select: { code: true } }),
         prisma.pattern.findUnique({ where: { id: data.patternId }, select: { code: true } })
-      ]);
+      ];
+
+      // Adicionar subcategoria se informada
+      if (data.subcategoryId) {
+        promises.push(
+          prisma.subcategory.findUnique({ where: { id: data.subcategoryId }, select: { code: true } })
+        );
+      }
+
+      const results = await Promise.all(promises);
+      const [size, category, pattern, subcategory] = results;
 
       if (!size || !category || !pattern) {
         throw new Error('Tamanho, categoria ou estampa não encontrados');
       }
 
+      // Se subcategoria foi informada, verificar se ela existe
+      if (data.subcategoryId && !subcategory) {
+        throw new Error('Subcategoria não encontrada');
+      }
+
       // Validar e formatar códigos
       const sizeCode = this.validateAndFormatCode(size.code, 2, 'Tamanho');
       const categoryCode = this.validateAndFormatCode(category.code, 2, 'Categoria');
+      const subcategoryCode = subcategory ? this.validateAndFormatCode(subcategory.code, 2, 'Subcategoria') : '00';
       const patternCode = this.validateAndFormatCode(pattern.code, 4, 'Estampa');
 
-      // Gerar SKU no formato TTCCEEEE
-      const sku = `${sizeCode}${categoryCode}${patternCode}`;
+      // Gerar SKU no formato TTCCSSEEEE (adicionando subcategoria)
+      const sku = `${sizeCode}${categoryCode}${subcategoryCode}${patternCode}`;
 
       // Gerar código de barras (EAN-13 baseado no SKU)
       const barcode = this.generateEAN13(sku);
@@ -104,35 +121,12 @@ export class BarcodeService {
   }
 
   /**
-   * Gera QR Code contendo informações do produto
+   * Gera QR Code contendo apenas o código SKU do produto
    */
   private static async generateQRCode(sku: string): Promise<string> {
     try {
-      // Buscar informações completas do produto para o QR Code
-      const skuInfo = this.parseSkuInfo(sku);
-      if (!skuInfo) {
-        throw new Error('SKU inválido');
-      }
-
-      // Buscar dados do tamanho, categoria e estampa
-      const [size, category, pattern] = await Promise.all([
-        prisma.size.findFirst({ where: { code: skuInfo.sizeCode }, select: { name: true } }),
-        prisma.category.findFirst({ where: { code: skuInfo.categoryCode }, select: { name: true } }),
-        prisma.pattern.findFirst({ where: { code: skuInfo.patternCode }, select: { name: true } })
-      ]);
-
-      // Dados para o QR Code - formato otimizado para PDV
-      const qrData = {
-        sku,
-        size: size?.name || 'N/A',
-        category: category?.name || 'N/A', 
-        pattern: pattern?.name || 'N/A',
-        company: 'Amoras Capital',
-        timestamp: new Date().toISOString()
-      };
-
-      // Gerar QR Code como Data URL (Base64)
-      const qrCodeDataUrl = await QRCode.toDataURL(JSON.stringify(qrData), {
+      // QR Code contém apenas o código SKU - formato simples para escaneamento
+      const qrCodeDataUrl = await QRCode.toDataURL(sku, {
         errorCorrectionLevel: 'M' as const,
         width: 256,
         margin: 1,
@@ -197,15 +191,16 @@ export class BarcodeService {
   /**
    * Extrai informações do SKU
    */
-  static parseSkuInfo(sku: string): { sizeCode: string; categoryCode: string; patternCode: string } | null {
-    if (sku.length !== 8) {
+  static parseSkuInfo(sku: string): { sizeCode: string; categoryCode: string; subcategoryCode: string; patternCode: string } | null {
+    if (sku.length !== 10) {
       return null;
     }
 
     return {
       sizeCode: sku.substring(0, 2),
       categoryCode: sku.substring(2, 4),
-      patternCode: sku.substring(4, 8)
+      subcategoryCode: sku.substring(4, 6),
+      patternCode: sku.substring(6, 10)
     };
   }
 
@@ -223,23 +218,35 @@ export class BarcodeService {
         }
       });
 
-      // Se não encontrar, tentar por SKU (formato TTCCEEEE)
-      if (!product && code.length === 8) {
+      // Se não encontrar, tentar por SKU (formato TTCCSSEEEE)
+      if (!product && code.length === 10) {
         const skuInfo = this.parseSkuInfo(code);
         if (skuInfo) {
           // Buscar produto que corresponda ao SKU
-          const products = await prisma.product.findMany({
-            where: {
-              sizeCode: skuInfo.sizeCode,
-              category: {
-                code: skuInfo.categoryCode
-              },
-              pattern: {
-                code: skuInfo.patternCode
-              }
+          const whereClause: any = {
+            sizeCode: skuInfo.sizeCode,
+            category: {
+              code: skuInfo.categoryCode
             },
+            pattern: {
+              code: skuInfo.patternCode
+            }
+          };
+
+          // Adicionar filtro de subcategoria se não for '00'
+          if (skuInfo.subcategoryCode !== '00') {
+            whereClause.subcategory = {
+              code: skuInfo.subcategoryCode
+            };
+          } else {
+            whereClause.subcategoryId = null;
+          }
+
+          const products = await prisma.product.findMany({
+            where: whereClause,
             include: {
               category: true,
+              subcategory: true,
               pattern: true
             }
           });

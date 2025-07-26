@@ -15,9 +15,10 @@ interface AuthenticatedRequest extends Request {
 
 const router = Router();
 
-// Função para gerar código de barras
-function generateBarcode(sizeCode: string, categoryCode: string, patternCode: string): string {
-  return `${sizeCode}${categoryCode}${patternCode}`;
+// Função para gerar código de barras com subcategoria opcional
+function generateBarcode(sizeCode: string, categoryCode: string, subcategoryCode: string | null, patternCode: string): string {
+  const subCode = subcategoryCode || '00'; // Usar '00' como padrão quando não há subcategoria
+  return `${sizeCode}${categoryCode}${subCode}${patternCode}`;
 }
 
 // Função para gerar QR Code
@@ -80,10 +81,19 @@ router.get('/', authenticateToken, async (req, res, next) => {
     };
 
     if (search) {
-      where.name = {
-        contains: search as string,
-        mode: 'insensitive',
-      };
+      where.OR = [
+        {
+          name: {
+            contains: search as string,
+            mode: 'insensitive',
+          },
+        },
+        {
+          barcode: {
+            contains: search as string,
+          },
+        },
+      ];
     }
 
     if (barcode) {
@@ -91,12 +101,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
     }
 
     if (category) {
-      where.category = {
-        name: {
-          contains: category as string,
-          mode: 'insensitive',
-        },
-      };
+      where.categoryId = category as string;
     }
 
     const [products, total] = await Promise.all([
@@ -104,7 +109,6 @@ router.get('/', authenticateToken, async (req, res, next) => {
         where,
         include: {
           category: true,
-          size: true,
           pattern: true,
         },
         skip,
@@ -159,7 +163,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       where: { id },
       include: {
         category: true,
-        size: true,
+        subcategory: true,
         pattern: true,
         stockMovements: {
           orderBy: {
@@ -232,6 +236,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     const {
       name,
       categoryId,
+      subcategoryId,
       sizeId,
       patternId,
       price,
@@ -247,9 +252,10 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       });
     }
 
-    // Buscar categoria, tamanho e estampa para gerar código de barras
-    const [category, size, pattern] = await Promise.all([
+    // Buscar categoria, subcategoria (se informada), tamanho e estampa para gerar código de barras
+    const [category, subcategory, size, pattern] = await Promise.all([
       prisma.category.findUnique({ where: { id: categoryId } }),
+      subcategoryId ? prisma.subcategory.findUnique({ where: { id: subcategoryId } }) : null,
       prisma.size.findUnique({ where: { id: sizeId } }),
       prisma.pattern.findUnique({ where: { id: patternId } }),
     ]);
@@ -261,18 +267,69 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       });
     }
 
+    // Se subcategoria foi informada, verificar se ela existe e pertence à categoria
+    if (subcategoryId) {
+      if (!subcategory) {
+        return res.status(400).json({
+          error: 'Subcategoria inválida',
+          message: 'Subcategoria não encontrada',
+        });
+      }
+
+      if (subcategory.categoryId !== categoryId) {
+        return res.status(400).json({
+          error: 'Subcategoria inválida',
+          message: 'A subcategoria não pertence à categoria especificada',
+        });
+      }
+    }
+
     // Gerar código de barras
-    const barcode = generateBarcode(size.code, category.code, pattern.code);
+    const barcode = generateBarcode(size.code, category.code, subcategory?.code || null, pattern.code);
 
     // Verificar se código de barras já existe
     const existingProduct = await prisma.product.findUnique({
       where: { barcode },
+      include: {
+        category: true,
+        pattern: true,
+      },
     });
 
     if (existingProduct) {
-      return res.status(409).json({
-        error: 'Código de barras já existe',
-        message: 'Já existe um produto com este código de barras',
+      // Se produto já existe, adicionar ao estoque existente
+      const newStock = existingProduct.stock + stock;
+      
+      const updatedProduct = await prisma.product.update({
+        where: { id: existingProduct.id },
+        data: {
+          stock: newStock,
+          price, // Atualizar preço também
+          description: description || existingProduct.description, // Manter descrição existente se não informada
+        },
+        include: {
+          category: true,
+          pattern: true,
+        },
+      });
+
+      // Registrar movimentação de entrada de estoque
+      if (stock > 0) {
+        await prisma.stockMovement.create({
+          data: {
+            productId: existingProduct.id,
+            type: 'ENTRY',
+            quantity: stock,
+            reason: 'Adição de estoque via criação de produto',
+            userId: req.user!.id,
+          },
+        });
+      }
+
+      return res.status(200).json({
+        ...updatedProduct,
+        message: `Estoque adicionado ao produto existente. Novo estoque: ${newStock}`,
+        stockAdded: stock,
       });
     }
 
@@ -284,7 +341,9 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       data: {
         name,
         categoryId,
-        sizeId,
+        subcategoryId,
+        size: size.name, // Usar o nome do tamanho como string
+        sizeCode: size.code, // Usar o código do tamanho como string
         patternId,
         price,
         stock,
@@ -294,7 +353,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       },
       include: {
         category: true,
-        size: true,
+        subcategory: true,
         pattern: true,
       },
     });
@@ -312,7 +371,10 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       });
     }
 
-    return res.status(201).json(product);
+    return res.status(201).json({
+      ...product,
+      message: 'Produto criado com sucesso',
+    });
   } catch (error) {
     return next(error);
   }
@@ -671,6 +733,260 @@ router.get('/search/:code', authenticateToken, async (req, res, next) => {
     return next(error);
   }
   return;
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/stock/add:
+ *   put:
+ *     summary: Adicionar estoque a um produto
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do produto
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *                 description: Quantidade a adicionar
+ *               reason:
+ *                 type: string
+ *                 description: Motivo da adição
+ *     responses:
+ *       200:
+ *         description: Estoque adicionado com sucesso
+ */
+router.put('/:id/stock/add', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { quantity, reason = 'Adição manual de estoque' } = req.body;
+
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({
+        error: 'Quantidade inválida',
+        message: 'A quantidade deve ser maior que zero',
+      });
+    }
+
+    // Buscar produto
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        pattern: true,
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado',
+        message: 'Produto não encontrado',
+      });
+    }
+
+    // Atualizar estoque
+    const newStock = product.stock + quantity;
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: { stock: newStock },
+      include: {
+        category: true,
+        pattern: true,
+      },
+    });
+
+    // Registrar movimentação
+    await prisma.stockMovement.create({
+      data: {
+        productId: id,
+        type: 'ENTRY',
+        quantity,
+        reason,
+        userId: req.user!.id,
+      },
+    });
+
+    return res.json({
+      message: `Estoque adicionado com sucesso. Novo estoque: ${newStock}`,
+      product: updatedProduct,
+      stockAdded: quantity,
+      previousStock: product.stock,
+      newStock,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/stock/remove:
+ *   put:
+ *     summary: Retirar estoque de um produto
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do produto
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *                 description: Quantidade a retirar
+ *               reason:
+ *                 type: string
+ *                 description: Motivo da retirada
+ *     responses:
+ *       200:
+ *         description: Estoque retirado com sucesso
+ */
+router.put('/:id/stock/remove', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { quantity, reason = 'Retirada manual de estoque' } = req.body;
+
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({
+        error: 'Quantidade inválida',
+        message: 'A quantidade deve ser maior que zero',
+      });
+    }
+
+    // Buscar produto
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        pattern: true,
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado',
+        message: 'Produto não encontrado',
+      });
+    }
+
+    // Verificar se há estoque suficiente
+    if (product.stock < quantity) {
+      return res.status(400).json({
+        error: 'Estoque insuficiente',
+        message: `Estoque atual: ${product.stock}. Não é possível retirar ${quantity} unidades.`,
+        currentStock: product.stock,
+        requestedQuantity: quantity,
+      });
+    }
+
+    // Atualizar estoque
+    const newStock = product.stock - quantity;
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: { stock: newStock },
+      include: {
+        category: true,
+        pattern: true,
+      },
+    });
+
+    // Registrar movimentação
+    await prisma.stockMovement.create({
+      data: {
+        productId: id,
+        type: 'EXIT',
+        quantity,
+        reason,
+        userId: req.user!.id,
+      },
+    });
+
+    return res.json({
+      message: `Estoque retirado com sucesso. Novo estoque: ${newStock}`,
+      product: updatedProduct,
+      stockRemoved: quantity,
+      previousStock: product.stock,
+      newStock,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/stock/history:
+ *   get:
+ *     summary: Consultar histórico de movimentações de estoque
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do produto
+ *     responses:
+ *       200:
+ *         description: Histórico de movimentações
+ */
+router.get('/:id/stock/history', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se produto existe
+    const product = await prisma.product.findUnique({
+      where: { id },
+      select: { id: true, name: true, stock: true },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado',
+        message: 'Produto não encontrado',
+      });
+    }
+
+    // Buscar movimentações
+    const movements = await prisma.stockMovement.findMany({
+      where: { productId: id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json({
+      product,
+      movements,
+      totalMovements: movements.length,
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 export default router; 

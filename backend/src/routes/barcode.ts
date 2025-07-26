@@ -63,7 +63,7 @@ const prisma = new PrismaClient();
  */
 router.post('/generate', authenticateToken, async (req, res) => {
   try {
-    const { sizeId, categoryId, patternId } = req.body;
+    const { sizeId, categoryId, subcategoryId, patternId } = req.body;
 
     // Validar dados obrigatórios
     if (!sizeId || !categoryId || !patternId) {
@@ -73,6 +73,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
     const codes = await BarcodeService.generateProductCodes({
       sizeId,
       categoryId,
+      subcategoryId,
       patternId
     });
 
