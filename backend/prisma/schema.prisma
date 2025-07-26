@@ -39,9 +39,31 @@ model Category {
   updatedAt   DateTime  @updatedAt
 
   // Relacionamentos
-  products Product[]
+  products      Product[]
+  subcategories Subcategory[]
 
   @@map("categories")
+}
+
+// Subcategorias de produtos
+model Subcategory {
+  id          String    @id @default(cuid())
+  name        String
+  code        String    // Código numérico de 2 dígitos
+  description String?
+  categoryId  String
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relacionamentos
+  category Category  @relation(fields: [categoryId], references: [id])
+  products Product[]
+
+  // Índices únicos compostos
+  @@unique([categoryId, name], name: "categoryId_name")
+  @@unique([categoryId, code], name: "categoryId_code")
+  @@map("subcategories")
 }
 
 // Estampas dos produtos
@@ -80,6 +102,7 @@ model Product {
   id            String   @id @default(cuid())
   name          String
   categoryId    String
+  subcategoryId String?  // Opcional - subcategoria do produto
   sizeId        String   // Relação com o modelo Size
   patternId     String
   price         Float
@@ -95,6 +118,7 @@ model Product {
 
   // Relacionamentos
   category       Category        @relation(fields: [categoryId], references: [id])
+  subcategory    Subcategory?    @relation(fields: [subcategoryId], references: [id])
   size           Size            @relation(fields: [sizeId], references: [id])
   pattern        Pattern         @relation(fields: [patternId], references: [id])
   saleItems      SaleItem[]

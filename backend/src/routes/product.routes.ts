@@ -342,8 +342,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         name,
         categoryId,
         subcategoryId,
-        size: size.name, // Usar o nome do tamanho como string
-        sizeCode: size.code, // Usar o código do tamanho como string
+        sizeId,
         patternId,
         price,
         stock,

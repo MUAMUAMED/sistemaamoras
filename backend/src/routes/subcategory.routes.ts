@@ -125,9 +125,9 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response, next: 
       });
     }
 
-    res.json(subcategory);
+    return res.json(subcategory);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -246,9 +246,9 @@ router.post('/', authenticateToken, async (req: Request, res: Response, next: Ne
       },
     });
 
-    res.status(201).json(subcategory);
+    return res.status(201).json(subcategory);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -364,9 +364,9 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response, next: 
       },
     });
 
-    res.json(subcategory);
+    return res.json(subcategory);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -433,12 +433,12 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response, nex
       where: { id },
     });
 
-    res.json({
+    return res.json({
       message: 'Subcategoria excluída com sucesso',
       subcategory: subcategory.name,
     });
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

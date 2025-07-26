@@ -765,7 +765,7 @@ router.put('/:id/tags', authenticateToken, async (req: AuthenticatedRequest, res
     const updatedLead = await prisma.lead.update({
       where: { id },
       data: {
-        tags: tags.join(','),
+        tags: tags,
         lastInteraction: new Date(),
       },
       include: {

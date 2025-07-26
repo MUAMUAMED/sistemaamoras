@@ -11,20 +11,18 @@ echo.
 echo Escolha uma opção:
 echo.
 echo [1] Configurar ambiente PostgreSQL (Docker)
-echo [2] Configurar ambiente SQLite (Local)
-echo [3] Inicializar banco PostgreSQL (Docker)
-echo [4] Inicializar banco SQLite (Local)
-echo [5] Iniciar sistema completo (Docker)
-echo [6] Iniciar sistema local (SQLite)
-echo [7] Ver logs do sistema (Docker)
-echo [8] Parar sistema Docker
-echo [9] Parar sistema local
-echo [10] Status dos serviços
-echo [11] Backup do banco de dados
-echo [12] Restaurar backup
-echo [13] Limpar dados (cuidado!)
-echo [14] Testar sistema completo
-echo [15] Testar TypeScript
+echo [2] Inicializar banco PostgreSQL (Docker)
+echo [3] Iniciar sistema completo (Docker)
+echo [4] Iniciar sistema local (PostgreSQL)
+echo [5] Ver logs do sistema (Docker)
+echo [6] Parar sistema Docker
+echo [7] Parar sistema local
+echo [8] Status dos serviços
+echo [9] Backup do banco de dados
+echo [10] Restaurar backup
+echo [11] Limpar dados (cuidado!)
+echo [12] Testar sistema completo
+echo [13] Testar TypeScript
 echo [0] Sair
 echo.
 echo ========================================
@@ -34,30 +32,24 @@ if "%opcao%"=="1" (
     call configurar-ambiente.bat
     goto menu
 ) else if "%opcao%"=="2" (
-    call configurar-ambiente-sqlite.bat
-    goto menu
-) else if "%opcao%"=="3" (
     call inicializar-banco.bat
     goto menu
-) else if "%opcao%"=="4" (
-    call inicializar-banco-sqlite.bat
-    goto menu
-) else if "%opcao%"=="5" (
+) else if "%opcao%"=="3" (
     call iniciar-sistema-completo.bat
     goto menu
-) else if "%opcao%"=="6" (
+) else if "%opcao%"=="4" (
     call iniciar-sistema-local.bat
     goto menu
-) else if "%opcao%"=="7" (
+) else if "%opcao%"=="5" (
     call ver-logs.bat
     goto menu
-) else if "%opcao%"=="8" (
+) else if "%opcao%"=="6" (
     call parar-sistema.bat
     goto menu
-) else if "%opcao%"=="9" (
+) else if "%opcao%"=="7" (
     call parar-sistema-local.bat
     goto menu
-) else if "%opcao%"=="10" (
+) else if "%opcao%"=="8" (
     cls
     echo ========================================
     echo    Status dos Serviços
@@ -68,13 +60,13 @@ if "%opcao%"=="1" (
     echo ========================================
     pause
     goto menu
-) else if "%opcao%"=="11" (
+) else if "%opcao%"=="9" (
     call backup-banco.bat
     goto menu
-) else if "%opcao%"=="12" (
+) else if "%opcao%"=="10" (
     call restaurar-backup.bat
     goto menu
-) else if "%opcao%"=="13" (
+) else if "%opcao%"=="11" (
     cls
     echo ========================================
     echo    LIMPAR DADOS - ATENÇÃO!
@@ -95,10 +87,10 @@ if "%opcao%"=="1" (
     )
     pause
     goto menu
-) else if "%opcao%"=="14" (
+) else if "%opcao%"=="12" (
     call teste-sistema-completo.bat
     goto menu
-) else if "%opcao%"=="15" (
+) else if "%opcao%"=="13" (
     call teste-typescript.bat
     goto menu
 ) else if "%opcao%"=="0" (

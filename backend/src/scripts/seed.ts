@@ -148,8 +148,7 @@ async function main() {
       data: {
         name: 'Vestido Azul Marinho M',
         categoryId: categories[0].id, // Vestidos
-        size: 'M',
-        sizeCode: '02',
+        sizeId: sizes[1].id, // M
         patternId: patterns[0].id, // Azul Marinho
         price: 89.90,
         stock: 10,
@@ -163,8 +162,7 @@ async function main() {
       data: {
         name: 'Blusa Preta P',
         categoryId: categories[1].id, // Blusas
-        size: 'P',
-        sizeCode: '01',
+        sizeId: sizes[0].id, // P
         patternId: patterns[1].id, // Preto
         price: 45.90,
         stock: 15,
@@ -191,7 +189,7 @@ async function main() {
         assignedToId: attendant.id,
         notes: 'Interessada em vestidos',
         leadScore: 75,
-        tags: 'interessada,vestidos,instagram',
+        tags: ['interessada', 'vestidos', 'instagram'],
         totalPurchases: 0,
         purchaseCount: 0,
       },
@@ -207,7 +205,7 @@ async function main() {
         assignedToId: admin.id,
         notes: 'Cliente recorrente',
         leadScore: 90,
-        tags: 'recorrente,site,google',
+        tags: ['recorrente', 'site', 'google'],
         totalPurchases: 250.00,
         purchaseCount: 3,
       },
