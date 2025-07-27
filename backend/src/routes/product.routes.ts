@@ -109,6 +109,8 @@ router.get('/', authenticateToken, async (req, res, next) => {
         where,
         include: {
           category: true,
+          subcategory: true,
+          size: true,
           pattern: true,
         },
         skip,
@@ -164,6 +166,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       include: {
         category: true,
         subcategory: true,
+        size: true,
         pattern: true,
         stockMovements: {
           orderBy: {
@@ -309,6 +312,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         },
         include: {
           category: true,
+          subcategory: true,
+          size: true,
           pattern: true,
         },
       });
@@ -353,6 +358,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       include: {
         category: true,
         subcategory: true,
+        size: true,
         pattern: true,
       },
     });
@@ -522,6 +528,8 @@ router.patch('/:id/stock', authenticateToken, async (req: AuthenticatedRequest, 
         data: { stock: newStock },
         include: {
           category: true,
+          subcategory: true,
+          size: true,
           pattern: true,
         },
       }),
