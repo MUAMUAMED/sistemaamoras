@@ -1440,8 +1440,8 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   width: 40mm;
                   height: 30mm;
                   font-family: 'Arial', 'Helvetica', sans-serif;
-                  font-size: 10px;
-                  line-height: 1.1;
+                  font-size: 8px;
+                  line-height: 1.0;
                   display: flex;
                   overflow: hidden;
                   background: white;
@@ -1451,99 +1451,93 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   width: 100%;
                   height: 100%;
                   display: flex;
-                  padding: 1mm;
-                  gap: 0.5mm;
+                  padding: 0.5mm;
+                  gap: 1mm;
                   border: 1px solid #000;
                 }
                 .qr-section {
-                  width: 17mm;
+                  width: 16mm;
                   height: 100%;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
                   justify-content: flex-start;
-                  position: relative;
                   padding-top: 0.5mm;
                 }
                 .qr-code {
-                  width: 11mm;
-                  height: 11mm;
+                  width: 10mm;
+                  height: 10mm;
                   object-fit: contain;
                   image-rendering: -webkit-optimize-contrast;
                   image-rendering: pixelated;
-                  padding: 0;
-                  margin: 0 auto;
                   border: none;
+                  margin-bottom: 0.5mm;
                 }
                 .sku-code {
-                  font-size: 9px;
+                  font-size: 7px;
                   font-weight: bold;
                   text-align: center;
-                  margin-top: 0.4mm;
                   word-break: break-all;
-                  line-height: 1;
-                  font-family: 'Arial', sans-serif;
+                  line-height: 0.9;
                   width: 100%;
-                  padding: 0;
-                  box-sizing: border-box;
+                  margin-bottom: 0.5mm;
                 }
-
                 .left-info {
-                  font-size: 10px;
+                  font-size: 7px;
                   text-align: center;
-                  margin-top: 0.3mm;
-                  line-height: 1.1;
+                  line-height: 0.9;
                   width: 100%;
-                  padding: 0;
-                  box-sizing: border-box;
                 }
-
                 .left-info-line {
-                  margin-bottom: 0.4mm;
-                  white-space: normal;
-                  overflow: visible;
-                  word-wrap: break-word;
+                  margin-bottom: 0.2mm;
                   font-weight: 500;
-                  padding: 0;
-                  line-height: 1.1;
+                  line-height: 0.9;
                 }
                 .info-section {
                   flex: 1;
                   display: flex;
                   flex-direction: column;
-                  justify-content: space-between;
+                  justify-content: flex-start;
                   overflow: hidden;
-                  padding: 0.3mm 0;
-                  box-sizing: border-box;
+                  padding: 0.2mm 0;
                 }
                 .product-name {
                   font-weight: bold;
-                  font-size: 11px;
-                  line-height: 1.1;
-                  margin-bottom: 0.7mm;
+                  font-size: 9px;
+                  line-height: 1.0;
+                  margin-bottom: 1mm;
                   word-wrap: break-word;
                   overflow: hidden;
                   display: -webkit-box;
-                  -webkit-line-clamp: 2;
+                  -webkit-line-clamp: 1;
                   -webkit-box-orient: vertical;
                   text-transform: uppercase;
                   text-align: left;
-                  padding: 0;
                 }
                 .product-details {
-                  font-size: 10px;
-                  line-height: 1.1;
-                  flex-grow: 1;
+                  font-size: 8px;
+                  line-height: 0.9;
+                  margin-bottom: 1mm;
                 }
                 .detail-line {
-                  margin-bottom: 0.4mm;
-                  white-space: normal;
-                  overflow: visible;
-                  word-wrap: break-word;
+                  margin-bottom: 0.3mm;
                   font-weight: 500;
                   text-align: left;
-                  padding: 0;
-                  line-height: 1.1;
+                  line-height: 0.9;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                }
+                .price {
+                  font-weight: bold;
+                  font-size: 9px;
+                  text-align: right;
+                  background: #f0f0f0;
+                  padding: 0.5mm;
+                  border-radius: 1mm;
+                  margin-top: auto;
+                  width: fit-content;
+                  margin-left: auto;
                 }
                 @media print {
                   body {
@@ -1554,19 +1548,6 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                     background: #f0f0f0 !important;
                   }
                 }
-                .price {
-                  font-weight: bold;
-                  font-size: 10px;
-                  margin-top: auto;
-                  text-align: right;
-                  background: #f0f0f0;
-                  padding: 0.3mm 0.6mm;
-                  border-radius: 1mm;
-                  margin-left: auto;
-                  margin-right: 0;
-                  width: fit-content;
-                }
-                @media print {
               </style>
             </head>
             <body>
@@ -1574,18 +1555,14 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                 <div class="qr-section">
                   <img src="${codes.qrcodeUrl}" alt="QR Code" class="qr-code" />
                   <div class="sku-code">${codes.sku}</div>
-                  <div class="left-info">
-                    ${productDetails.subcategory ? `<div class="left-info-line">SUB: ${productDetails.subcategory.name}</div>` : ''}
-                    <div class="left-info-line">EST: ${productDetails.pattern?.name || 'N/A'}</div>
-                  </div>
+                  ${productDetails.subcategory ? `<div class="left-info-line">SUB: ${productDetails.subcategory.name}</div>` : ''}
+                  <div class="left-info-line">EST: ${productDetails.pattern?.name || 'N/A'}</div>
                 </div>
                 <div class="info-section">
                   <div class="product-name">${productDetails.name}</div>
                   <div class="product-details">
                     <div class="detail-line">TAM: ${productDetails.size?.name || 'N/A'}</div>
                     <div class="detail-line">CAT: ${productDetails.category?.name || 'N/A'}</div>
-                    ${productDetails.subcategory ? `<div class="detail-line">SUB: ${productDetails.subcategory.name}</div>` : ''}
-                    <div class="detail-line">EST: ${productDetails.pattern?.name || 'N/A'}</div>
                   </div>
                   <div class="price">R$ ${productDetails.price.toFixed(2).replace('.', ',')}</div>
                 </div>
