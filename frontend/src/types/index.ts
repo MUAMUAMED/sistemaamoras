@@ -92,9 +92,8 @@ export interface Product {
   imageUrl?: string;
   categoryId: string;
   subcategoryId?: string; // Opcional
+  sizeId: string; // ID do tamanho
   patternId: string;
-  size: string; // Campo string para compatibilidade com SQLite
-  sizeCode: string; // Campo string para compatibilidade com SQLite
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +102,7 @@ export interface Product {
   category?: Category;
   subcategory?: Subcategory;
   pattern?: Pattern;
+  size?: Size; // Relação completa do tamanho
 }
 
 // Tipos de movimentação de estoque

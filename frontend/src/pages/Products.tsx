@@ -905,7 +905,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     categoryId: product?.categoryId || '',
     subcategoryId: product?.subcategoryId || '',
     patternId: product?.patternId || '',
-    sizeId: product?.size ? sizes.find(s => s.name === product.size)?.id || '' : '',
+    sizeId: product?.sizeId || '',
     imageFile: null,
   });
 
