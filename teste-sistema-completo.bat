@@ -38,12 +38,12 @@ echo ✓ Banco de dados está funcionando
 
 echo.
 echo [4/6] Testando API do backend...
-curl -s http://localhost:3001/health >nul 2>&1
+curl -s http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health >nul 2>&1
 if %errorlevel% neq 0 (
     echo AVISO: Backend pode não estar respondendo ainda...
     echo Aguardando 10 segundos...
     timeout /t 10 /nobreak > nul
-    curl -s http://localhost:3001/health >nul 2>&1
+    curl -s http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health >nul 2>&1
     if %errorlevel% neq 0 (
         echo ERRO: Backend não está respondendo!
         pause
@@ -90,7 +90,7 @@ echo ✓ TODOS OS TESTES PASSARAM!
 echo.
 echo Sistema funcionando corretamente:
 echo - Frontend: http://localhost:3000
-echo - Backend: http://localhost:3001
+echo - Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 echo - Nginx: http://localhost:80
 echo.
 echo Credenciais de teste:

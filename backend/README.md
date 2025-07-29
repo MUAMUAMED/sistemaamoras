@@ -67,13 +67,13 @@ npx prisma db seed
 
 ## 📚 API Documentation
 
-- **Desenvolvimento:** http://localhost:3001/api-docs
+- **Desenvolvimento:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 - **Produção:** https://api.exemplo.com/api-docs
 
 ## 🔍 Health Check
 
 - **Endpoint:** `/health`
-- **Desenvolvimento:** http://localhost:3001/health
+- **Desenvolvimento:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
 - **Produção:** https://api.exemplo.com/health
 
 ## 🗂️ Estrutura

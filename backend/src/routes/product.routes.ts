@@ -415,6 +415,20 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
  *                 type: string
  *               active:
  *                 type: boolean
+ *               categoryId:
+ *                 type: string
+ *               subcategoryId:
+ *                 type: string
+ *               sizeId:
+ *                 type: string
+ *               patternId:
+ *                 type: string
+ *               stock:
+ *                 type: integer
+ *               minStock:
+ *                 type: integer
+ *               cost:
+ *                 type: number
  *     responses:
  *       200:
  *         description: Produto atualizado com sucesso
@@ -424,7 +438,19 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, price, description, active } = req.body;
+    const { 
+      name, 
+      price, 
+      description, 
+      active, 
+      categoryId, 
+      subcategoryId, 
+      sizeId, 
+      patternId,
+      stock,
+      minStock,
+      cost
+    } = req.body;
 
     const product = await prisma.product.findUnique({
       where: { id },
@@ -437,16 +463,85 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
+    // Se estiver alterando categoria, tamanho ou estampa, validar e gerar novo código de barras
+    let newBarcode = product.barcode;
+    if (categoryId || sizeId || patternId || subcategoryId !== undefined) {
+      const finalCategoryId = categoryId || product.categoryId;
+      const finalSubcategoryId = subcategoryId !== undefined ? subcategoryId : product.subcategoryId;
+      const finalSizeId = sizeId || product.sizeId;
+      const finalPatternId = patternId || product.patternId;
+
+      // Buscar dados para validação e geração do código de barras
+      const [category, subcategory, size, pattern] = await Promise.all([
+        prisma.category.findUnique({ where: { id: finalCategoryId } }),
+        finalSubcategoryId ? prisma.subcategory.findUnique({ where: { id: finalSubcategoryId } }) : null,
+        prisma.size.findUnique({ where: { id: finalSizeId } }),
+        prisma.pattern.findUnique({ where: { id: finalPatternId } }),
+      ]);
+
+      if (!category || !size || !pattern) {
+        return res.status(400).json({
+          error: 'Categoria, tamanho ou estampa inválida',
+          message: 'Categoria, tamanho ou estampa não encontrada',
+        });
+      }
+
+      // Se subcategoria foi informada, verificar se ela existe e pertence à categoria
+      if (finalSubcategoryId) {
+        if (!subcategory) {
+          return res.status(400).json({
+            error: 'Subcategoria inválida',
+            message: 'Subcategoria não encontrada',
+          });
+        }
+
+        if (subcategory.categoryId !== finalCategoryId) {
+          return res.status(400).json({
+            error: 'Subcategoria inválida',
+            message: 'A subcategoria não pertence à categoria especificada',
+          });
+        }
+      }
+
+      // Gerar novo código de barras
+      newBarcode = generateBarcode(size.code, category.code, subcategory?.code || null, pattern.code);
+
+      // Verificar se o novo código de barras já existe (em outro produto)
+      const existingProduct = await prisma.product.findFirst({
+        where: { 
+          barcode: newBarcode,
+          id: { not: id }
+        }
+      });
+
+      if (existingProduct) {
+        return res.status(400).json({
+          error: 'Código de barras já existe',
+          message: 'Já existe um produto com essa combinação de categoria, tamanho e estampa',
+        });
+      }
+    }
+
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: {
         ...(name && { name }),
-        ...(price && { price }),
-        ...(description && { description }),
+        ...(price !== undefined && { price }),
+        ...(cost !== undefined && { cost }),
+        ...(stock !== undefined && { stock }),
+        ...(minStock !== undefined && { minStock }),
+        ...(description !== undefined && { description }),
         ...(active !== undefined && { active }),
+        ...(categoryId && { categoryId }),
+        ...(subcategoryId !== undefined && { subcategoryId }),
+        ...(sizeId && { sizeId }),
+        ...(patternId && { patternId }),
+        ...(newBarcode !== product.barcode && { barcode: newBarcode }),
       },
       include: {
         category: true,
+        subcategory: true,
+        size: true,
         pattern: true,
       },
     });
@@ -455,7 +550,6 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
-  return;
 });
 
 /**
@@ -996,4 +1090,4 @@ router.get('/:id/stock/history', authenticateToken, async (req: AuthenticatedReq
   }
 });
 
-export default router; 
+export default router;

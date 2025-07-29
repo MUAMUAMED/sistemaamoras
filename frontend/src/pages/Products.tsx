@@ -549,7 +549,7 @@ const Products: React.FC = () => {
                           <div className="relative h-48 bg-gray-100 overflow-hidden">
                             {product.imageUrl ? (
                               <img 
-                                src={`http://localhost:3001${product.imageUrl}`}
+                                src={`http://https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
                                 alt={product.name}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
@@ -1227,7 +1227,7 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
             {product.imageUrl && (
               <div className="mb-4">
                 <img 
-                  src={`http://localhost:3001${product.imageUrl}`}
+                  src={`http://https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
                   alt={product.name}
                   className="w-full h-48 object-cover rounded-lg"
                 />

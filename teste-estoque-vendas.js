@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 // Configuração
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api';
 let authToken = '';
 
 // Função para fazer login

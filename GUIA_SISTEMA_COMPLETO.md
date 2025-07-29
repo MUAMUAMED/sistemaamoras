@@ -58,9 +58,9 @@
 
 ### URLs de Acesso
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
+- **Backend API**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 - **Nginx**: http://localhost:80
-- **API Docs**: http://localhost:3001/api-docs
+- **API Docs**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ## 🔐 Credenciais de Teste
 
@@ -118,7 +118,7 @@ docker-compose down -v
 
 ### Frontend Não Carrega
 1. Verifique se o backend está rodando: `docker-compose ps backend`
-2. Teste API: `curl http://localhost:3001/health`
+2. Teste API: `curl http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health`
 3. Verifique logs: `docker-compose logs frontend`
 
 ### Portas Ocupadas

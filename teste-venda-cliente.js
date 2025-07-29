@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api';
 
 // Token de autenticação (substitua por um token válido)
 const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtZDlkMTdldDAwMDB3NHc1ZG1wNGVlazQiLCJuYW1lIjoiQWRtaW5pc3RyYWRvciIsImVtYWlsIjoiYWRtaW5AYW1vcmFzY2FwaXRhbC5jb20iLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3NTI5NDE4NDcsImV4cCI6MTc1MzAzMDI0N30.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8';

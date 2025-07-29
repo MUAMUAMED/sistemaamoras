@@ -65,10 +65,10 @@ echo ===============================================
 echo   SISTEMA INICIADO COM SUCESSO!
 echo ===============================================
 echo.
-echo 🖥️  Backend: http://localhost:3001
+echo 🖥️  Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 echo 🌐 Frontend: http://localhost:3000
-echo 📚 Documentação: http://localhost:3001/api-docs
-echo 🏥 Health Check: http://localhost:3001/health
+echo 📚 Documentação: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
+echo 🏥 Health Check: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
 echo.
 echo Contas para teste:
 echo   👤 ADMIN: admin@amorascapital.com / admin123

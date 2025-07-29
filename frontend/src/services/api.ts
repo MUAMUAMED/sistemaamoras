@@ -35,8 +35,8 @@ import {
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || (
     process.env.NODE_ENV === 'production' 
-      ? 'https://api.exemplo.com/api'
-      : 'http://localhost:3001/api'
+      ? 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
+      : 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
   ),
   timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
 });

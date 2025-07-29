@@ -1,10 +1,10 @@
 # 🌸 Sistema Amoras Capital - FUNCIONANDO! ✅
 
 ## Status do Sistema
-- ✅ **Backend**: Rodando perfeitamente em http://localhost:3001
+- ✅ **Backend**: Rodando perfeitamente em http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 - ✅ **Frontend**: Rodando perfeitamente em http://localhost:3000
 - ✅ **Banco de Dados**: PostgreSQL conectado e funcionando
-- ✅ **API Docs**: Disponível em http://localhost:3001/api-docs
+- ✅ **API Docs**: Disponível em http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ## Problemas Corrigidos
 
@@ -46,9 +46,9 @@ cd frontend
 
 ## URLs do Sistema
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
-- **Health Check**: http://localhost:3001/health
-- **API Documentation**: http://localhost:3001/api-docs
+- **Backend API**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- **Health Check**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
+- **API Documentation**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ## Credenciais de Teste
 - **Admin**: admin@amorascapital.com / admin123

@@ -176,7 +176,7 @@ npm run dev
 ### Teste 3: APIs Respondendo
 ```bash
 # Teste básico
-curl http://localhost:3001/api/categories
+curl http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/categories
 # Deve retornar: []
 ```
 
@@ -255,7 +255,7 @@ npx prisma generate
 ### Frontend com erros 500
 ```bash
 # Verifique se backend está rodando
-curl http://localhost:3001/api/categories
+curl http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/categories
 
 # Verifique logs do backend
 # Terminal onde rodou npm run dev

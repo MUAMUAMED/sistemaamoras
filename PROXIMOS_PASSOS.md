@@ -53,8 +53,8 @@ npm run dev
 
 Após iniciar, acesse:
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
-- **Documentação**: http://localhost:3001/api-docs
+- **Backend API**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- **Documentação**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ## 🔑 Fazer Login
 
@@ -108,7 +108,7 @@ taskkill /PID <numero_do_pid> /F
 
 ### 1. Configurar Integração com Chatwoot
 - Cadastre-se no Chatwoot
-- Configure webhook para `http://localhost:3001/api/webhooks/chatwoot`
+- Configure webhook para `http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/webhooks/chatwoot`
 - Adicione o token no arquivo `.env`
 
 ### 2. Configurar Gateway de Pagamento
