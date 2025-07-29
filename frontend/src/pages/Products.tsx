@@ -1507,16 +1507,21 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   flex: 1;
                   display: flex;
                   flex-direction: column;
-                  gap: 0.3mm;
+                  gap: 0.2mm;
                   min-height: 0;
                 }
                 .detail-line {
                   font-size: 8px;
                   line-height: 1.0;
                   font-weight: 500;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
+                  word-wrap: break-word;
+                  overflow-wrap: break-word;
+                  hyphens: auto;
+                }
+                .detail-line.subcategory,
+                .detail-line.pattern {
+                  font-size: 7px;
+                  line-height: 0.9;
                 }
                 .price {
                   font-weight: bold;
@@ -1545,8 +1550,8 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   <div class="product-details">
                     <div class="detail-line">TAM: ${productDetails.size?.name || 'N/A'}</div>
                     <div class="detail-line">CAT: ${productDetails.category?.name || 'N/A'}</div>
-                    ${productDetails.subcategory ? `<div class="detail-line">SUB: ${productDetails.subcategory.name}</div>` : ''}
-                    <div class="detail-line">EST: ${productDetails.pattern?.name || 'N/A'}</div>
+                    ${productDetails.subcategory ? `<div class="detail-line subcategory">SUB: ${productDetails.subcategory.name}</div>` : ''}
+                    <div class="detail-line pattern">EST: ${productDetails.pattern?.name || 'N/A'}</div>
                   </div>
                   <div class="price">R$ ${productDetails.price.toFixed(2).replace('.', ',')}</div>
                 </div>
