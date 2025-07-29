@@ -171,8 +171,12 @@ const Products: React.FC = () => {
   };
 
   const handleCreateProduct = async (data: ProductFormData) => {
+    console.log('🆕 [FRONTEND CREATE] Dados do formulário recebidos:', data);
+    
     // Buscar o objeto do tamanho selecionado
     const selectedSize = sizes.find(s => s.id === data.sizeId);
+    console.log('🔍 [FRONTEND CREATE] Tamanho selecionado:', selectedSize);
+    
     // Montar o payload com size e sizeCode (sem o arquivo de imagem)
     const { imageFile, ...productData } = data;
     const payload = {
@@ -181,13 +185,19 @@ const Products: React.FC = () => {
       sizeCode: selectedSize ? selectedSize.code : '',
     };
     
+    console.log('📤 [FRONTEND CREATE] Payload que será enviado para API:', payload);
+    
     try {
       // Criar o produto primeiro
+      console.log('🚀 [FRONTEND CREATE] Enviando requisição para criar produto...');
       const createdProduct = await productsApi.create(payload);
+      console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
       
       // Se há uma imagem, fazer o upload
       if (imageFile) {
+        console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
         await productsApi.uploadImage(createdProduct.id, imageFile);
+        console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
       }
       
       // Atualizar a lista de produtos
@@ -195,21 +205,31 @@ const Products: React.FC = () => {
       setShowCreateModal(false);
       toast.success('Produto criado com sucesso!');
     } catch (error: any) {
+      console.error('💥 [FRONTEND CREATE] Erro ao criar produto:', error);
+      console.error('💥 [FRONTEND CREATE] Resposta do servidor:', error.response?.data);
       toast.error(error.response?.data?.error || 'Erro ao criar produto');
     }
   };
 
   const handleUpdateProduct = async (data: Partial<ProductFormData>) => {
     if (selectedProduct) {
+      console.log('🔄 [FRONTEND UPDATE] Produto selecionado:', selectedProduct);
+      console.log('🔄 [FRONTEND UPDATE] Dados do formulário recebidos:', data);
+      
       try {
         const { imageFile, ...productData } = data;
+        console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', productData);
         
         // Atualizar dados do produto (sem a imagem)
-        await productsApi.update(selectedProduct.id, productData);
+        console.log('🚀 [FRONTEND UPDATE] Enviando requisição para atualizar produto...');
+        const updatedProduct = await productsApi.update(selectedProduct.id, productData);
+        console.log('✅ [FRONTEND UPDATE] Produto atualizado com sucesso:', updatedProduct);
         
         // Se há uma nova imagem, fazer o upload
         if (imageFile) {
+          console.log('📷 [FRONTEND UPDATE] Fazendo upload de nova imagem...');
           await productsApi.uploadImage(selectedProduct.id, imageFile);
+          console.log('✅ [FRONTEND UPDATE] Imagem atualizada com sucesso');
         }
         
         // Atualizar a lista de produtos
@@ -218,6 +238,8 @@ const Products: React.FC = () => {
         setSelectedProduct(null);
         toast.success('Produto atualizado com sucesso!');
       } catch (error: any) {
+        console.error('💥 [FRONTEND UPDATE] Erro ao atualizar produto:', error);
+        console.error('💥 [FRONTEND UPDATE] Resposta do servidor:', error.response?.data);
         toast.error(error.response?.data?.error || 'Erro ao atualizar produto');
       }
     }
@@ -258,8 +280,8 @@ const Products: React.FC = () => {
       return;
     }
 
-    // Buscar o tamanho pelo nome para obter o ID
-    const sizeObj = sizes.find(s => s.name === product.size);
+    // Buscar o tamanho pelo ID para obter o objeto completo
+    const sizeObj = sizes.find(s => s.id === product.sizeId);
     if (!sizeObj) {
       toast.error('Tamanho não encontrado');
       return;
@@ -895,6 +917,24 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onClose,
   isLoading,
 }) => {
+  console.log('🔧 [FORM MODAL] Inicializando formulário:', {
+    title,
+    product: product ? {
+      id: product.id,
+      name: product.name,
+      categoryId: product.categoryId,
+      subcategoryId: product.subcategoryId,
+      sizeId: product.sizeId,
+      patternId: product.patternId,
+      price: product.price,
+      stock: product.stock
+    } : null,
+    sizesCount: sizes.length,
+    categoriesCount: categories.length,
+    patternsCount: patterns.length,
+    subcategoriesCount: subcategories.length
+  });
+
   const [formData, setFormData] = useState<ProductFormModalData>({
     name: product?.name || '',
     description: product?.description || '',
@@ -908,6 +948,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     sizeId: product?.sizeId || '',
     imageFile: null,
   });
+
+  console.log('📝 [FORM MODAL] FormData inicial:', formData);
+  console.log('🔍 [FORM MODAL] Tamanho encontrado nos sizes:', sizes.find(s => s.id === formData.sizeId));
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -1208,7 +1251,7 @@ interface ProductDetailsModalProps {
 const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, categories, patterns, sizes, onClose }) => {
   const category = categories.find(c => c.id === product.categoryId);
   const pattern = patterns.find(p => p.id === product.patternId);
-  const size = sizes.find(s => s.name === product.size);
+  const size = sizes.find(s => s.id === product.sizeId);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -2149,7 +2192,7 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
                   Estoque atual: <span className="font-semibold text-blue-600">{product.stock} unidades</span>
                 </p>
                 <p className="text-xs text-gray-500">
-                  {product.category?.name} • {product.pattern?.name} • {product.size}
+                  {product.category?.name} • {product.pattern?.name} • {product.size?.name}
                 </p>
               </div>
             </div>
