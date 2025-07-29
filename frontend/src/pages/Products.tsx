@@ -1451,33 +1451,34 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   width: 100%;
                   height: 100%;
                   display: flex;
-                  padding: 1mm;
-                  gap: 1.5mm;
+                  padding: 0.3mm;
+                  gap: 0.8mm;
                 }
                 .qr-section {
-                  width: 15mm;
+                  width: 14mm;
                   height: 100%;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
                   justify-content: flex-start;
-                  gap: 1mm;
+                  gap: 0.5mm;
                 }
                 .qr-code {
-                  width: 14mm;
-                  height: 14mm;
+                  width: 13mm;
+                  height: 13mm;
                   object-fit: contain;
                   image-rendering: -webkit-optimize-contrast;
                   image-rendering: pixelated;
                   border: none;
                 }
                 .sku-code {
-                  font-size: 9px;
+                  font-size: 8px;
                   font-weight: bold;
                   text-align: center;
                   word-break: break-all;
                   line-height: 1.0;
-                  margin-top: 1mm;
+                  margin-top: 0.3mm;
+                  width: 100%;
                 }
                 .info-section {
                   flex: 1;
@@ -1485,38 +1486,48 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   display: flex;
                   flex-direction: column;
                   justify-content: space-between;
+                  min-width: 0;
+                  overflow: hidden;
                 }
                 .product-name {
-                  font-size: 12px;
+                  font-size: 11px;
                   font-weight: bold;
-                  line-height: 1.1;
-                  margin-bottom: 2mm;
+                  line-height: 1.0;
+                  margin-bottom: 1mm;
                   word-wrap: break-word;
                   overflow-wrap: break-word;
                   hyphens: auto;
-                  max-height: 6mm;
+                  max-height: 5.5mm;
                   overflow: hidden;
+                  display: -webkit-box;
+                  -webkit-line-clamp: 2;
+                  -webkit-box-orient: vertical;
                 }
                 .product-details {
                   flex: 1;
                   display: flex;
                   flex-direction: column;
-                  gap: 0.8mm;
+                  gap: 0.3mm;
+                  min-height: 0;
                 }
                 .detail-line {
-                  font-size: 9px;
+                  font-size: 8px;
                   line-height: 1.0;
                   font-weight: 500;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
                 }
                 .price {
                   font-weight: bold;
-                  font-size: 12px;
+                  font-size: 11px;
                   text-align: right;
                   background: #f5f5f5;
-                  padding: 1mm 1.5mm;
-                  border-radius: 1mm;
-                  margin-top: 1mm;
+                  padding: 0.5mm 0.8mm;
+                  border-radius: 0.5mm;
+                  margin-top: 0.5mm;
                   border: 1px solid #ddd;
+                  white-space: nowrap;
                 }
                 @media print {
                   body { -webkit-print-color-adjust: exact; color-adjust: exact; }
