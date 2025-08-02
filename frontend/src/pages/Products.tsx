@@ -38,9 +38,11 @@ const Products: React.FC = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
   const [showPatternModal, setShowPatternModal] = useState(false);
   const [showSizeModal, setShowSizeModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [generatedCodes, setGeneratedCodes] = useState<GeneratedCodes | null>(null);
   const [forceDeleteId, setForceDeleteId] = useState<string | null>(null);
   const [forceDeleteLoading, setForceDeleteLoading] = useState(false);
@@ -130,6 +132,18 @@ const Products: React.FC = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Erro ao criar categoria');
+    },
+  });
+
+  const createSubcategoryMutation = useMutation({
+    mutationFn: subcategoriesApi.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subcategories'] });
+      setShowSubcategoryModal(false);
+      toast.success('Subcategoria criada com sucesso!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao criar subcategoria');
     },
   });
 
@@ -300,6 +314,10 @@ const Products: React.FC = () => {
 
   const handleCreateCategory = async (data: { name: string; code: string; description?: string }) => {
     createCategoryMutation.mutate(data);
+  };
+
+  const handleCreateSubcategory = async (data: { name: string; code: string; description?: string; categoryId: string }) => {
+    createSubcategoryMutation.mutate(data);
   };
 
   const handleCreatePattern = async (data: { name: string; code: string; description?: string }) => {
@@ -573,7 +591,7 @@ const Products: React.FC = () => {
                               <img 
                                 src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
                                 alt={product.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
                                   e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -755,6 +773,10 @@ const Products: React.FC = () => {
           onSubmit={handleCreateProduct}
           onClose={() => setShowCreateModal(false)}
           isLoading={createMutation.isPending}
+          setShowCategoryModal={setShowCategoryModal}
+          setShowSubcategoryModal={setShowSubcategoryModal}
+          setShowPatternModal={setShowPatternModal}
+          setSelectedCategoryId={setSelectedCategoryId}
         />
       )}
 
@@ -772,6 +794,10 @@ const Products: React.FC = () => {
             setSelectedProduct(null);
           }}
           isLoading={updateMutation.isPending}
+          setShowCategoryModal={setShowCategoryModal}
+          setShowSubcategoryModal={setShowSubcategoryModal}
+          setShowPatternModal={setShowPatternModal}
+          setSelectedCategoryId={setSelectedCategoryId}
         />
       )}
 
@@ -804,6 +830,15 @@ const Products: React.FC = () => {
           onSubmit={handleCreateCategory}
           onClose={() => setShowCategoryModal(false)}
           isLoading={createCategoryMutation.isPending}
+        />
+      )}
+
+      {showSubcategoryModal && (
+        <SubcategoryFormModal
+          categoryId={selectedCategoryId}
+          onSubmit={handleCreateSubcategory}
+          onClose={() => setShowSubcategoryModal(false)}
+          isLoading={createSubcategoryMutation.isPending}
         />
       )}
 
@@ -904,6 +939,10 @@ interface ProductFormModalProps {
   onSubmit: (data: ProductFormData) => void;
   onClose: () => void;
   isLoading: boolean;
+  setShowCategoryModal: (show: boolean) => void;
+  setShowSubcategoryModal: (show: boolean) => void;
+  setShowPatternModal: (show: boolean) => void;
+  setSelectedCategoryId: (id: string) => void;
 }
 
 const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -916,6 +955,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onSubmit,
   onClose,
   isLoading,
+  setShowCategoryModal,
+  setShowSubcategoryModal,
+  setShowPatternModal,
+  setSelectedCategoryId,
 }) => {
   console.log('🔧 [FORM MODAL] Inicializando formulário:', {
     title,
@@ -1131,52 +1174,97 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
             </div>
 
-            <SearchableSelect
-              label="Categoria"
-              required
-              options={categories.map(cat => ({
-                id: cat.id,
-                name: cat.name,
-                code: cat.code,
-                description: cat.description
-              }))}
-              value={formData.categoryId}
-              onChange={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
-              placeholder="Busque ou selecione uma categoria"
-              error={errors.categoryId}
-            />
-
-            <SearchableSelect
-              label="Subcategoria (opcional)"
-              options={subcategories
-                .filter(sub => sub.categoryId === formData.categoryId)
-                .map(sub => ({
-                  id: sub.id,
-                  name: sub.name,
-                  code: sub.code,
-                  description: sub.description
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                Categoria *
+              </label>
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(true)}
+                  className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition-colors"
+                  title="Criar nova categoria"
+                >
+                  + Nova
+                </button>
+              </div>
+              <SearchableSelect
+                options={categories.map(cat => ({
+                  id: cat.id,
+                  name: cat.name,
+                  code: cat.code,
+                  description: cat.description
                 }))}
-              value={formData.subcategoryId || ''}
-              onChange={(value) => setFormData(prev => ({ ...prev, subcategoryId: value }))}
-              placeholder="Busque ou selecione uma subcategoria"
-              disabled={!formData.categoryId}
-              error={errors.subcategoryId}
-            />
+                value={formData.categoryId}
+                onChange={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
+                placeholder="Busque ou selecione uma categoria"
+                error={errors.categoryId}
+              />
+            </div>
 
-            <SearchableSelect
-              label="Estampa"
-              required
-              options={patterns.map(pattern => ({
-                id: pattern.id,
-                name: pattern.name,
-                code: pattern.code,
-                description: pattern.description
-              }))}
-              value={formData.patternId}
-              onChange={(value) => setFormData(prev => ({ ...prev, patternId: value }))}
-              placeholder="Busque ou selecione uma estampa"
-              error={errors.patternId}
-            />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  Subcategoria (opcional)
+              </label>
+                {formData.categoryId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategoryId(formData.categoryId);
+                      setShowSubcategoryModal(true);
+                    }}
+                    className="text-xs bg-green-50 text-green-600 px-2 py-1 rounded hover:bg-green-100 transition-colors"
+                    title="Criar nova subcategoria"
+                  >
+                    + Nova
+                  </button>
+                )}
+              </div>
+              <SearchableSelect
+                options={subcategories
+                  .filter(sub => sub.categoryId === formData.categoryId)
+                  .map(sub => ({
+                    id: sub.id,
+                    name: sub.name,
+                    code: sub.code,
+                    description: sub.description
+                  }))}
+                value={formData.subcategoryId || ''}
+                onChange={(value) => setFormData(prev => ({ ...prev, subcategoryId: value }))}
+                placeholder="Busque ou selecione uma subcategoria"
+                disabled={!formData.categoryId}
+                error={errors.subcategoryId}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  Estampa *
+              </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPatternModal(true)}
+                  className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded hover:bg-purple-100 transition-colors"
+                  title="Criar nova estampa"
+                >
+                  + Nova
+                </button>
+              </div>
+              <SearchableSelect
+                options={patterns.map(pattern => ({
+                  id: pattern.id,
+                  name: pattern.name,
+                  code: pattern.code,
+                  description: pattern.description
+                }))}
+                value={formData.patternId}
+                onChange={(value) => setFormData(prev => ({ ...prev, patternId: value }))}
+                placeholder="Busque ou selecione uma estampa"
+                error={errors.patternId}
+              />
+            </div>
 
             <SearchableSelect
               label="Tamanho"
@@ -1272,7 +1360,7 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
                 <img 
                   src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
                   alt={product.name}
-                  className="w-full h-48 object-cover rounded-lg"
+                  className="w-full h-48 object-contain rounded-lg"
                 />
               </div>
             )}
@@ -1605,7 +1693,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
             <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
             <div className="flex items-center gap-2">
               <div className="flex-1 p-2 bg-gray-50 rounded border font-mono text-center">
-                {codes.sku}
+              {codes.sku}
               </div>
               <button
                 onClick={() => copyToClipboard(codes.sku)}
@@ -1623,7 +1711,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
             </label>
             <div className="flex items-center gap-2">
               <div className="flex-1 p-2 bg-gray-50 rounded border font-mono text-center">
-                {codes.barcode}
+              {codes.barcode}
               </div>
               <button
                 onClick={() => copyToClipboard(codes.barcode)}
@@ -1779,6 +1867,143 @@ const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               rows={3}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Subcategory Form Modal Component
+interface SubcategoryFormModalProps {
+  categoryId: string;
+  onSubmit: (data: { name: string; code: string; description?: string; categoryId: string }) => void;
+  onClose: () => void;
+  isLoading: boolean;
+}
+
+const SubcategoryFormModal: React.FC<SubcategoryFormModalProps> = ({
+  categoryId,
+  onSubmit,
+  onClose,
+  isLoading,
+}) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    code: '',
+    description: '',
+  });
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Nome é obrigatório';
+    }
+
+    if (!formData.code.trim()) {
+      newErrors.code = 'Código é obrigatório';
+    } else if (!/^\d{1,3}$/.test(formData.code)) {
+      newErrors.code = 'Código deve ter 1 a 3 dígitos numéricos (ex: 001, 050)';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validateForm()) {
+      onSubmit({
+        ...formData,
+        categoryId
+      });
+    }
+  };
+
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 3); // Apenas números, máximo 3 dígitos
+    setFormData(prev => ({ ...prev, code: value }));
+    if (errors.code) {
+      setErrors(prev => ({ ...prev, code: '' }));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Nova Subcategoria</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ×
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nome *
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                errors.name ? 'border-red-500' : 'border-gray-300'
+              }`}
+            />
+            {errors.name && (
+              <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Código *
+            </label>
+            <input
+              type="text"
+              value={formData.code}
+              onChange={handleCodeChange}
+              className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                errors.code ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="Ex: 001"
+            />
+            {errors.code && (
+              <p className="text-red-500 text-xs mt-1">{errors.code}</p>
+            )}
+            <p className="text-gray-500 text-xs mt-1">Máximo 3 dígitos numéricos</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Descrição
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
 

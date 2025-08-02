@@ -84,8 +84,8 @@ router.get('/', authenticateToken, async (req, res, next) => {
       where.OR = [
         {
           name: {
-            contains: search as string,
-            mode: 'insensitive',
+        contains: search as string,
+        mode: 'insensitive',
           },
         },
         {
@@ -393,16 +393,16 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     console.log('📱 [PRODUTO CREATE] QR Code gerado');
 
     const createData = {
-      name,
-      categoryId,
+        name,
+        categoryId,
       subcategoryId,
-      sizeId,
-      patternId,
-      price,
-      stock,
-      barcode,
-      qrcodeUrl,
-      description,
+        sizeId,
+        patternId,
+        price,
+        stock,
+        barcode,
+        qrcodeUrl,
+        description,
     };
 
     console.log('💾 [PRODUTO CREATE] Dados que serão criados:', createData);
@@ -657,13 +657,13 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
     }
 
     const updateData = {
-      ...(name && { name }),
+        ...(name && { name }),
       ...(price !== undefined && { price }),
       ...(cost !== undefined && { cost }),
       ...(stock !== undefined && { stock }),
       ...(minStock !== undefined && { minStock }),
       ...(description !== undefined && { description }),
-      ...(active !== undefined && { active }),
+        ...(active !== undefined && { active }),
       ...(categoryId && { categoryId }),
       ...(subcategoryId !== undefined && { subcategoryId }),
       ...(sizeId && { sizeId }),
@@ -1243,4 +1243,4 @@ router.get('/:id/stock/history', authenticateToken, async (req: AuthenticatedReq
   }
 });
 
-export default router;
+export default router; 
