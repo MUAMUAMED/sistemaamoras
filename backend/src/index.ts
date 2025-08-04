@@ -92,7 +92,7 @@ app.use(cors({
     ? (process.env.CORS_ORIGINS?.split(',') || ['https://app.exemplo.com'])
     : true, // Permitir todas as origens em desenvolvimento
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   maxAge: 86400
 }));

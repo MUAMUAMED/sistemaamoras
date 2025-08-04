@@ -1033,8 +1033,11 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     imageFile: null,
   });
 
-  console.log('📝 [FORM MODAL] FormData inicial:', formData);
-  console.log('🔍 [FORM MODAL] Tamanho encontrado nos sizes:', sizes.find(s => s.id === formData.sizeId));
+  // Debug apenas quando produto muda
+  useEffect(() => {
+    console.log('📝 [FORM MODAL] FormData inicial:', formData);
+    console.log('🔍 [FORM MODAL] Tamanho encontrado nos sizes:', sizes.find(s => s.id === formData.sizeId));
+  }, [product?.id]); // Só executa quando produto mudar
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
