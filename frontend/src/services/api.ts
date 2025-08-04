@@ -10,6 +10,7 @@ import {
   Sale,
   SaleItem,
   StockMovement,
+  StockLocation,
   Interaction,
   SystemConfig,
   DashboardMetrics,
@@ -314,6 +315,52 @@ export const productsApi = {
     totalMovements: number;
   }> => {
     const response = await api.get(`/products/${id}/stock/history`);
+    return response.data;
+  },
+  
+  addStockLocation: async (id: string, quantity: number, location: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/add-location`, {
+      quantity,
+      location,
+      reason: reason || `Adição manual de estoque - ${location}`
+    });
+    return response.data;
+  },
+  
+  removeStockLocation: async (id: string, quantity: number, location: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/remove-location`, {
+      quantity,
+      location,
+      reason: reason || `Retirada manual de estoque - ${location}`
+    });
+    return response.data;
+  },
+  
+  transferStock: async (id: string, quantity: number, fromLocation: StockLocation, toLocation: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+    transferDetails: {
+      quantity: number;
+      fromLocation: StockLocation;
+      toLocation: StockLocation;
+      previousFromStock: number;
+      newFromStock: number;
+      previousToStock: number;
+      newToStock: number;
+    };
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/transfer`, {
+      quantity,
+      fromLocation,
+      toLocation,
+      reason: reason || `Transferência de estoque: ${fromLocation} → ${toLocation}`
+    });
     return response.data;
   },
 };

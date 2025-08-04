@@ -35,6 +35,7 @@ const Products: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -631,11 +632,17 @@ const Products: React.FC = () => {
                                 </span>
                               </div>
                               
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Estoque:</span>
-                                <span className={`font-medium ${product.stock <= product.minStock ? 'text-yellow-600' : 'text-gray-900'}`}>
-                                  {product.stock} un
-                                </span>
+                              <div className="text-sm">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-gray-600">Estoque:</span>
+                                  <span className={`font-medium ${product.stock <= product.minStock ? 'text-yellow-600' : 'text-gray-900'}`}>
+                                    {product.stock} un
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-500">
+                                  <span>Loja: <span className="font-semibold text-green-600">{product.stockLoja || 0}</span></span>
+                                  <span>Armazém: <span className="font-semibold text-blue-600">{product.stockArmazem || 0}</span></span>
+                                </div>
                               </div>
 
                               <div className="flex items-center justify-between text-sm">
@@ -647,58 +654,78 @@ const Products: React.FC = () => {
                             </div>
 
                             {/* Ações */}
-                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-gray-100">
-                              <button
-                                onClick={() => {
-                                  setSelectedProduct(product);
-                                  setShowDetailsModal(true);
-                                }}
-                                className="px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors duration-200 flex items-center justify-center gap-1"
-                              >
-                                <Eye className="w-4 h-4" />
-                                Ver
-                              </button>
-                              
-                              <button
-                                onClick={() => {
-                                  setSelectedProduct(product);
-                                  setShowEditModal(true);
-                                }}
-                                className="px-3 py-2 text-sm bg-yellow-50 text-yellow-600 rounded-lg hover:bg-yellow-100 transition-colors duration-200 flex items-center justify-center gap-1"
-                              >
-                                <Edit3 className="w-4 h-4" />
-                                Editar
-                              </button>
-                              
-                              <button
-                                onClick={() => handleGenerateCodes(product)}
-                                className="px-3 py-2 text-sm bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors duration-200 flex items-center justify-center gap-1"
-                                title="Gerar códigos de barras"
-                              >
-                                <Barcode className="w-4 h-4" />
-                                Códigos
-                              </button>
-                              
-                              <button
-                                onClick={() => {
-                                  setSelectedProduct(product);
-                                  setShowStockModal(true);
-                                }}
-                                className="px-3 py-2 text-sm bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors duration-200 flex items-center justify-center gap-1"
-                                title="Gerenciar estoque"
-                              >
-                                <Package className="w-4 h-4" />
-                                Estoque
-                              </button>
-                              
-                              <button
-                                onClick={() => handleDeleteProduct(product.id)}
-                                className="px-3 py-2 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200 flex items-center justify-center gap-1"
-                                title="Excluir produto"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                Excluir
-                              </button>
+                            <div className="space-y-2 pt-3 border-t border-gray-100">
+                              {/* Primeira linha - Ações básicas */}
+                              <div className="grid grid-cols-3 gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedProduct(product);
+                                    setShowDetailsModal(true);
+                                  }}
+                                  className="px-2 py-1.5 text-xs bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  Ver
+                                </button>
+                                
+                                <button
+                                  onClick={() => {
+                                    setSelectedProduct(product);
+                                    setShowEditModal(true);
+                                  }}
+                                  className="px-2 py-1.5 text-xs bg-yellow-50 text-yellow-600 rounded-md hover:bg-yellow-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                >
+                                  <Edit3 className="w-3 h-3" />
+                                  Editar
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleGenerateCodes(product)}
+                                  className="px-2 py-1.5 text-xs bg-purple-50 text-purple-600 rounded-md hover:bg-purple-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                  title="Gerar códigos de barras"
+                                >
+                                  <Barcode className="w-3 h-3" />
+                                  Códigos
+                                </button>
+                              </div>
+
+                              {/* Segunda linha - Gestão de estoque */}
+                              <div className="grid grid-cols-3 gap-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedProduct(product);
+                                    setShowStockModal(true);
+                                  }}
+                                  className="px-2 py-1.5 text-xs bg-green-50 text-green-600 rounded-md hover:bg-green-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                  title="Gerenciar estoque geral"
+                                >
+                                  <Package className="w-3 h-3" />
+                                  Estoque
+                                </button>
+                                
+                                <button
+                                  onClick={() => {
+                                    setSelectedProduct(product);
+                                    setShowTransferModal(true);
+                                  }}
+                                  className="px-2 py-1.5 text-xs bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                  title="Transferir entre localizações"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                  </svg>
+                                  Transfer
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleDeleteProduct(product.id)}
+                                  className="px-2 py-1.5 text-xs bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                  title="Excluir produto"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  Excluir
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -863,6 +890,19 @@ const Products: React.FC = () => {
           product={selectedProduct}
           onClose={() => {
             setShowStockModal(false);
+            setSelectedProduct(null);
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+      )}
+
+      {showTransferModal && selectedProduct && (
+        <TransferStockModal
+          product={selectedProduct}
+          onClose={() => {
+            setShowTransferModal(false);
             setSelectedProduct(null);
           }}
           onSuccess={() => {
@@ -2301,9 +2341,10 @@ interface StockModalProps {
 }
 
 const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) => {
-  const [operation, setOperation] = useState<'add' | 'remove' | 'history'>('add');
+  const [operation, setOperation] = useState<'add' | 'remove' | 'add-location' | 'remove-location' | 'history'>('add');
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState<string>('');
+  const [location, setLocation] = useState<'LOJA' | 'ARMAZEM'>('LOJA');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleStockOperation = async (e: React.FormEvent) => {
@@ -2320,7 +2361,12 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
         toast.success(result.message);
       } else if (operation === 'remove') {
         const result = await productsApi.removeStock(product.id, quantity, reason);
-        toast.success(result.message);
+      } else if (operation === 'add-location') {
+        const result = await productsApi.addStockLocation(product.id, quantity, location, reason);
+        toast.success(`Estoque adicionado na ${location}`);
+      } else if (operation === 'remove-location') {
+        const result = await productsApi.removeStockLocation(product.id, quantity, location, reason);
+        toast.success(`Estoque removido da ${location}`);
       }
       
       onSuccess();
@@ -2374,12 +2420,18 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
           <div className="bg-gray-50 p-4 rounded-lg mb-6">
             <div className="flex items-center gap-3">
               <Package className="w-8 h-8 text-blue-600" />
-              <div>
+              <div className="flex-1">
                 <h3 className="font-medium text-gray-900">{product.name}</h3>
-                <p className="text-sm text-gray-600">
-                  Estoque atual: <span className="font-semibold text-blue-600">{product.stock} unidades</span>
-                </p>
-                <p className="text-xs text-gray-500">
+                <div className="text-sm text-gray-600 mt-1">
+                  <div className="flex justify-between items-center">
+                    <span>Total: <span className="font-semibold text-blue-600">{product.stock} un.</span></span>
+                  </div>
+                  <div className="flex justify-between mt-1 text-xs">
+                    <span>Loja: <span className="font-semibold text-green-600">{product.stockLoja || 0} un.</span></span>
+                    <span>Armazém: <span className="font-semibold text-blue-600">{product.stockArmazem || 0} un.</span></span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
                   {product.category?.name} • {product.pattern?.name} • {product.size?.name}
                 </p>
               </div>
@@ -2387,45 +2439,93 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
           </div>
 
           {/* Abas de operação */}
-          <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setOperation('add')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                operation === 'add'
-                  ? 'bg-white text-green-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Plus className="w-4 h-4 inline-block mr-2" />
-              Adicionar
-            </button>
-            <button
-              onClick={() => setOperation('remove')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                operation === 'remove'
-                  ? 'bg-white text-red-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Minus className="w-4 h-4 inline-block mr-2" />
-              Retirar
-            </button>
-            <button
-              onClick={() => setOperation('history')}
-              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors ${
-                operation === 'history'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <History className="w-4 h-4 inline-block mr-2" />
-              Histórico
-            </button>
+          <div className="space-y-2 mb-6">
+            {/* Operações Gerais */}
+            <div className="text-xs font-medium text-gray-700 mb-1">Estoque Geral:</div>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setOperation('add')}
+                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
+                  operation === 'add'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Plus className="w-3 h-3 inline-block mr-1" />
+                Adicionar
+              </button>
+              <button
+                onClick={() => setOperation('remove')}
+                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
+                  operation === 'remove'
+                    ? 'bg-white text-red-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Minus className="w-3 h-3 inline-block mr-1" />
+                Retirar
+              </button>
+              <button
+                onClick={() => setOperation('history')}
+                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
+                  operation === 'history'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <History className="w-3 h-3 inline-block mr-1" />
+                Histórico
+              </button>
+            </div>
+
+            {/* Operações por Localização */}
+            <div className="text-xs font-medium text-gray-700 mb-1">Por Localização:</div>
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setOperation('add-location')}
+                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
+                  operation === 'add-location'
+                    ? 'bg-white text-green-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Plus className="w-3 h-3 inline-block mr-1" />
+                Entrada
+              </button>
+              <button
+                onClick={() => setOperation('remove-location')}
+                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
+                  operation === 'remove-location'
+                    ? 'bg-white text-red-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Minus className="w-3 h-3 inline-block mr-1" />
+                Saída
+              </button>
+            </div>
           </div>
 
           {/* Formulário de operação */}
           {operation !== 'history' && (
             <form onSubmit={handleStockOperation} className="space-y-4">
+              {/* Campo de localização para operações específicas */}
+              {(operation === 'add-location' || operation === 'remove-location') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Localização
+                  </label>
+                  <select
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value as 'LOJA' | 'ARMAZEM')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="LOJA">Loja ({product.stockLoja || 0} unidades)</option>
+                    <option value="ARMAZEM">Armazém ({product.stockArmazem || 0} unidades)</option>
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Quantidade
@@ -2433,12 +2533,22 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
                 <input
                   type="number"
                   min="1"
+                  max={
+                    operation === 'remove-location' 
+                      ? (location === 'LOJA' ? product.stockLoja : product.stockArmazem)
+                      : undefined
+                  }
                   value={quantity}
                   onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Digite a quantidade"
                   required
                 />
+                {operation === 'remove-location' && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Máximo disponível na {location}: {location === 'LOJA' ? product.stockLoja : product.stockArmazem} unidades
+                  </p>
+                )}
               </div>
 
               <div>
@@ -2450,7 +2560,12 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder={operation === 'add' ? 'Ex: Recebimento de fornecedor' : 'Ex: Produto danificado'}
+                  placeholder={
+                    operation === 'add' || operation === 'add-location' 
+                      ? 'Ex: Recebimento de fornecedor' 
+                      : 'Ex: Produto danificado'
+                  }
+                  required
                 />
               </div>
 
@@ -2466,12 +2581,17 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
                   type="submit"
                   disabled={isLoading}
                   className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                    operation === 'add'
+                    operation === 'add' || operation === 'add-location'
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >
-                  {isLoading ? 'Processando...' : operation === 'add' ? 'Adicionar' : 'Retirar'}
+                  {isLoading ? 'Processando...' : 
+                    operation === 'add' ? 'Adicionar' :
+                    operation === 'remove' ? 'Retirar' :
+                    operation === 'add-location' ? `Adicionar na ${location}` :
+                    operation === 'remove-location' ? `Retirar da ${location}` : 'Processar'
+                  }
                 </button>
               </div>
             </form>
@@ -2524,6 +2644,184 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
               )}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Modal de transferência de estoque entre localizações
+interface TransferStockModalProps {
+  product: Product;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const TransferStockModal: React.FC<TransferStockModalProps> = ({ product, onClose, onSuccess }) => {
+  const [quantity, setQuantity] = useState<number>(1);
+  const [fromLocation, setFromLocation] = useState<'LOJA' | 'ARMAZEM'>('LOJA');
+  const [toLocation, setToLocation] = useState<'LOJA' | 'ARMAZEM'>('ARMAZEM');
+  const [reason, setReason] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleTransfer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (quantity <= 0) {
+      toast.error('Quantidade deve ser maior que zero');
+      return;
+    }
+
+    if (fromLocation === toLocation) {
+      toast.error('Localização de origem e destino devem ser diferentes');
+      return;
+    }
+
+    const fromStock = fromLocation === 'LOJA' ? product.stockLoja : product.stockArmazem;
+    if (fromStock < quantity) {
+      toast.error(`Estoque insuficiente na ${fromLocation}. Disponível: ${fromStock}`);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await productsApi.transferStock(product.id, quantity, fromLocation, toLocation, reason);
+      toast.success(result.message);
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Erro ao transferir estoque';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Transferir Estoque
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Informações do produto */}
+          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="flex items-center gap-3">
+              <Package className="w-8 h-8 text-blue-600" />
+              <div>
+                <h3 className="font-medium text-gray-900">{product.name}</h3>
+                <div className="text-sm text-gray-600 mt-1">
+                  <div className="flex justify-between">
+                    <span>Loja: <span className="font-semibold text-green-600">{product.stockLoja} un.</span></span>
+                    <span>Armazém: <span className="font-semibold text-blue-600">{product.stockArmazem} un.</span></span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {product.category?.name} • {product.pattern?.name} • {product.size?.name}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Formulário de transferência */}
+          <form onSubmit={handleTransfer} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  De
+                </label>
+                <select
+                  value={fromLocation}
+                  onChange={(e) => {
+                    const newFrom = e.target.value as 'LOJA' | 'ARMAZEM';
+                    setFromLocation(newFrom);
+                    // Automaticamente ajusta o destino
+                    setToLocation(newFrom === 'LOJA' ? 'ARMAZEM' : 'LOJA');
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="LOJA">Loja ({product.stockLoja} un.)</option>
+                  <option value="ARMAZEM">Armazém ({product.stockArmazem} un.)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Para
+                </label>
+                <select
+                  value={toLocation}
+                  onChange={(e) => setToLocation(e.target.value as 'LOJA' | 'ARMAZEM')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="LOJA" disabled={fromLocation === 'LOJA'}>
+                    Loja ({product.stockLoja} un.)
+                  </option>
+                  <option value="ARMAZEM" disabled={fromLocation === 'ARMAZEM'}>
+                    Armazém ({product.stockArmazem} un.)
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Quantidade
+              </label>
+              <input
+                type="number"
+                min="1"
+                max={fromLocation === 'LOJA' ? product.stockLoja : product.stockArmazem}
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Digite a quantidade"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Máximo disponível: {fromLocation === 'LOJA' ? product.stockLoja : product.stockArmazem} unidades
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Motivo
+              </label>
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder={`Ex: Transferência ${fromLocation} → ${toLocation}`}
+                required
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Transferindo...' : 'Transferir'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

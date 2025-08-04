@@ -85,7 +85,9 @@ export interface Product {
   description?: string;
   price: number;
   cost?: number;
-  stock: number;
+  stock: number; // Estoque total (para compatibilidade)
+  stockLoja: number; // Estoque na Loja
+  stockArmazem: number; // Estoque no Armazém
   minStock: number;
   barcode: string;
   qrcodeUrl?: string;
@@ -105,6 +107,9 @@ export interface Product {
   size?: Size; // Relação completa do tamanho
 }
 
+// Enums de localização de estoque
+export type StockLocation = 'LOJA' | 'ARMAZEM';
+
 // Tipos de movimentação de estoque
 export interface StockMovement {
   id: string;
@@ -113,7 +118,10 @@ export interface StockMovement {
   quantity: number;
   reason: string;
   reference?: string;
-  userId: string;
+  userId?: string;
+  location?: StockLocation; // Para ENTRY/EXIT/ADJUSTMENT
+  fromLocation?: StockLocation; // Para TRANSFER
+  toLocation?: StockLocation; // Para TRANSFER
   createdAt: string;
   
   // Relações

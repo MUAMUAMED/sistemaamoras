@@ -106,7 +106,9 @@ model Product {
   sizeId        String   // Relação com o modelo Size
   patternId     String
   price         Float
-  stock         Int      @default(0)
+  stock         Int      @default(0) // Estoque total (para compatibilidade)
+  stockLoja     Int      @default(0) // Estoque na Loja
+  stockArmazem  Int      @default(0) // Estoque no Armazém
   minStock      Int      @default(5)
   barcode       String   @unique
   qrcodeUrl     String?
@@ -232,6 +234,9 @@ model StockMovement {
   reason      String
   reference   String?           // Referência (ID da venda, nota fiscal, etc.)
   userId      String?           // Usuário responsável pela movimentação
+  location    StockLocation?    // Localização do estoque (para ENTRY/EXIT/ADJUSTMENT)
+  fromLocation StockLocation?   // Localização de origem (para TRANSFER)
+  toLocation  StockLocation?    // Localização de destino (para TRANSFER)
   createdAt   DateTime          @default(now())
 
   // Relacionamentos
@@ -334,5 +339,10 @@ enum StockMovementType {
   SALE              // Venda
   RETURN            // Devolução
   LOSS              // Perda
-  TRANSFER          // Transferência
+  TRANSFER          // Transferência entre estoques
+}
+
+enum StockLocation {
+  LOJA              // Estoque da Loja
+  ARMAZEM           // Estoque do Armazém
 }

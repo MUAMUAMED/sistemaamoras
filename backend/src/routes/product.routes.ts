@@ -1243,4 +1243,354 @@ router.get('/:id/stock/history', authenticateToken, async (req: AuthenticatedReq
   }
 });
 
+/**
+ * @swagger
+ * /api/products/{id}/stock/add-location:
+ *   patch:
+ *     summary: Adicionar estoque em localização específica
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *               - location
+ *               - reason
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *               location:
+ *                 type: string
+ *                 enum: [LOJA, ARMAZEM]
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Estoque adicionado com sucesso
+ */
+router.patch('/:id/stock/add-location', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { quantity, location, reason } = req.body;
+
+    if (!quantity || !location || !reason) {
+      return res.status(400).json({
+        error: 'Dados obrigatórios',
+        message: 'Quantidade, localização e motivo são obrigatórios',
+      });
+    }
+
+    if (!['LOJA', 'ARMAZEM'].includes(location)) {
+      return res.status(400).json({
+        error: 'Localização inválida',
+        message: 'Localização deve ser LOJA ou ARMAZEM',
+      });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado',
+        message: 'O produto solicitado não foi encontrado',
+      });
+    }
+
+    const stockField = location === 'LOJA' ? 'stockLoja' : 'stockArmazem';
+    const newLocationStock = product[stockField] + quantity;
+    const newTotalStock = product.stock + quantity;
+
+    const [updatedProduct] = await prisma.$transaction([
+      prisma.product.update({
+        where: { id },
+        data: { 
+          [stockField]: newLocationStock,
+          stock: newTotalStock
+        },
+        include: {
+          category: true,
+          subcategory: true,
+          size: true,
+          pattern: true,
+        },
+      }),
+      prisma.stockMovement.create({
+        data: {
+          productId: id,
+          type: 'ENTRY',
+          quantity,
+          reason,
+          location,
+          userId: req.user!.id,
+        },
+      }),
+    ]);
+
+    return res.json(updatedProduct);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/stock/remove-location:
+ *   patch:
+ *     summary: Remover estoque de localização específica
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *               - location
+ *               - reason
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *               location:
+ *                 type: string
+ *                 enum: [LOJA, ARMAZEM]
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Estoque removido com sucesso
+ */
+router.patch('/:id/stock/remove-location', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { quantity, location, reason } = req.body;
+
+    if (!quantity || !location || !reason) {
+      return res.status(400).json({
+        error: 'Dados obrigatórios',
+        message: 'Quantidade, localização e motivo são obrigatórios',
+      });
+    }
+
+    if (!['LOJA', 'ARMAZEM'].includes(location)) {
+      return res.status(400).json({
+        error: 'Localização inválida',
+        message: 'Localização deve ser LOJA ou ARMAZEM',
+      });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado',
+        message: 'O produto solicitado não foi encontrado',
+      });
+    }
+
+    const stockField = location === 'LOJA' ? 'stockLoja' : 'stockArmazem';
+    const currentLocationStock = product[stockField];
+
+    if (currentLocationStock < quantity) {
+      return res.status(400).json({
+        error: 'Estoque insuficiente',
+        message: `Não há estoque suficiente na ${location}. Disponível: ${currentLocationStock}`,
+      });
+    }
+
+    const newLocationStock = currentLocationStock - quantity;
+    const newTotalStock = product.stock - quantity;
+
+    const [updatedProduct] = await prisma.$transaction([
+      prisma.product.update({
+        where: { id },
+        data: { 
+          [stockField]: newLocationStock,
+          stock: newTotalStock
+        },
+        include: {
+          category: true,
+          subcategory: true,
+          size: true,
+          pattern: true,
+        },
+      }),
+      prisma.stockMovement.create({
+        data: {
+          productId: id,
+          type: 'EXIT',
+          quantity,
+          reason,
+          location,
+          userId: req.user!.id,
+        },
+      }),
+    ]);
+
+    return res.json(updatedProduct);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/stock/transfer:
+ *   patch:
+ *     summary: Transferir estoque entre localizações
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *               - fromLocation
+ *               - toLocation
+ *               - reason
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *               fromLocation:
+ *                 type: string
+ *                 enum: [LOJA, ARMAZEM]
+ *               toLocation:
+ *                 type: string
+ *                 enum: [LOJA, ARMAZEM]
+ *               reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Transferência realizada com sucesso
+ */
+router.patch('/:id/stock/transfer', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { quantity, fromLocation, toLocation, reason } = req.body;
+
+    if (!quantity || !fromLocation || !toLocation || !reason) {
+      return res.status(400).json({
+        error: 'Dados obrigatórios',
+        message: 'Quantidade, localização de origem, destino e motivo são obrigatórios',
+      });
+    }
+
+    if (!['LOJA', 'ARMAZEM'].includes(fromLocation) || !['LOJA', 'ARMAZEM'].includes(toLocation)) {
+      return res.status(400).json({
+        error: 'Localização inválida',
+        message: 'Localizações devem ser LOJA ou ARMAZEM',
+      });
+    }
+
+    if (fromLocation === toLocation) {
+      return res.status(400).json({
+        error: 'Transferência inválida',
+        message: 'Localização de origem e destino devem ser diferentes',
+      });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado',
+        message: 'O produto solicitado não foi encontrado',
+      });
+    }
+
+    const fromStockField = fromLocation === 'LOJA' ? 'stockLoja' : 'stockArmazem';
+    const toStockField = toLocation === 'LOJA' ? 'stockLoja' : 'stockArmazem';
+    const currentFromStock = product[fromStockField];
+
+    if (currentFromStock < quantity) {
+      return res.status(400).json({
+        error: 'Estoque insuficiente',
+        message: `Não há estoque suficiente na ${fromLocation}. Disponível: ${currentFromStock}`,
+      });
+    }
+
+    const newFromStock = currentFromStock - quantity;
+    const newToStock = product[toStockField] + quantity;
+
+    const [updatedProduct] = await prisma.$transaction([
+      prisma.product.update({
+        where: { id },
+        data: { 
+          [fromStockField]: newFromStock,
+          [toStockField]: newToStock
+          // stock total não muda na transferência
+        },
+        include: {
+          category: true,
+          subcategory: true,
+          size: true,
+          pattern: true,
+        },
+      }),
+      prisma.stockMovement.create({
+        data: {
+          productId: id,
+          type: 'TRANSFER',
+          quantity,
+          reason,
+          fromLocation,
+          toLocation,
+          userId: req.user!.id,
+        },
+      }),
+    ]);
+
+    return res.json({
+      message: `Transferência realizada: ${quantity} unidades de ${fromLocation} para ${toLocation}`,
+      product: updatedProduct,
+      transferDetails: {
+        quantity,
+        fromLocation,
+        toLocation,
+        previousFromStock: currentFromStock,
+        newFromStock,
+        previousToStock: product[toStockField],
+        newToStock
+      }
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 export default router; 
