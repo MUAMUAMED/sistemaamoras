@@ -967,6 +967,7 @@ interface ProductFormModalData {
   sizeId: string;
   active?: boolean;
   imageFile?: File | null;
+  initialLocation?: 'LOJA' | 'ARMAZEM'; // Nova propriedade para localização inicial
 }
 
 interface ProductFormModalProps {
@@ -1110,6 +1111,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         stock: parseInt(formData.stock) || 0,
         minStock: parseInt(formData.minStock) || 0,
         imageFile: formData.imageFile || undefined,
+        initialLocation: formData.initialLocation || 'LOJA', // Padrão para Loja
       };
       onSubmit(submitData);
     }
@@ -1188,17 +1190,36 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estoque Atual
-              </label>
-              <input
-                type="number"
-                value={formData.stock}
-                onChange={(e) => setFormData(prev => ({ ...prev, stock: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                min="0"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estoque Inicial
+                </label>
+                <input
+                  type="number"
+                  value={formData.stock}
+                  onChange={(e) => setFormData(prev => ({ ...prev, stock: e.target.value }))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="0"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Localização Inicial
+                </label>
+                <select
+                  value={formData.initialLocation || 'LOJA'}
+                  onChange={(e) => setFormData(prev => ({ ...prev, initialLocation: e.target.value as 'LOJA' | 'ARMAZEM' }))}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="LOJA">🏪 Loja</option>
+                  <option value="ARMAZEM">🏭 Armazém</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Onde o estoque inicial será adicionado
+                </p>
+              </div>
             </div>
 
             <div>

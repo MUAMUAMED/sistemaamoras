@@ -327,6 +327,7 @@ export interface ProductFormData {
   sizeId: string; // ID do tamanho para buscar dados
   active?: boolean;
   imageFile?: File;
+  initialLocation?: 'LOJA' | 'ARMAZEM'; // Localização inicial do estoque
 }
 
 export interface SubcategoryFormData {

@@ -245,6 +245,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       price,
       stock,
       description,
+      initialLocation,
     } = req.body;
 
     console.log('🆕 [PRODUTO CREATE] Dados recebidos:', {
@@ -355,7 +356,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         where: { id: existingProduct.id },
         data: {
           stock: newStock,
-          stockLoja: (existingProduct.stockLoja || 0) + stock, // Adicionar na loja
+          stockLoja: initialLocation === 'LOJA' ? (existingProduct.stockLoja || 0) + stock : existingProduct.stockLoja,
+          stockArmazem: initialLocation === 'ARMAZEM' ? (existingProduct.stockArmazem || 0) + stock : existingProduct.stockArmazem,
           price, // Atualizar preço também
           description: description || existingProduct.description, // Manter descrição existente se não informada
         },
@@ -375,7 +377,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
             type: 'ENTRY',
             quantity: stock,
             reason: 'Adição de estoque via criação de produto',
-            location: 'LOJA', // Estoque adicionado na loja
+            location: initialLocation || 'LOJA', // Usar localização escolhida
             userId: req.user!.id,
           },
         });
@@ -402,8 +404,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         patternId,
         price,
         stock,
-        stockLoja: stock, // Todo estoque inicial vai para a loja
-        stockArmazem: 0,  // Armazém começa vazio
+        stockLoja: initialLocation === 'LOJA' ? stock : 0,
+        stockArmazem: initialLocation === 'ARMAZEM' ? stock : 0,
         barcode,
         qrcodeUrl,
         description,
@@ -445,11 +447,11 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
           type: 'ENTRY',
           quantity: stock,
           reason: 'Estoque inicial',
-          location: 'LOJA', // Estoque inicial vai para a loja
+          location: initialLocation || 'LOJA', // Usar localização escolhida
           userId: req.user!.id,
         },
       });
-      console.log('📦 [PRODUTO CREATE] Movimentação de estoque inicial registrada na LOJA');
+      console.log(`📦 [PRODUTO CREATE] Movimentação de estoque inicial registrada na ${initialLocation || 'LOJA'}`);
     }
 
     return res.status(201).json({
