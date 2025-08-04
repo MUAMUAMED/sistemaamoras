@@ -355,6 +355,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         where: { id: existingProduct.id },
         data: {
           stock: newStock,
+          stockLoja: (existingProduct.stockLoja || 0) + stock, // Adicionar na loja
           price, // Atualizar preço também
           description: description || existingProduct.description, // Manter descrição existente se não informada
         },
@@ -374,6 +375,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
             type: 'ENTRY',
             quantity: stock,
             reason: 'Adição de estoque via criação de produto',
+            location: 'LOJA', // Estoque adicionado na loja
             userId: req.user!.id,
           },
         });
@@ -400,6 +402,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         patternId,
         price,
         stock,
+        stockLoja: stock, // Todo estoque inicial vai para a loja
+        stockArmazem: 0,  // Armazém começa vazio
         barcode,
         qrcodeUrl,
         description,
@@ -441,10 +445,11 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
           type: 'ENTRY',
           quantity: stock,
           reason: 'Estoque inicial',
+          location: 'LOJA', // Estoque inicial vai para a loja
           userId: req.user!.id,
         },
       });
-      console.log('📦 [PRODUTO CREATE] Movimentação de estoque inicial registrada');
+      console.log('📦 [PRODUTO CREATE] Movimentação de estoque inicial registrada na LOJA');
     }
 
     return res.status(201).json({
