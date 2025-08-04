@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Package, Barcode, QrCode, Edit3, Trash2, Eye, AlertTriangle, Minus, History, X, Printer } from 'lucide-react';
+import { Plus, Search, Filter, Package, Barcode, QrCode, Edit3, Trash2, Eye, AlertTriangle, Minus, History, X, Printer, ArrowDown, ArrowUp, Camera } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { 
@@ -42,6 +42,8 @@ const Products: React.FC = () => {
   const [showSubcategoryModal, setShowSubcategoryModal] = useState(false);
   const [showPatternModal, setShowPatternModal] = useState(false);
   const [showSizeModal, setShowSizeModal] = useState(false);
+  const [showEntryModal, setShowEntryModal] = useState(false);
+  const [showExitModal, setShowExitModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [generatedCodes, setGeneratedCodes] = useState<GeneratedCodes | null>(null);
@@ -571,9 +573,28 @@ const Products: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900">
                     Produtos ({productsData?.pagination?.total || 0})
                   </h3>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Package className="w-4 h-4" />
-                    <span>Catálogo de Produtos</span>
+                  <div className="flex items-center gap-3">
+                    {/* Botões de Entrada e Saída */}
+                    <button
+                      onClick={() => setShowEntryModal(true)}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center gap-2 text-sm font-medium"
+                      title="Registrar entrada de estoque"
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                      Entradas
+                    </button>
+                    <button
+                      onClick={() => setShowExitModal(true)}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center gap-2 text-sm font-medium"
+                      title="Registrar saída de estoque"
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                      Saídas
+                    </button>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <Package className="w-4 h-4" />
+                      <span>Catálogo de Produtos</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -905,6 +926,26 @@ const Products: React.FC = () => {
             setShowTransferModal(false);
             setSelectedProduct(null);
           }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+      )}
+
+      {/* Entry Stock Modal */}
+      {showEntryModal && (
+        <EntryStockModal
+          onClose={() => setShowEntryModal(false)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+      )}
+
+      {/* Exit Stock Modal */}
+      {showExitModal && (
+        <ExitStockModal
+          onClose={() => setShowExitModal(false)}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['products'] });
           }}
@@ -2847,6 +2888,506 @@ const TransferStockModal: React.FC<TransferStockModalProps> = ({ product, onClos
             </div>
           </form>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Entry Stock Modal Component
+interface EntryStockModalProps {
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const EntryStockModal: React.FC<EntryStockModalProps> = ({ onClose, onSuccess }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [quantity, setQuantity] = useState('');
+  const [location, setLocation] = useState<'LOJA' | 'ARMAZEM'>('LOJA');
+  const [reason, setReason] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+
+  // Buscar produtos
+  const { data: productsData } = useQuery({
+    queryKey: ['products', { search: searchTerm }],
+    queryFn: () => productsApi.list({ search: searchTerm, limit: 50 }),
+    enabled: searchTerm.length > 2,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProduct || !quantity) {
+      toast.error('Selecione um produto e informe a quantidade');
+      return;
+    }
+
+    const qty = parseInt(quantity);
+    if (qty <= 0) {
+      toast.error('Quantidade deve ser maior que zero');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await productsApi.addStockLocation(selectedProduct.id, qty, location, reason || 'Entrada de estoque');
+      toast.success(`Entrada realizada: +${qty} unidades na ${location}`);
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Erro ao registrar entrada';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProductSelect = (product: Product) => {
+    setSelectedProduct(product);
+    setSearchTerm(product.name);
+  };
+
+  const handleQRScan = (data: string) => {
+    // Buscar produto pelo QR Code
+    setSearchTerm(data);
+    setShowScanner(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <ArrowDown className="w-6 h-6 text-green-600" />
+            <h2 className="text-xl font-bold text-gray-900">Entrada de Estoque</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Busca de Produto */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Buscar Produto
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Digite o nome ou código do produto..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <QrCode className="w-4 h-4" />
+                QR
+              </button>
+            </div>
+
+            {/* Lista de produtos encontrados */}
+            {searchTerm.length > 2 && productsData?.data && (
+              <div className="mt-2 border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
+                {productsData.data.map((product: Product) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => handleProductSelect(product)}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="font-medium">{product.name}</div>
+                    <div className="text-sm text-gray-500">
+                      {product.category?.name} • {product.pattern?.name} • {product.size?.name}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      Estoque: Loja {product.stockLoja} | Armazém {product.stockArmazem}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Produto Selecionado */}
+          {selectedProduct && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-gray-900 mb-2">Produto Selecionado:</h3>
+              <div className="flex items-center gap-3">
+                <Package className="w-8 h-8 text-blue-600" />
+                <div>
+                  <div className="font-medium">{selectedProduct.name}</div>
+                  <div className="text-sm text-gray-600">
+                    {selectedProduct.category?.name} • {selectedProduct.pattern?.name} • {selectedProduct.size?.name}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Estoque atual: Loja {selectedProduct.stockLoja} | Armazém {selectedProduct.stockArmazem}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Quantidade */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Quantidade
+              </label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="0"
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                required
+              />
+            </div>
+
+            {/* Localização */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Localização
+              </label>
+              <select
+                value={location}
+                onChange={(e) => setLocation(e.target.value as 'LOJA' | 'ARMAZEM')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              >
+                <option value="LOJA">🏪 Loja</option>
+                <option value="ARMAZEM">🏭 Armazém</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Motivo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Motivo (opcional)
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Ex: Reposição de estoque, compra de fornecedor..."
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading || !selectedProduct}
+              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Registrando...' : 'Registrar Entrada'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Exit Stock Modal Component
+interface ExitStockModalProps {
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const ExitStockModal: React.FC<ExitStockModalProps> = ({ onClose, onSuccess }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [quantity, setQuantity] = useState('');
+  const [operation, setOperation] = useState<'REMOVE' | 'TRANSFER'>('REMOVE');
+  const [fromLocation, setFromLocation] = useState<'LOJA' | 'ARMAZEM'>('LOJA');
+  const [toLocation, setToLocation] = useState<'LOJA' | 'ARMAZEM'>('ARMAZEM');
+  const [reason, setReason] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+
+  // Buscar produtos
+  const { data: productsData } = useQuery({
+    queryKey: ['products', { search: searchTerm }],
+    queryFn: () => productsApi.list({ search: searchTerm, limit: 50 }),
+    enabled: searchTerm.length > 2,
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProduct || !quantity) {
+      toast.error('Selecione um produto e informe a quantidade');
+      return;
+    }
+
+    const qty = parseInt(quantity);
+    if (qty <= 0) {
+      toast.error('Quantidade deve ser maior que zero');
+      return;
+    }
+
+    // Verificar estoque disponível
+    const availableStock = fromLocation === 'LOJA' ? selectedProduct.stockLoja : selectedProduct.stockArmazem;
+    if (qty > availableStock) {
+      toast.error(`Estoque insuficiente na ${fromLocation}. Disponível: ${availableStock}`);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (operation === 'REMOVE') {
+        await productsApi.removeStockLocation(selectedProduct.id, qty, fromLocation, reason || 'Saída de estoque');
+        toast.success(`Saída realizada: -${qty} unidades da ${fromLocation}`);
+      } else {
+        await productsApi.transferStock(selectedProduct.id, qty, fromLocation, toLocation, reason || `Transferência: ${fromLocation} → ${toLocation}`);
+        toast.success(`Transferência realizada: ${qty} unidades de ${fromLocation} → ${toLocation}`);
+      }
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'Erro ao registrar saída';
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProductSelect = (product: Product) => {
+    setSelectedProduct(product);
+    setSearchTerm(product.name);
+  };
+
+  const handleQRScan = (data: string) => {
+    // Buscar produto pelo QR Code
+    setSearchTerm(data);
+    setShowScanner(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center gap-3">
+            <ArrowUp className="w-6 h-6 text-red-600" />
+            <h2 className="text-xl font-bold text-gray-900">Saída de Estoque</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Tipo de Operação */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Operação
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setOperation('REMOVE')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  operation === 'REMOVE' 
+                    ? 'bg-red-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                🗑️ Remover do Estoque
+              </button>
+              <button
+                type="button"
+                onClick={() => setOperation('TRANSFER')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  operation === 'TRANSFER' 
+                    ? 'bg-purple-600 text-white' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                🔄 Transferir Localização
+              </button>
+            </div>
+          </div>
+
+          {/* Busca de Produto */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Buscar Produto
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Digite o nome ou código do produto..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              >
+                <QrCode className="w-4 h-4" />
+                QR
+              </button>
+            </div>
+
+            {/* Lista de produtos encontrados */}
+            {searchTerm.length > 2 && productsData?.data && (
+              <div className="mt-2 border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
+                {productsData.data.map((product: Product) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => handleProductSelect(product)}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="font-medium">{product.name}</div>
+                    <div className="text-sm text-gray-500">
+                      {product.category?.name} • {product.pattern?.name} • {product.size?.name}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      Estoque: Loja {product.stockLoja} | Armazém {product.stockArmazem}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Produto Selecionado */}
+          {selectedProduct && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="font-medium text-gray-900 mb-2">Produto Selecionado:</h3>
+              <div className="flex items-center gap-3">
+                <Package className="w-8 h-8 text-blue-600" />
+                <div>
+                  <div className="font-medium">{selectedProduct.name}</div>
+                  <div className="text-sm text-gray-600">
+                    {selectedProduct.category?.name} • {selectedProduct.pattern?.name} • {selectedProduct.size?.name}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Estoque atual: Loja {selectedProduct.stockLoja} | Armazém {selectedProduct.stockArmazem}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Quantidade */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Quantidade
+              </label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="0"
+                min="1"
+                max={selectedProduct ? (fromLocation === 'LOJA' ? selectedProduct.stockLoja : selectedProduct.stockArmazem) : undefined}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                required
+              />
+              {selectedProduct && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Máximo: {fromLocation === 'LOJA' ? selectedProduct.stockLoja : selectedProduct.stockArmazem} unidades
+                </p>
+              )}
+            </div>
+
+            {/* Localização */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {operation === 'REMOVE' ? 'Localização' : 'De'}
+              </label>
+              <select
+                value={fromLocation}
+                onChange={(e) => {
+                  const newFromLocation = e.target.value as 'LOJA' | 'ARMAZEM';
+                  setFromLocation(newFromLocation);
+                  if (operation === 'TRANSFER') {
+                    setToLocation(newFromLocation === 'LOJA' ? 'ARMAZEM' : 'LOJA');
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              >
+                <option value="LOJA">🏪 Loja</option>
+                <option value="ARMAZEM">🏭 Armazém</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Para (apenas para transferência) */}
+          {operation === 'TRANSFER' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Para
+              </label>
+              <select
+                value={toLocation}
+                onChange={(e) => setToLocation(e.target.value as 'LOJA' | 'ARMAZEM')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="LOJA">🏪 Loja</option>
+                <option value="ARMAZEM">🏭 Armazém</option>
+              </select>
+            </div>
+          )}
+
+          {/* Motivo */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Motivo (opcional)
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={operation === 'REMOVE' ? 'Ex: Venda, avaria, perda...' : 'Ex: Reorganização, demanda...'}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading || !selectedProduct}
+              className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                operation === 'REMOVE' 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-purple-600 hover:bg-purple-700'
+              }`}
+            >
+              {isLoading ? 'Processando...' : (operation === 'REMOVE' ? 'Registrar Saída' : 'Transferir')}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
