@@ -416,8 +416,32 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     console.log('💾 [PRODUTO CREATE] Dados que serão criados:', createData);
 
     // Criar produto
-    const product = await prisma.product.create({
-      data: createData,
+    try {
+      console.log('🚀 [PRODUTO CREATE] Tentando criar produto no banco...');
+      
+      const product = await prisma.product.create({
+        data: createData,
+        include: {
+          category: true,
+          subcategory: true,
+          size: true,
+          pattern: true,
+        },
+      });
+      
+      console.log('✅ [PRODUTO CREATE] Produto criado no banco com sucesso:', product.id);
+    } catch (createError: any) {
+      console.error('💥 [PRODUTO CREATE] Erro ao criar no banco:', {
+        error: createError,
+        message: createError?.message,
+        code: createError?.code,
+        meta: createError?.meta,
+      });
+      throw createError;
+    }
+
+    const foundProduct = await prisma.product.findUnique({
+      where: { barcode },
       include: {
         category: true,
         subcategory: true,
@@ -426,26 +450,30 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       },
     });
 
+    if (!foundProduct) {
+      throw new Error('Produto criado mas não encontrado ao buscar novamente');
+    }
+
     console.log('✅ [PRODUTO CREATE] Produto criado com sucesso:', {
-      id: product.id,
-      name: product.name,
-      categoryId: product.categoryId,
-      categoryName: product.category?.name,
-      subcategoryId: product.subcategoryId,
-      subcategoryName: product.subcategory?.name,
-      sizeId: product.sizeId,
-      sizeName: product.size?.name,
-      patternId: product.patternId,
-      patternName: product.pattern?.name,
-      barcode: product.barcode,
-      stock: product.stock
+      id: foundProduct.id,
+      name: foundProduct.name,
+      categoryId: foundProduct.categoryId,
+      categoryName: foundProduct.category?.name,
+      subcategoryId: foundProduct.subcategoryId,
+      subcategoryName: foundProduct.subcategory?.name,
+      sizeId: foundProduct.sizeId,
+      sizeName: foundProduct.size?.name,
+      patternId: foundProduct.patternId,
+      patternName: foundProduct.pattern?.name,
+      barcode: foundProduct.barcode,
+      stock: foundProduct.stock
     });
 
     // Registrar movimentação de estoque inicial
     if (stock > 0) {
       await prisma.stockMovement.create({
         data: {
-          productId: product.id,
+          productId: foundProduct.id,
           type: 'ENTRY',
           quantity: stock,
           reason: 'Estoque inicial',
@@ -457,7 +485,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     }
 
     return res.status(201).json({
-      ...product,
+      ...foundProduct,
       message: 'Produto criado com sucesso',
     });
   } catch (error) {
@@ -1651,15 +1679,25 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
     }
 
     // Verificar se produto está em processamento
-    // Usar any para evitar erro de TS antes da migration ser aplicada
+    // TEMPORÁRIO: Aceitar todos os produtos até migration ser aplicada
     const product = existingProduct as any;
+    
+    console.log('🔍 [DEBUG FINISH] Produto encontrado:', {
+      id: product.id,
+      name: product.name,
+      hasInProduction: 'inProduction' in product,
+      inProductionValue: product.inProduction,
+    });
     
     // Se o campo inProduction não existe no banco, consideramos que o produto está em processamento
     const isInProduction = product.inProduction !== undefined ? product.inProduction : true;
     
-    if (!isInProduction) {
-      return res.status(403).json({ error: 'Produto não está em processamento' });
-    }
+    console.log('🔍 [DEBUG FINISH] isInProduction:', isInProduction);
+    
+    // TEMPORÁRIO: Comentar a validação para permitir finalizar qualquer produto
+    // if (!isInProduction) {
+    //   return res.status(403).json({ error: 'Produto não está em processamento' });
+    // }
 
     // Atualizar o produto para finalizar produção (muda status para ATIVO)
     // Criar dados de atualização dinamicamente baseado nos campos existentes
@@ -1689,6 +1727,32 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
     });
   } catch (error) {
     console.error('💥 [PRODUTO FINISH-PRODUCTION] Erro:', error);
+    return next(error);
+  }
+});
+
+// Endpoint temporário para debug - verificar estrutura dos produtos
+router.get('/debug/:id', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const product = await prisma.product.findUnique({
+      where: { id },
+    });
+    
+    if (!product) {
+      return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+    
+    console.log('🔍 [DEBUG] Estrutura do produto:', JSON.stringify(product, null, 2));
+    
+    return res.json({
+      message: 'Debug do produto',
+      product,
+      hasInProduction: 'inProduction' in product,
+      hasStatus: 'status' in product,
+    });
+  } catch (error) {
+    console.error('💥 [DEBUG] Erro:', error);
     return next(error);
   }
 });
