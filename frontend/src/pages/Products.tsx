@@ -50,6 +50,9 @@ const Products: React.FC = () => {
   const [generatedCodes, setGeneratedCodes] = useState<GeneratedCodes | null>(null);
   const [forceDeleteId, setForceDeleteId] = useState<string | null>(null);
   const [forceDeleteLoading, setForceDeleteLoading] = useState(false);
+  
+  // Lista de produtos que foram finalizados (para controle local)
+  const [finishedProducts, setFinishedProducts] = useState<Set<string>>(new Set());
 
   // Queries
   const { data: productsData, isLoading: loadingProducts } = useQuery({
@@ -117,7 +120,9 @@ const Products: React.FC = () => {
 
   const finishProductionMutation = useMutation({
     mutationFn: productsApi.finishProduction,
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      // Adicionar produto à lista de finalizados
+      setFinishedProducts(prev => new Set(Array.from(prev).concat([variables])));
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Processo finalizado com sucesso! Produto adicionado ao estoque.');
     },
@@ -360,6 +365,28 @@ const Products: React.FC = () => {
     if (product.stock <= 0) return { color: 'text-red-600 bg-red-100', text: 'Sem estoque' };
     if (product.stock <= product.minStock) return { color: 'text-yellow-600 bg-yellow-100', text: 'Estoque baixo' };
     return { color: 'text-green-600 bg-green-100', text: 'Em estoque' };
+  };
+
+  // Função para verificar se produto está processando
+  const isProductProcessing = (product: Product) => {
+    // Se foi finalizado localmente, não está mais processando
+    if (finishedProducts.has(product.id)) {
+      return false;
+    }
+    
+    // Se tem status definido, usa ele
+    if (product.status !== undefined) {
+      return product.status === 'PROCESSANDO';
+    }
+    
+    // Se tem inProduction definido, usa ele
+    if (product.inProduction !== undefined) {
+      return product.inProduction === true;
+    }
+    
+    // Se não tem nenhum campo definido, considera que está processando
+    // (produtos sem migration)
+    return true;
   };
 
   return (
@@ -651,17 +678,12 @@ const Products: React.FC = () => {
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {product.active ? 'Ativo' : 'Inativo'}
                               </span>
-                              {(product.status === 'PROCESSANDO' || product.inProduction === true || 
-                                (product.inProduction === undefined && product.status === undefined)) && (
+                              {isProductProcessing(product) && (
                                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                                   Processando
                                 </span>
                               )}
-                              {/* Debug - remover após funcionamento */}
-                              {(() => {
-                                console.log('Product debug:', { id: product.id, name: product.name, status: product.status, inProduction: product.inProduction });
-                                return null;
-                              })()}
+
                             </div>
 
                             {/* Estoque Badge */}
@@ -782,8 +804,7 @@ const Products: React.FC = () => {
                               </div>
 
                               {/* Terceira linha - Ações especiais (apenas se necessário) */}
-                              {(product.status === 'PROCESSANDO' || product.inProduction === true || 
-                                (product.inProduction === undefined && product.status === undefined)) && (
+                              {isProductProcessing(product) && (
                                 <div className="mt-2">
                                   <button
                                     onClick={() => handleFinishProduction(product.id)}
