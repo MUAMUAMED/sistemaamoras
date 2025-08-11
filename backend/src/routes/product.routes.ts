@@ -409,7 +409,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         barcode,
         qrcodeUrl,
         description,
-        inProduction: true, // Produtos começam sempre em produção
+        // inProduction: true, // Temporariamente removido até migration ser aplicada
         // status: 'PROCESSANDO', // Produtos começam sempre como PROCESSANDO (será adicionado após migration)
     };
 
@@ -1653,17 +1653,26 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
     // Verificar se produto está em processamento
     // Usar any para evitar erro de TS antes da migration ser aplicada
     const product = existingProduct as any;
-    if (!product.inProduction) {
+    
+    // Se o campo inProduction não existe no banco, consideramos que o produto está em processamento
+    const isInProduction = product.inProduction !== undefined ? product.inProduction : true;
+    
+    if (!isInProduction) {
       return res.status(403).json({ error: 'Produto não está em processamento' });
     }
 
     // Atualizar o produto para finalizar produção (muda status para ATIVO)
+    // Criar dados de atualização dinamicamente baseado nos campos existentes
+    const updateData: any = {};
+    
+    // Só adicionar inProduction se o campo existir no banco
+    if (product.inProduction !== undefined) {
+      updateData.inProduction = false;
+    }
+    
     const updatedProduct = await prisma.product.update({
       where: { id },
-      data: {
-        inProduction: false,
-        // status: 'ATIVO', // Será habilitado após migration
-      } as any, // Usar any para evitar erro de TS antes da migration
+      data: updateData,
       include: {
         category: true,
         subcategory: true,
