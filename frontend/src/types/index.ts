@@ -97,6 +97,8 @@ export interface Product {
   sizeId: string; // ID do tamanho
   patternId: string;
   active: boolean;
+  inProduction: boolean; // Status de produção (mantido para compatibilidade)
+  status: ProductStatus; // Status do produto
   createdAt: string;
   updatedAt: string;
   
@@ -109,6 +111,9 @@ export interface Product {
 
 // Enums de localização de estoque
 export type StockLocation = 'LOJA' | 'ARMAZEM';
+
+// Enums de status de produto
+export type ProductStatus = 'PROCESSANDO' | 'ATIVO' | 'INATIVO';
 
 // Tipos de movimentação de estoque
 export interface StockMovement {

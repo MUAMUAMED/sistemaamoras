@@ -409,6 +409,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         barcode,
         qrcodeUrl,
         description,
+        // status: 'PROCESSANDO', // Produtos começam sempre como PROCESSANDO (será adicionado após migration)
     };
 
     console.log('💾 [PRODUTO CREATE] Dados que serão criados:', createData);
@@ -1596,6 +1597,86 @@ router.patch('/:id/stock/transfer', authenticateToken, async (req: Authenticated
       }
     });
   } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/finish-production:
+ *   put:
+ *     summary: Finalizar processamento de um produto
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do produto
+ *     responses:
+ *       200:
+ *         description: Processamento finalizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Product'
+ *       404:
+ *         description: Produto não encontrado
+ *       403:
+ *         description: Produto não está em processamento
+ */
+router.put('/:id/finish-production', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`🏭 [PRODUTO FINISH-PRODUCTION] Finalizando processamento do produto: ${id}`);
+
+    // Verificar se o produto existe
+    const existingProduct = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        subcategory: true,
+        size: true,
+        pattern: true,
+      },
+    });
+
+    if (!existingProduct) {
+      return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+
+    // Verificar se produto está em processamento (temporariamente usando inProduction)
+    if (!existingProduct.inProduction) {
+      return res.status(403).json({ error: 'Produto não está em processamento' });
+    }
+
+    // Atualizar o produto para finalizar produção (muda status para ATIVO)
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: {
+        inProduction: false,
+        // status: 'ATIVO', // Será habilitado após migration
+      },
+      include: {
+        category: true,
+        subcategory: true,
+        size: true,
+        pattern: true,
+      },
+    });
+
+    console.log(`✅ [PRODUTO FINISH-PRODUCTION] Processamento finalizado para o produto: ${updatedProduct.name}`);
+
+    return res.json({
+      ...updatedProduct,
+      message: 'Processamento finalizado com sucesso',
+    });
+  } catch (error) {
+    console.error('💥 [PRODUTO FINISH-PRODUCTION] Erro:', error);
     return next(error);
   }
 });

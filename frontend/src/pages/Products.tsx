@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Package, Barcode, QrCode, Edit3, Trash2, Eye, AlertTriangle, Minus, History, X, Printer, ArrowDown, ArrowUp, Camera } from 'lucide-react';
+import { Plus, Search, Filter, Package, Barcode, QrCode, Edit3, Trash2, Eye, AlertTriangle, Minus, History, X, Printer, ArrowDown, ArrowUp, Camera, CheckCircle } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { 
@@ -10,7 +10,8 @@ import {
   Size, 
   ProductFormData, 
   ProductFilters,
-  GeneratedCodes 
+  GeneratedCodes,
+  ProductStatus 
 } from '../types';
 import { 
   productsApi, 
@@ -111,6 +112,17 @@ const Products: React.FC = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || 'Erro ao excluir produto');
+    },
+  });
+
+  const finishProductionMutation = useMutation({
+    mutationFn: productsApi.finishProduction,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Processo finalizado com sucesso! Produto adicionado ao estoque.');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao finalizar processo');
     },
   });
 
@@ -332,6 +344,16 @@ const Products: React.FC = () => {
       ...data,
       active: true
     });
+  };
+
+  const handleFinishProduction = async (id: string) => {
+    if (window.confirm('Tem certeza que deseja finalizar o processamento deste produto e adicioná-lo ao estoque?')) {
+      try {
+        await finishProductionMutation.mutateAsync(id);
+      } catch (error: any) {
+        // Erro já tratado na mutation
+      }
+    }
   };
 
   const getStockStatus = (product: Product) => {
@@ -625,10 +647,15 @@ const Products: React.FC = () => {
                             </div>
                             
                             {/* Status Badge */}
-                            <div className="absolute top-3 right-3">
+                            <div className="absolute top-3 right-3 flex flex-col gap-1">
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {product.active ? 'Ativo' : 'Inativo'}
                               </span>
+                              {(product.status === 'PROCESSANDO' || product.inProduction) && (
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                  Processando
+                                </span>
+                              )}
                             </div>
 
                             {/* Estoque Badge */}
@@ -747,6 +774,20 @@ const Products: React.FC = () => {
                                   Excluir
                                 </button>
                               </div>
+
+                              {/* Terceira linha - Ações especiais (apenas se necessário) */}
+                              {(product.status === 'PROCESSANDO' || product.inProduction) && (
+                                <div className="mt-2">
+                                  <button
+                                    onClick={() => handleFinishProduction(product.id)}
+                                    className="w-full px-2 py-1.5 text-xs bg-orange-50 text-orange-600 rounded-md hover:bg-orange-100 transition-colors duration-200 flex items-center justify-center gap-1"
+                                    title="Finalizar processo"
+                                  >
+                                    <CheckCircle className="w-3 h-3" />
+                                    Finalizar Processo
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

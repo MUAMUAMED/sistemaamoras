@@ -281,6 +281,11 @@ export const productsApi = {
     return response.data;
   },
   
+  finishProduction: async (id: string): Promise<Product> => {
+    const response = await api.put(`/products/${id}/finish-production`);
+    return response.data;
+  },
+  
   addStock: async (id: string, quantity: number, reason?: string): Promise<{
     message: string;
     product: Product;

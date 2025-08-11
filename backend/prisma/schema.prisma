@@ -113,10 +113,12 @@ model Product {
   barcode       String   @unique
   qrcodeUrl     String?
   imageUrl      String?  // URL da imagem do produto
-  description   String?
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  description     String?
+  active          Boolean  @default(true)
+  inProduction    Boolean  @default(true) // Status de produção - true quando recém criado (manter para compatibilidade)
+  status          ProductStatus @default(PROCESSANDO) // Status do produto
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relacionamentos
   category       Category        @relation(fields: [categoryId], references: [id])
@@ -345,4 +347,10 @@ enum StockMovementType {
 enum StockLocation {
   LOJA              // Estoque da Loja
   ARMAZEM           // Estoque do Armazém
+}
+
+enum ProductStatus {
+  PROCESSANDO       // Produto em processamento/criação
+  ATIVO             // Produto ativo no estoque
+  INATIVO           // Produto inativo
 }
