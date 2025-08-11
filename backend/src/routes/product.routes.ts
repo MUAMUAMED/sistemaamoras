@@ -409,6 +409,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         barcode,
         qrcodeUrl,
         description,
+        inProduction: true, // Produtos começam sempre em produção
         // status: 'PROCESSANDO', // Produtos começam sempre como PROCESSANDO (será adicionado após migration)
     };
 

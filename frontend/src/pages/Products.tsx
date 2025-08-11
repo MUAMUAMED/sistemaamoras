@@ -656,6 +656,8 @@ const Products: React.FC = () => {
                                   Processando
                                 </span>
                               )}
+                              {/* Debug - remover após funcionamento */}
+                              {console.log('Product debug:', { id: product.id, name: product.name, status: product.status, inProduction: product.inProduction })}
                             </div>
 
                             {/* Estoque Badge */}
