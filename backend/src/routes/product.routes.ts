@@ -396,7 +396,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     const qrcodeUrl = await generateQRCode(barcode);
     console.log('📱 [PRODUTO CREATE] QR Code gerado');
 
-    const createData = {
+    const createData: any = {
         name,
         categoryId,
       subcategoryId,
@@ -1650,8 +1650,10 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
       return res.status(404).json({ error: 'Produto não encontrado' });
     }
 
-    // Verificar se produto está em processamento (temporariamente usando inProduction)
-    if (!existingProduct.inProduction) {
+    // Verificar se produto está em processamento
+    // Usar any para evitar erro de TS antes da migration ser aplicada
+    const product = existingProduct as any;
+    if (!product.inProduction) {
       return res.status(403).json({ error: 'Produto não está em processamento' });
     }
 
@@ -1661,7 +1663,7 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
       data: {
         inProduction: false,
         // status: 'ATIVO', // Será habilitado após migration
-      },
+      } as any, // Usar any para evitar erro de TS antes da migration
       include: {
         category: true,
         subcategory: true,
