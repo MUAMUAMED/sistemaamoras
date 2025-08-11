@@ -651,7 +651,8 @@ const Products: React.FC = () => {
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {product.active ? 'Ativo' : 'Inativo'}
                               </span>
-                              {(product.status === 'PROCESSANDO' || product.inProduction) && (
+                              {(product.status === 'PROCESSANDO' || product.inProduction === true || 
+                                (product.inProduction === undefined && product.status === undefined)) && (
                                 <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                                   Processando
                                 </span>
@@ -781,7 +782,8 @@ const Products: React.FC = () => {
                               </div>
 
                               {/* Terceira linha - Ações especiais (apenas se necessário) */}
-                              {(product.status === 'PROCESSANDO' || product.inProduction) && (
+                              {(product.status === 'PROCESSANDO' || product.inProduction === true || 
+                                (product.inProduction === undefined && product.status === undefined)) && (
                                 <div className="mt-2">
                                   <button
                                     onClick={() => handleFinishProduction(product.id)}
