@@ -121,12 +121,23 @@ const Products: React.FC = () => {
   const finishProductionMutation = useMutation({
     mutationFn: productsApi.finishProduction,
     onSuccess: (data, variables) => {
+      console.log('🎉 [FRONTEND DEBUG] Mutation onSuccess chamada!');
+      console.log('🎉 [FRONTEND DEBUG] Data recebida do backend:', data);
+      console.log('🎉 [FRONTEND DEBUG] ProductId finalizado:', variables);
+      
       // Adicionar produto à lista de finalizados
-      setFinishedProducts(prev => new Set(Array.from(prev).concat([variables])));
+      setFinishedProducts(prev => {
+        const newSet = new Set(Array.from(prev).concat([variables]));
+        console.log('🎉 [FRONTEND DEBUG] Lista de produtos finalizados atualizada:', Array.from(newSet));
+        return newSet;
+      });
+      
+      console.log('🔄 [FRONTEND DEBUG] Invalidando queries...');
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Processo finalizado com sucesso! Produto adicionado ao estoque.');
     },
     onError: (error: any) => {
+      console.error('💥 [FRONTEND DEBUG] Erro na mutation:', error);
       toast.error(error.response?.data?.error || 'Erro ao finalizar processo');
     },
   });
@@ -352,12 +363,20 @@ const Products: React.FC = () => {
   };
 
   const handleFinishProduction = async (id: string) => {
+    console.log('🔘 [FRONTEND DEBUG] Botão Finalizar Processo clicado para produto:', id);
+    
     if (window.confirm('Tem certeza que deseja finalizar o processamento deste produto e adicioná-lo ao estoque?')) {
+      console.log('🔘 [FRONTEND DEBUG] Usuário confirmou, iniciando processo...');
       try {
-        await finishProductionMutation.mutateAsync(id);
+        console.log('🚀 [FRONTEND DEBUG] Chamando API finishProduction...');
+        const result = await finishProductionMutation.mutateAsync(id);
+        console.log('✅ [FRONTEND DEBUG] API retornou sucesso:', result);
       } catch (error: any) {
+        console.error('💥 [FRONTEND DEBUG] Erro capturado:', error);
         // Erro já tratado na mutation
       }
+    } else {
+      console.log('❌ [FRONTEND DEBUG] Usuário cancelou a operação');
     }
   };
 
@@ -369,28 +388,46 @@ const Products: React.FC = () => {
 
   // Função para verificar se produto está processando
   const isProductProcessing = (product: Product) => {
+    const debugInfo = {
+      productId: product.id,
+      productName: product.name,
+      description: product.description,
+      hasFinalizadoMark: product.description ? product.description.includes('[FINALIZADO]') : false,
+      inFinishedProducts: finishedProducts.has(product.id),
+      status: product.status,
+      inProduction: product.inProduction,
+    };
+    
+    console.log('🔍 [FRONTEND DEBUG] Verificando se produto está processando:', debugInfo);
+    
     // Verificar se foi finalizado no banco (marca na descrição)
     if (product.description && product.description.includes('[FINALIZADO]')) {
+      console.log('✅ [FRONTEND DEBUG] Produto NÃO está processando - tem marca [FINALIZADO] no banco');
       return false;
     }
     
     // Se foi finalizado localmente, não está mais processando
     if (finishedProducts.has(product.id)) {
+      console.log('✅ [FRONTEND DEBUG] Produto NÃO está processando - está na lista local');
       return false;
     }
     
     // Se tem status definido, usa ele
     if (product.status !== undefined) {
-      return product.status === 'PROCESSANDO';
+      const isProcessing = product.status === 'PROCESSANDO';
+      console.log(`🔍 [FRONTEND DEBUG] Usando campo status: ${product.status} -> processando: ${isProcessing}`);
+      return isProcessing;
     }
     
     // Se tem inProduction definido, usa ele
     if (product.inProduction !== undefined) {
+      console.log(`🔍 [FRONTEND DEBUG] Usando campo inProduction: ${product.inProduction}`);
       return product.inProduction === true;
     }
     
     // Se não tem nenhum campo definido, considera que está processando
     // (produtos sem migration)
+    console.log('🔍 [FRONTEND DEBUG] Produto ESTÁ processando - fallback (sem campos definidos)');
     return true;
   };
 

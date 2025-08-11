@@ -1685,14 +1685,17 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
     console.log('🔍 [DEBUG FINISH] Produto encontrado:', {
       id: product.id,
       name: product.name,
+      description: product.description,
       hasInProduction: 'inProduction' in product,
       inProductionValue: product.inProduction,
+      hasFinalizadoMark: product.description ? product.description.includes('[FINALIZADO]') : false,
     });
     
     // Se o campo inProduction não existe no banco, consideramos que o produto está em processamento
     const isInProduction = product.inProduction !== undefined ? product.inProduction : true;
     
     console.log('🔍 [DEBUG FINISH] isInProduction:', isInProduction);
+    console.log('🔍 [DEBUG FINISH] Descrição atual:', product.description);
     
     // TEMPORÁRIO: Comentar a validação para permitir finalizar qualquer produto
     // if (!isInProduction) {
@@ -1701,37 +1704,78 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
 
     // Atualizar o produto para finalizar produção (muda status para ATIVO)
     console.log('🔄 [DEBUG FINISH] Tentando atualizar produto...');
+    console.log('🔄 [DEBUG FINISH] ID do produto:', id);
     
     // SOLUÇÃO TEMPORÁRIA: Usar o campo 'description' para salvar estado de processamento
     // Vamos adicionar uma marca no final da descrição para indicar que foi finalizado
-    let newDescription = product.description || '';
+    let currentDescription = product.description || '';
+    console.log('🔄 [DEBUG FINISH] Descrição original:', JSON.stringify(currentDescription));
     
     // Verificar se já tem a marca de finalizado
-    if (!newDescription.includes('[FINALIZADO]')) {
-      newDescription = newDescription + ' [FINALIZADO]';
+    if (!currentDescription.includes('[FINALIZADO]')) {
+      const newDescription = currentDescription + ' [FINALIZADO]';
+      console.log('🔄 [DEBUG FINISH] Nova descrição calculada:', JSON.stringify(newDescription));
+      
+      try {
+        console.log('🔄 [DEBUG FINISH] Executando UPDATE no banco...');
+        const updatedProduct = await prisma.product.update({
+          where: { id },
+          data: {
+            description: newDescription
+          },
+          include: {
+            category: true,
+            subcategory: true,
+            size: true,
+            pattern: true,
+          },
+        });
+        
+        console.log('✅ [DEBUG FINISH] UPDATE executado com sucesso!');
+        console.log('✅ [DEBUG FINISH] Descrição salva no banco:', JSON.stringify(updatedProduct.description));
+        console.log('✅ [DEBUG FINISH] Produto atualizado ID:', updatedProduct.id);
+        
+        // Verificar se realmente foi salvo fazendo uma nova consulta
+        const verificacao = await prisma.product.findUnique({
+          where: { id },
+          select: { description: true, id: true, name: true }
+        });
+        
+        console.log('🔍 [DEBUG FINISH] Verificação pós-update:', {
+          id: verificacao?.id,
+          name: verificacao?.name,
+          description: JSON.stringify(verificacao?.description),
+          hasFinalizadoMark: verificacao?.description?.includes('[FINALIZADO]') || false
+        });
+        
+        return res.json({
+          ...updatedProduct,
+          message: 'Processamento finalizado com sucesso',
+        });
+        
+      } catch (updateError) {
+        console.error('💥 [DEBUG FINISH] Erro no UPDATE:', updateError);
+        throw updateError;
+      }
+    } else {
+      console.log('⚠️ [DEBUG FINISH] Produto já tinha marca [FINALIZADO], não atualizando');
+      const updatedProduct = await prisma.product.findUnique({
+        where: { id },
+        include: {
+          category: true,
+          subcategory: true,
+          size: true,
+          pattern: true,
+        },
+      });
+
+      console.log(`✅ [PRODUTO FINISH-PRODUCTION] Processamento finalizado para o produto: ${updatedProduct?.name}`);
+
+      return res.json({
+        ...updatedProduct,
+        message: 'Processamento finalizado com sucesso',
+      });
     }
-    
-    console.log('🔄 [DEBUG FINISH] Nova descrição:', newDescription);
-    
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: {
-        description: newDescription
-      },
-      include: {
-        category: true,
-        subcategory: true,
-        size: true,
-        pattern: true,
-      },
-    });
-
-    console.log(`✅ [PRODUTO FINISH-PRODUCTION] Processamento finalizado para o produto: ${updatedProduct.name}`);
-
-    return res.json({
-      ...updatedProduct,
-      message: 'Processamento finalizado com sucesso',
-    });
   } catch (error) {
     console.error('💥 [PRODUTO FINISH-PRODUCTION] Erro:', error);
     return next(error);
