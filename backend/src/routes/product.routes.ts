@@ -1700,17 +1700,24 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
     // }
 
     // Atualizar o produto para finalizar produção (muda status para ATIVO)
-    // Criar dados de atualização dinamicamente baseado nos campos existentes
-    const updateData: any = {};
+    console.log('🔄 [DEBUG FINISH] Tentando atualizar produto...');
     
-    // Só adicionar inProduction se o campo existir no banco
-    if (product.inProduction !== undefined) {
-      updateData.inProduction = false;
+    // SOLUÇÃO TEMPORÁRIA: Usar o campo 'description' para salvar estado de processamento
+    // Vamos adicionar uma marca no final da descrição para indicar que foi finalizado
+    let newDescription = product.description || '';
+    
+    // Verificar se já tem a marca de finalizado
+    if (!newDescription.includes('[FINALIZADO]')) {
+      newDescription = newDescription + ' [FINALIZADO]';
     }
+    
+    console.log('🔄 [DEBUG FINISH] Nova descrição:', newDescription);
     
     const updatedProduct = await prisma.product.update({
       where: { id },
-      data: updateData,
+      data: {
+        description: newDescription
+      },
       include: {
         category: true,
         subcategory: true,

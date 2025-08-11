@@ -369,6 +369,11 @@ const Products: React.FC = () => {
 
   // Função para verificar se produto está processando
   const isProductProcessing = (product: Product) => {
+    // Verificar se foi finalizado no banco (marca na descrição)
+    if (product.description && product.description.includes('[FINALIZADO]')) {
+      return false;
+    }
+    
     // Se foi finalizado localmente, não está mais processando
     if (finishedProducts.has(product.id)) {
       return false;
