@@ -1969,7 +1969,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
               <style>
                 @page {
                   size: 40mm 30mm;
-                  margin: 0mm;
+                  margin: 1.5mm;
                   padding: 0mm;
                 }
                 * {
@@ -1978,12 +1978,14 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   box-sizing: border-box;
                 }
                 body {
-                  width: 40mm;
-                  height: 30mm;
+                  width: 37mm;
+                  height: 27mm;
                   font-family: 'Arial', 'Helvetica', sans-serif;
                   font-size: 10px;
                   line-height: 1.1;
                   display: flex;
+                  justify-content: center;
+                  align-items: center;
                   overflow: hidden;
                   background: white;
                   color: black;
@@ -1992,88 +1994,102 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   width: 100%;
                   height: 100%;
                   display: flex;
-                  padding: 0.3mm;
-                  gap: 0.8mm;
+                  padding: 1mm;
+                  gap: 1mm;
+                  align-items: center;
+                  justify-content: center;
                 }
                 .qr-section {
-                  width: 14mm;
+                  width: 15mm;
                   height: 100%;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
-                  justify-content: flex-start;
-                  gap: 0.5mm;
+                  justify-content: center;
+                  gap: 0.8mm;
+                  padding: 0.5mm;
                 }
                 .qr-code {
-                  width: 13mm;
-                  height: 13mm;
+                  width: 12mm;
+                  height: 12mm;
                   object-fit: contain;
                   image-rendering: -webkit-optimize-contrast;
                   image-rendering: pixelated;
                   border: none;
+                  display: block;
+                  margin: 0 auto;
                 }
                 .sku-code {
-                  font-size: 8px;
+                  font-size: 7px;
                   font-weight: bold;
                   text-align: center;
                   word-break: break-all;
                   line-height: 1.0;
-                  margin-top: 0.3mm;
                   width: 100%;
+                  margin: 0;
                 }
                 .info-section {
                   flex: 1;
                   height: 100%;
                   display: flex;
                   flex-direction: column;
-                  justify-content: space-between;
+                  justify-content: center;
                   min-width: 0;
                   overflow: hidden;
+                  padding: 0.5mm;
+                  gap: 0.5mm;
                 }
                 .product-name {
-                  font-size: 11px;
+                  font-size: 10px;
                   font-weight: bold;
-                  line-height: 1.0;
-                  margin-bottom: 1mm;
+                  line-height: 1.1;
+                  margin-bottom: 0.5mm;
                   word-wrap: break-word;
                   overflow-wrap: break-word;
                   hyphens: auto;
-                  max-height: 5.5mm;
+                  max-height: 5mm;
                   overflow: hidden;
                   display: -webkit-box;
                   -webkit-line-clamp: 2;
                   -webkit-box-orient: vertical;
+                  text-align: center;
                 }
                 .product-details {
-                  flex: 1;
                   display: flex;
                   flex-direction: column;
-                  gap: 0.2mm;
+                  gap: 0.3mm;
                   min-height: 0;
+                  justify-content: center;
+                  align-items: center;
                 }
                 .detail-line {
-                  font-size: 8px;
+                  font-size: 7px;
                   line-height: 1.0;
                   font-weight: 500;
                   word-wrap: break-word;
                   overflow-wrap: break-word;
                   hyphens: auto;
+                  text-align: center;
+                  width: 100%;
                 }
                 .detail-line.subcategory,
                 .detail-line.pattern {
-                  font-size: 7px;
+                  font-size: 6px;
                   line-height: 0.9;
                 }
                 .price {
                   font-weight: bold;
-                  font-size: 11px;
-                  text-align: right;
+                  font-size: 9px;
+                  text-align: center;
                   background: #f5f5f5;
-                  padding: 0.5mm 0.8mm;
-                  border-radius: 0.5mm;
+                  padding: 0.3mm 0.5mm;
+                  border-radius: 0.3mm;
                   margin-top: 0.5mm;
                   border: 1px solid #ddd;
                   white-space: nowrap;
+                  width: fit-content;
+                  margin-left: auto;
+                  margin-right: auto;
                 }
                 @media print {
                   body { -webkit-print-color-adjust: exact; color-adjust: exact; }
