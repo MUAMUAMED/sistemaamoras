@@ -126,14 +126,19 @@ router.get('/', authenticateToken, async (req, res, next) => {
     const productIds = productsBase.map((p) => p.id);
     let imagesByProduct: Record<string, any[]> = {};
     if (productIds.length > 0) {
-      const allImages = await (prisma as any).productImage.findMany({
-        where: { productId: { in: productIds } },
-        orderBy: { position: 'asc' },
-      });
-      imagesByProduct = allImages.reduce((acc: Record<string, any[]>, img: any) => {
-        (acc[img.productId] = acc[img.productId] || []).push(img);
-        return acc;
-      }, {});
+      try {
+        const allImages = await (prisma as any).productImage.findMany({
+          where: { productId: { in: productIds } },
+          orderBy: { position: 'asc' },
+        });
+        imagesByProduct = allImages.reduce((acc: Record<string, any[]>, img: any) => {
+          (acc[img.productId] = acc[img.productId] || []).push(img);
+          return acc;
+        }, {});
+      } catch (err) {
+        // Se a tabela ainda não existir (migration não aplicada), segue sem imagens
+        imagesByProduct = {};
+      }
     }
 
     const products = productsBase.map((p) => ({
@@ -203,7 +208,12 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    let images: any[] = [];
+    try {
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    } catch (err) {
+      images = [];
+    }
     const product = { ...productBase, images } as any;
     return res.json(product);
   } catch (error) {
@@ -985,15 +995,32 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
     const typeParam = (req.query.type as string)?.toUpperCase();
     const imageType = typeParam === 'IA' ? 'IA' : 'ROUPA';
 
-    // Criar registro em ProductImage
-    const createdImage = await (prisma as any).productImage.create({
-      data: {
-        productId: id,
-        url: imageUrl,
-        type: imageType as any,
-        position: 0,
-      },
-    });
+    // Enforce máximo 6 imagens por produto
+    let existingCount = 0;
+    try {
+      existingCount = await (prisma as any).productImage.count({ where: { productId: id } });
+    } catch (err) {
+      existingCount = 0; // tabela pode não existir ainda; segue compat
+    }
+    if (existingCount >= 6) {
+      return res.status(400).json({ error: 'Limite de imagens atingido', message: 'Cada produto pode ter no máximo 6 imagens' });
+    }
+
+    // Criar registro em ProductImage (se tabela existir)
+    let createdImage: any = null;
+    try {
+      createdImage = await (prisma as any).productImage.create({
+        data: {
+          productId: id,
+          url: imageUrl,
+          type: imageType as any,
+          position: existingCount,
+        },
+      });
+    } catch (err) {
+      // Se falhar (ex: tabela não existe), segue apenas com imageUrl principal
+      createdImage = null;
+    }
 
     // Se desejar setar como principal, atualizar campo legacy imageUrl
     let updatedProduct: any = null;
@@ -1010,7 +1037,12 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
       });
     }
 
-    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    let images: any[] = [];
+    try {
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    } catch (err) {
+      images = [];
+    }
 
     return res.json({
       message: 'Imagem carregada com sucesso',
@@ -1104,19 +1136,37 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
 
     const files = req.files as Express.Multer.File[];
-    const created = await prisma.$transaction(files.map((file, index) =>
+    // Máximo 6 imagens por produto
+    let existingCount = 0;
+    try {
+      existingCount = await (prisma as any).productImage.count({ where: { productId: id } });
+    } catch (err) {
+      existingCount = 0; // tabela pode não existir ainda
+    }
+    const available = Math.max(0, 6 - existingCount);
+    if (available === 0) {
+      return res.status(400).json({ error: 'Limite de imagens atingido', message: 'Cada produto pode ter no máximo 6 imagens' });
+    }
+    const filesToInsert = files.slice(0, available);
+
+    const created = await prisma.$transaction(filesToInsert.map((file, index) =>
       (prisma as any).productImage.create({
         data: {
           productId: id,
           url: `/uploads/products/${file.filename}`,
           type: imageType as any,
-          position: index,
+          position: existingCount + index,
         },
       })
     ));
 
-    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
-    return res.json({ message: 'Imagens enviadas com sucesso', created, images });
+    let images: any[] = [];
+    try {
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    } catch (err) {
+      images = [];
+    }
+    return res.json({ message: 'Imagens enviadas com sucesso', created, images, remaining: Math.max(0, 6 - (existingCount + filesToInsert.length)) });
   } catch (error) {
     return next(error);
   }

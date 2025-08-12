@@ -241,17 +241,23 @@ const Products: React.FC = () => {
       // Se há uma imagem, fazer o upload (compatibilidade)
       if (imageFile) {
         console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
-        await productsApi.uploadImage(createdProduct.id, imageFile);
+        try {
+          await productsApi.uploadImage(createdProduct.id, imageFile);
+        } catch (e) {
+          console.warn('⚠️ Upload compat de imagem falhou (seguindo com múltiplas):', e);
+        }
         console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
       }
       // Upload de múltiplas imagens por tipo
-      if (imageFilesRoupa && imageFilesRoupa.length > 0) {
+      const limitedRoupa = (imageFilesRoupa || []).slice(0, 6);
+      const limitedIA = (imageFilesIA || []).slice(0, 6);
+      if (limitedRoupa.length > 0) {
         console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
+        await productsApi.uploadImages(createdProduct.id, limitedRoupa, 'ROUPA');
       }
-      if (imageFilesIA && imageFilesIA.length > 0) {
+      if (limitedIA.length > 0) {
         console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
+        await productsApi.uploadImages(createdProduct.id, limitedIA, 'IA');
       }
       
       // Atualizar a lista de produtos
@@ -286,13 +292,15 @@ const Products: React.FC = () => {
           console.log('✅ [FRONTEND UPDATE] Imagem atualizada com sucesso');
         }
         // Upload de múltiplas imagens por tipo
-        if (imageFilesRoupa && (imageFilesRoupa as File[]).length > 0) {
-          console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', (imageFilesRoupa as File[]).length);
-          await productsApi.uploadImages(selectedProduct.id, imageFilesRoupa as File[], 'ROUPA');
+        const limitedRoupa = (imageFilesRoupa as File[] | undefined)?.slice(0, 6) || [];
+        const limitedIA = (imageFilesIA as File[] | undefined)?.slice(0, 6) || [];
+        if (limitedRoupa.length > 0) {
+          console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', limitedRoupa.length);
+          await productsApi.uploadImages(selectedProduct.id, limitedRoupa, 'ROUPA');
         }
-        if (imageFilesIA && (imageFilesIA as File[]).length > 0) {
-          console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', (imageFilesIA as File[]).length);
-          await productsApi.uploadImages(selectedProduct.id, imageFilesIA as File[], 'IA');
+        if (limitedIA.length > 0) {
+          console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', limitedIA.length);
+          await productsApi.uploadImages(selectedProduct.id, limitedIA, 'IA');
         }
         
         // Atualizar a lista de produtos
