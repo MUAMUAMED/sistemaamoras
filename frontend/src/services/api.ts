@@ -280,6 +280,15 @@ export const productsApi = {
     });
     return response.data;
   },
+
+  uploadImages: async (id: string, images: File[], type: 'ROUPA' | 'IA'): Promise<{ message: string }> => {
+    const formData = new FormData();
+    images.forEach((file) => formData.append('images', file));
+    const response = await api.post(`/products/${id}/images?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
   
   finishProduction: async (id: string): Promise<Product> => {
     const response = await api.put(`/products/${id}/finish-production`);

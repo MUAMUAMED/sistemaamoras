@@ -104,7 +104,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
       where.categoryId = category as string;
     }
 
-    const [products, total] = await Promise.all([
+    const [productsBase, total] = await Promise.all([
       prisma.product.findMany({
         where,
         include: {
@@ -121,6 +121,25 @@ router.get('/', authenticateToken, async (req, res, next) => {
       }),
       prisma.product.count({ where }),
     ]);
+
+    // Buscar imagens em lote e anexar manualmente (evita tipos até gerar Prisma Client)
+    const productIds = productsBase.map((p) => p.id);
+    let imagesByProduct: Record<string, any[]> = {};
+    if (productIds.length > 0) {
+      const allImages = await (prisma as any).productImage.findMany({
+        where: { productId: { in: productIds } },
+        orderBy: { position: 'asc' },
+      });
+      imagesByProduct = allImages.reduce((acc: Record<string, any[]>, img: any) => {
+        (acc[img.productId] = acc[img.productId] || []).push(img);
+        return acc;
+      }, {});
+    }
+
+    const products = productsBase.map((p) => ({
+      ...p,
+      images: imagesByProduct[p.id] || [],
+    }));
 
     res.json({
       data: products,
@@ -161,7 +180,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const product = await prisma.product.findUnique({
+    const productBase = await prisma.product.findUnique({
       where: { id },
       include: {
         category: true,
@@ -177,13 +196,15 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       },
     });
 
-    if (!product) {
+    if (!productBase) {
       return res.status(404).json({
         error: 'Produto não encontrado',
         message: 'O produto solicitado não foi encontrado',
       });
     }
 
+    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    const product = { ...productBase, images } as any;
     return res.json(product);
   } catch (error) {
     return next(error);
@@ -959,25 +980,183 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
     // Construir URL da imagem
     const imageUrl = `/uploads/products/${req.file.filename}`;
 
-    // Atualizar produto com URL da imagem
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: { imageUrl },
-      include: {
-        category: true,
-        pattern: true,
+    // Compat: se vier query main=true, salvar também em imageUrl
+    const setAsMain = (req.query.main as string) === 'true';
+    const typeParam = (req.query.type as string)?.toUpperCase();
+    const imageType = typeParam === 'IA' ? 'IA' : 'ROUPA';
+
+    // Criar registro em ProductImage
+    const createdImage = await (prisma as any).productImage.create({
+      data: {
+        productId: id,
+        url: imageUrl,
+        type: imageType as any,
+        position: 0,
       },
     });
 
+    // Se desejar setar como principal, atualizar campo legacy imageUrl
+    let updatedProduct: any = null;
+    if (setAsMain) {
+      updatedProduct = await prisma.product.update({
+        where: { id },
+        data: { imageUrl },
+        include: { category: true, pattern: true },
+      });
+    } else {
+      updatedProduct = await prisma.product.findUnique({
+        where: { id },
+        include: { category: true, pattern: true },
+      });
+    }
+
+    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+
     return res.json({
       message: 'Imagem carregada com sucesso',
-      product: updatedProduct,
+      product: { ...(updatedProduct as any), images },
+      image: createdImage,
       imageUrl,
     });
   } catch (error) {
     return next(error);
   }
   return;
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/images:
+ *   get:
+ *     summary: Listar imagens do produto
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Lista de imagens
+ */
+router.get('/:id/images', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
+    if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
+    const images = await (prisma as any).productImage.findMany({
+      where: { productId: id },
+      orderBy: { position: 'asc' },
+    });
+    return res.json({ images });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/images:
+ *   post:
+ *     summary: Upload de imagens do produto (múltiplas)
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [ROUPA, IA]
+ *         description: Tipo da imagem
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ */
+router.post('/:id/images', authenticateToken, uploadProductImage.array('images', 10), async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const typeParam = (req.query.type as string)?.toUpperCase();
+    const imageType = typeParam === 'IA' ? 'IA' : 'ROUPA';
+
+    if (!req.files || !(req.files as any[]).length) {
+      return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+    }
+
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    const files = req.files as Express.Multer.File[];
+    const created = await prisma.$transaction(files.map((file, index) =>
+      (prisma as any).productImage.create({
+        data: {
+          productId: id,
+          url: `/uploads/products/${file.filename}`,
+          type: imageType as any,
+          position: index,
+        },
+      })
+    ));
+
+    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    return res.json({ message: 'Imagens enviadas com sucesso', created, images });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/images/{imageId}:
+ *   delete:
+ *     summary: Remover uma imagem do produto
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: imageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Imagem removida
+ */
+router.delete('/:id/images/:imageId', authenticateToken, async (req, res, next) => {
+  try {
+    const { id, imageId } = req.params;
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
+
+    await (prisma as any).productImage.delete({ where: { id: imageId } });
+    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    return res.json({ message: 'Imagem removida', images });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 /**

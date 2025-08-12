@@ -92,6 +92,7 @@ export interface Product {
   barcode: string;
   qrcodeUrl?: string;
   imageUrl?: string;
+  images?: ProductImage[]; // Galeria de imagens
   categoryId: string;
   subcategoryId?: string; // Opcional
   sizeId: string; // ID do tamanho
@@ -107,6 +108,17 @@ export interface Product {
   subcategory?: Subcategory;
   pattern?: Pattern;
   size?: Size; // Relação completa do tamanho
+}
+
+export type ProductImageType = 'ROUPA' | 'IA';
+
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  type: ProductImageType;
+  position: number;
+  createdAt: string;
 }
 
 // Enums de localização de estoque
@@ -332,6 +344,8 @@ export interface ProductFormData {
   sizeId: string; // ID do tamanho para buscar dados
   active?: boolean;
   imageFile?: File;
+  imageFilesRoupa?: File[]; // novas imagens tipo roupa
+  imageFilesIA?: File[];    // novas imagens tipo IA
   initialLocation?: 'LOJA' | 'ARMAZEM'; // Localização inicial do estoque
 }
 

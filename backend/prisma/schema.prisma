@@ -112,7 +112,8 @@ model Product {
   minStock      Int      @default(5)
   barcode       String   @unique
   qrcodeUrl     String?
-  imageUrl      String?  // URL da imagem do produto
+  imageUrl      String?  // URL da imagem principal do produto (compatibilidade)
+  images        ProductImage[] // Galeria de imagens do produto
   description     String?
   active          Boolean  @default(true)
   inProduction    Boolean  @default(true) // Status de produção - true quando recém criado (manter para compatibilidade)
@@ -129,6 +130,22 @@ model Product {
   stockMovements StockMovement[]
 
   @@map("products")
+}
+
+// Galeria de imagens do produto
+model ProductImage {
+  id        String            @id @default(cuid())
+  productId String
+  url       String
+  type      ProductImageType  // Tipo da imagem (roupa ou IA)
+  position  Int               @default(0) // Ordenação simples
+  createdAt DateTime          @default(now())
+
+  // Relacionamento
+  product   Product           @relation(fields: [productId], references: [id])
+
+  @@index([productId, type])
+  @@map("product_images")
 }
 
 // Leads/Clientes
@@ -353,4 +370,10 @@ enum ProductStatus {
   PROCESSANDO       // Produto em processamento/criação
   ATIVO             // Produto ativo no estoque
   INATIVO           // Produto inativo
+}
+
+// Tipos de imagem por produto
+enum ProductImageType {
+  ROUPA             // Foto real da roupa
+  IA                // Imagem gerada por IA
 }

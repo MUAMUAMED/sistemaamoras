@@ -223,7 +223,7 @@ const Products: React.FC = () => {
     console.log('🔍 [FRONTEND CREATE] Tamanho selecionado:', selectedSize);
     
     // Montar o payload com size e sizeCode (sem o arquivo de imagem)
-    const { imageFile, ...productData } = data;
+    const { imageFile, imageFilesRoupa, imageFilesIA, ...productData } = data;
     const payload = {
       ...productData,
       size: selectedSize ? selectedSize.name : '',
@@ -238,11 +238,20 @@ const Products: React.FC = () => {
       const createdProduct = await productsApi.create(payload);
       console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
       
-      // Se há uma imagem, fazer o upload
+      // Se há uma imagem, fazer o upload (compatibilidade)
       if (imageFile) {
         console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
         await productsApi.uploadImage(createdProduct.id, imageFile);
         console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
+      }
+      // Upload de múltiplas imagens por tipo
+      if (imageFilesRoupa && imageFilesRoupa.length > 0) {
+        console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
+        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
+      }
+      if (imageFilesIA && imageFilesIA.length > 0) {
+        console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
+        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
       }
       
       // Atualizar a lista de produtos
@@ -262,7 +271,7 @@ const Products: React.FC = () => {
       console.log('🔄 [FRONTEND UPDATE] Dados do formulário recebidos:', data);
       
       try {
-        const { imageFile, ...productData } = data;
+        const { imageFile, imageFilesRoupa, imageFilesIA, ...productData } = data as any;
         console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', productData);
         
         // Atualizar dados do produto (sem a imagem)
@@ -270,11 +279,20 @@ const Products: React.FC = () => {
         const updatedProduct = await productsApi.update(selectedProduct.id, productData);
         console.log('✅ [FRONTEND UPDATE] Produto atualizado com sucesso:', updatedProduct);
         
-        // Se há uma nova imagem, fazer o upload
+        // Se há uma nova imagem, fazer o upload (compatibilidade)
         if (imageFile) {
           console.log('📷 [FRONTEND UPDATE] Fazendo upload de nova imagem...');
           await productsApi.uploadImage(selectedProduct.id, imageFile);
           console.log('✅ [FRONTEND UPDATE] Imagem atualizada com sucesso');
+        }
+        // Upload de múltiplas imagens por tipo
+        if (imageFilesRoupa && (imageFilesRoupa as File[]).length > 0) {
+          console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', (imageFilesRoupa as File[]).length);
+          await productsApi.uploadImages(selectedProduct.id, imageFilesRoupa as File[], 'ROUPA');
+        }
+        if (imageFilesIA && (imageFilesIA as File[]).length > 0) {
+          console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', (imageFilesIA as File[]).length);
+          await productsApi.uploadImages(selectedProduct.id, imageFilesIA as File[], 'IA');
         }
         
         // Atualizar a lista de produtos
@@ -700,9 +718,9 @@ const Products: React.FC = () => {
                         <div key={product.id} className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden group card-hover animate-fade-in-up">
                           {/* Imagem do Produto */}
                           <div className="relative h-48 bg-gray-100 overflow-hidden">
-                            {product.imageUrl ? (
-                              <img 
-                                src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
+                            {product.images && product.images.length > 0 ? (
+                              <img
+                                src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.images[0].url}`}
                                 alt={product.name}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
@@ -710,8 +728,14 @@ const Products: React.FC = () => {
                                   e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                 }}
                               />
+                            ) : product.imageUrl ? (
+                              <img
+                                src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
+                                alt={product.name}
+                                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                              />
                             ) : null}
-                            <div className={`absolute inset-0 flex items-center justify-center ${product.imageUrl ? 'hidden' : ''}`}>
+                            <div className={`absolute inset-0 flex items-center justify-center ${(product.images && product.images.length > 0) || product.imageUrl ? 'hidden' : ''}`}>
                               <Package className="w-12 h-12 text-gray-400" />
                             </div>
                             
@@ -1119,6 +1143,8 @@ interface ProductFormModalData {
   sizeId: string;
   active?: boolean;
   imageFile?: File | null;
+  imageFilesRoupa?: File[];
+  imageFilesIA?: File[];
   initialLocation?: 'LOJA' | 'ARMAZEM'; // Nova propriedade para localização inicial
 }
 
@@ -1183,6 +1209,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     patternId: product?.patternId || '',
     sizeId: product?.sizeId || '',
     imageFile: null,
+    imageFilesRoupa: [],
+    imageFilesIA: [],
   });
 
   // Debug apenas quando produto muda
@@ -1277,6 +1305,16 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     if (file) {
       setFormData(prev => ({ ...prev, imageFile: file }));
     }
+  };
+
+  const handleImagesRoupaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    setFormData(prev => ({ ...prev, imageFilesRoupa: files }));
+  };
+
+  const handleImagesIAChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    setFormData(prev => ({ ...prev, imageFilesIA: files }));
   };
 
   return (
@@ -1496,16 +1534,39 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               error={errors.sizeId}
             />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Imagem
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagem Principal (opcional)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Compatibilidade com o campo antigo de imagem única</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagens da Roupa (múltiplas)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImagesRoupaChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Imagens IA (múltiplas)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImagesIAChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -1571,15 +1632,35 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{product.name}</h3>
             
-            {product.imageUrl && (
-              <div className="mb-4">
+            <div className="mb-4 space-y-3">
+              {(product.images && product.images.length > 0) ? (
+                <div>
+                  <p className="text-sm text-gray-700 mb-1">Imagens da Roupa</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {product.images.filter(img => img.type === 'ROUPA').map(img => (
+                      <img key={img.id} src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${img.url}`} alt="Imagem Roupa" className="w-full h-24 object-cover rounded" />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {(product.images && product.images.some(img => img.type === 'IA')) ? (
+                <div>
+                  <p className="text-sm text-gray-700 mb-1">Imagens IA</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {product.images.filter(img => img.type === 'IA').map(img => (
+                      <img key={img.id} src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${img.url}`} alt="Imagem IA" className="w-full h-24 object-cover rounded" />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {(!product.images || product.images.length === 0) && product.imageUrl && (
                 <img 
                   src={`https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
                   alt={product.name}
                   className="w-full h-48 object-contain rounded-lg"
                 />
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="space-y-3">
               <div>
