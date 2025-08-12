@@ -126,14 +126,19 @@ router.get('/', authenticateToken, async (req, res, next) => {
     const productIds = productsBase.map((p) => p.id);
     let imagesByProduct: Record<string, any[]> = {};
     if (productIds.length > 0) {
-      const allImages = await (prisma as any).productImage.findMany({
-        where: { productId: { in: productIds } },
-        orderBy: { position: 'asc' },
-      });
-      imagesByProduct = allImages.reduce((acc: Record<string, any[]>, img: any) => {
-        (acc[img.productId] = acc[img.productId] || []).push(img);
-        return acc;
-      }, {});
+      try {
+        const allImages = await (prisma as any).productImage.findMany({
+          where: { productId: { in: productIds } },
+          orderBy: { position: 'asc' },
+        });
+        imagesByProduct = allImages.reduce((acc: Record<string, any[]>, img: any) => {
+          (acc[img.productId] = acc[img.productId] || []).push(img);
+          return acc;
+        }, {});
+      } catch (error: any) {
+        console.warn('⚠️ ProductImage table not found in product list, returning empty images arrays:', error.message);
+        // Manter imagesByProduct como objeto vazio
+      }
     }
 
     const products = productsBase.map((p) => ({
@@ -203,7 +208,13 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    let images: any[] = [];
+    try {
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    } catch (error: any) {
+      console.warn('⚠️ ProductImage table not found in product details, returning empty images array:', error.message);
+    }
+    
     const product = { ...productBase, images } as any;
     return res.json(product);
   } catch (error) {
@@ -1057,10 +1068,17 @@ router.get('/:id/images', authenticateToken, async (req, res, next) => {
     const { id } = req.params;
     const product = await prisma.product.findUnique({ where: { id }, select: { id: true } });
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
-    const images = await (prisma as any).productImage.findMany({
-      where: { productId: id },
-      orderBy: { position: 'asc' },
-    });
+    
+    let images: any[] = [];
+    try {
+      images = await (prisma as any).productImage.findMany({
+        where: { productId: id },
+        orderBy: { position: 'asc' },
+      });
+    } catch (error: any) {
+      console.warn('⚠️ ProductImage table not found in images list, returning empty array:', error.message);
+    }
+    
     return res.json({ images });
   } catch (error) {
     return next(error);
@@ -1192,8 +1210,20 @@ router.delete('/:id/images/:imageId', authenticateToken, async (req, res, next) 
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
 
-    await (prisma as any).productImage.delete({ where: { id: imageId } });
-    const images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    try {
+      await (prisma as any).productImage.delete({ where: { id: imageId } });
+    } catch (error: any) {
+      console.warn('⚠️ ProductImage table not found in delete, skipping deletion:', error.message);
+      return res.status(404).json({ error: 'Imagem não encontrada ou tabela não existe' });
+    }
+
+    let images: any[] = [];
+    try {
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+    } catch (error: any) {
+      console.warn('⚠️ ProductImage table not found after delete, returning empty array:', error.message);
+    }
+
     return res.json({ message: 'Imagem removida', images });
   } catch (error) {
     return next(error);
