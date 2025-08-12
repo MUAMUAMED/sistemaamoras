@@ -241,23 +241,17 @@ const Products: React.FC = () => {
       // Se há uma imagem, fazer o upload (compatibilidade)
       if (imageFile) {
         console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
-        try {
-          await productsApi.uploadImage(createdProduct.id, imageFile);
-        } catch (e) {
-          console.warn('⚠️ Upload compat de imagem falhou (seguindo com múltiplas):', e);
-        }
+        await productsApi.uploadImage(createdProduct.id, imageFile);
         console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
       }
       // Upload de múltiplas imagens por tipo
-      const limitedRoupa = (imageFilesRoupa || []).slice(0, 6);
-      const limitedIA = (imageFilesIA || []).slice(0, 6);
-      if (limitedRoupa.length > 0) {
+      if (imageFilesRoupa && imageFilesRoupa.length > 0) {
         console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
-        await productsApi.uploadImages(createdProduct.id, limitedRoupa, 'ROUPA');
+        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
       }
-      if (limitedIA.length > 0) {
+      if (imageFilesIA && imageFilesIA.length > 0) {
         console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
-        await productsApi.uploadImages(createdProduct.id, limitedIA, 'IA');
+        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
       }
       
       // Atualizar a lista de produtos
@@ -292,15 +286,13 @@ const Products: React.FC = () => {
           console.log('✅ [FRONTEND UPDATE] Imagem atualizada com sucesso');
         }
         // Upload de múltiplas imagens por tipo
-        const limitedRoupa = (imageFilesRoupa as File[] | undefined)?.slice(0, 6) || [];
-        const limitedIA = (imageFilesIA as File[] | undefined)?.slice(0, 6) || [];
-        if (limitedRoupa.length > 0) {
-          console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', limitedRoupa.length);
-          await productsApi.uploadImages(selectedProduct.id, limitedRoupa, 'ROUPA');
+        if (imageFilesRoupa && (imageFilesRoupa as File[]).length > 0) {
+          console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', (imageFilesRoupa as File[]).length);
+          await productsApi.uploadImages(selectedProduct.id, imageFilesRoupa as File[], 'ROUPA');
         }
-        if (limitedIA.length > 0) {
-          console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', limitedIA.length);
-          await productsApi.uploadImages(selectedProduct.id, limitedIA, 'IA');
+        if (imageFilesIA && (imageFilesIA as File[]).length > 0) {
+          console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', (imageFilesIA as File[]).length);
+          await productsApi.uploadImages(selectedProduct.id, imageFilesIA as File[], 'IA');
         }
         
         // Atualizar a lista de produtos
@@ -1302,6 +1294,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         stock: parseInt(formData.stock) || 0,
         minStock: parseInt(formData.minStock) || 0,
         imageFile: formData.imageFile || undefined,
+        imageFilesRoupa: formData.imageFilesRoupa || [],
+        imageFilesIA: formData.imageFilesIA || [],
         initialLocation: formData.initialLocation || 'LOJA', // Padrão para Loja
       };
       onSubmit(submitData);
@@ -1317,12 +1311,20 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleImagesRoupaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
-    setFormData(prev => ({ ...prev, imageFilesRoupa: files }));
+    const limitedFiles = files.slice(0, 6);
+    setFormData(prev => ({ ...prev, imageFilesRoupa: limitedFiles }));
+    if (files.length > 6) {
+      alert('Máximo de 6 imagens permitidas. Apenas as primeiras 6 foram selecionadas.');
+    }
   };
 
   const handleImagesIAChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
-    setFormData(prev => ({ ...prev, imageFilesIA: files }));
+    const limitedFiles = files.slice(0, 6);
+    setFormData(prev => ({ ...prev, imageFilesIA: limitedFiles }));
+    if (files.length > 6) {
+      alert('Máximo de 6 imagens permitidas. Apenas as primeiras 6 foram selecionadas.');
+    }
   };
 
   return (
@@ -1555,7 +1557,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Imagens da Roupa (múltiplas)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Imagens da Roupa (máximo 6)
+                </label>
                 <input
                   type="file"
                   accept="image/*"
@@ -1563,10 +1567,38 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   onChange={handleImagesRoupaChange}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {formData.imageFilesRoupa && formData.imageFilesRoupa.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-600 mb-2">{formData.imageFilesRoupa.length} imagem(ns) selecionada(s)</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {formData.imageFilesRoupa.map((file, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-20 object-cover rounded border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newFiles = formData.imageFilesRoupa?.filter((_, i) => i !== index) || [];
+                              setFormData(prev => ({ ...prev, imageFilesRoupa: newFiles }));
+                            }}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Imagens IA (múltiplas)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Imagens IA (máximo 6)
+                </label>
                 <input
                   type="file"
                   accept="image/*"
@@ -1574,6 +1606,32 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                   onChange={handleImagesIAChange}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {formData.imageFilesIA && formData.imageFilesIA.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-600 mb-2">{formData.imageFilesIA.length} imagem(ns) selecionada(s)</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {formData.imageFilesIA.map((file, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`Preview IA ${index + 1}`}
+                            className="w-full h-20 object-cover rounded border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newFiles = formData.imageFilesIA?.filter((_, i) => i !== index) || [];
+                              setFormData(prev => ({ ...prev, imageFilesIA: newFiles }));
+                            }}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
