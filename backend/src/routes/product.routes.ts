@@ -71,6 +71,21 @@ async function generateQRCode(data: string): Promise<string> {
  */
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
+    console.log('🔍 [PRODUCT LIST] Iniciando busca de produtos');
+    console.log('🔌 [PRODUCT LIST] Testando conexão com banco...');
+    
+    // Teste de conexão básico
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      console.log('✅ [PRODUCT LIST] Conexão com banco OK');
+    } catch (connError: any) {
+      console.error('💥 [PRODUCT LIST] Erro de conexão:', connError.message);
+      return res.status(500).json({
+        error: 'Erro de conexão com banco de dados',
+        message: 'Não foi possível conectar ao banco de dados'
+      });
+    }
+
     const { search, barcode, category, page = 1, limit = 20 } = req.query;
     
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -104,28 +119,44 @@ router.get('/', authenticateToken, async (req, res, next) => {
       where.categoryId = category as string;
     }
 
-    const [productsBase, total] = await Promise.all([
-      prisma.product.findMany({
-        where,
-        include: {
-          category: true,
-          subcategory: true,
-          size: true,
-          pattern: true,
-        },
-        skip,
-        take,
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
-      prisma.product.count({ where }),
-    ]);
+    console.log('📊 [PRODUCT LIST] Buscando produtos no banco...');
+    let productsBase: any[] = [];
+    let total = 0;
+
+    try {
+      const [products, count] = await Promise.all([
+        prisma.product.findMany({
+          where,
+          include: {
+            category: true,
+            subcategory: true,
+            size: true,
+            pattern: true,
+          },
+          skip,
+          take,
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+        prisma.product.count({ where }),
+      ]);
+      
+      productsBase = products;
+      total = count;
+      console.log(`✅ [PRODUCT LIST] Encontrados ${total} produtos, retornando ${productsBase.length}`);
+    } catch (dbError: any) {
+      console.error('💥 [PRODUCT LIST] Erro ao buscar produtos no banco:', dbError.message);
+      console.error('Stack trace:', dbError.stack);
+      throw dbError; // Re-lançar para ser capturado pelo error handler
+    }
 
     // Buscar imagens em lote e anexar manualmente (evita tipos até gerar Prisma Client)
     const productIds = productsBase.map((p) => p.id);
     let imagesByProduct: Record<string, any[]> = {};
+    
     if (productIds.length > 0) {
+      console.log(`🖼️ [PRODUCT LIST] Buscando imagens para ${productIds.length} produtos...`);
       try {
         const allImages = await (prisma as any).productImage.findMany({
           where: { productId: { in: productIds } },
@@ -135,8 +166,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
           (acc[img.productId] = acc[img.productId] || []).push(img);
           return acc;
         }, {});
+        console.log(`✅ [PRODUCT LIST] Encontradas imagens para ${Object.keys(imagesByProduct).length} produtos`);
       } catch (error: any) {
-        console.warn('⚠️ ProductImage table not found in product list, returning empty images arrays:', error.message);
+        console.warn('⚠️ [PRODUCT LIST] ProductImage table not found, returning empty images arrays:', error.message);
         // Manter imagesByProduct como objeto vazio
       }
     }
@@ -146,6 +178,8 @@ router.get('/', authenticateToken, async (req, res, next) => {
       images: imagesByProduct[p.id] || [],
     }));
 
+    console.log(`🎯 [PRODUCT LIST] Retornando ${products.length} produtos com imagens`);
+    
     res.json({
       data: products,
       pagination: {
@@ -155,7 +189,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
         pages: Math.ceil(total / parseInt(limit as string)),
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error('💥 [PRODUCT LIST] Erro geral:', error.message);
+    console.error('💥 [PRODUCT LIST] Stack:', error.stack);
     return next(error);
   }
   return;
