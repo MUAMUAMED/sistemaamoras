@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 
@@ -37,8 +36,13 @@ import { notFoundHandler } from './middleware/notFoundHandler';
 // Importar rota de pagamento Mercado Pago
 import paymentGatewayRoutes from './routes/payment-gateway.service';
 
-// Carregar variáveis de ambiente
-dotenv.config();
+import path from 'path';
+import dotenv from 'dotenv';
+
+// Carrega o .env a partir da raiz do backend, mesmo quando o CWD muda (supervisor/Docker)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -87,15 +91,36 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? (process.env.CORS_ORIGINS?.split(',') || ['https://app.exemplo.com'])
-    : true, // Permitir todas as origens em desenvolvimento
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  maxAge: 86400
-}));
+
+// ---- CORS (allowlist do .env) ----
+const ALLOWLIST = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+  // ✅ log depois de calcular ALLOWLIST
+logger.info(`CORS allowlist => ${process.env.CORS_ORIGINS} -> ${JSON.stringify(ALLOWLIST)}`);
+
+  const corsOpts: cors.CorsOptions = {
+    origin(origin, cb) {
+      // Permite requisições sem Origin (curl/Postman)
+      if (!origin) return cb(null, true);
+  
+      const allowed = ALLOWLIST.includes(origin);
+      // Não lance erro; retorne false para origem não permitida
+      return cb(null, allowed);
+    },
+    credentials: true,
+    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
+    optionsSuccessStatus: 204,
+    maxAge: 86400,
+  };
+  
+app.use(cors(corsOpts));
+app.options('*', cors(corsOpts));
+// ---- fim CORS ----
+
 
 // Rate limiting
 const limiter = rateLimit({
