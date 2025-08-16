@@ -103,10 +103,18 @@ logger.info(`CORS allowlist => ${process.env.CORS_ORIGINS} -> ${JSON.stringify(A
 
   const corsOpts: cors.CorsOptions = {
     origin(origin, cb) {
+      logger.info(`🔍 CORS - Verificando origem: ${origin}`);
+      logger.info(`🔍 CORS - ALLOWLIST: ${JSON.stringify(ALLOWLIST)}`);
+      
       // Permite requisições sem Origin (curl/Postman)
-      if (!origin) return cb(null, true);
+      if (!origin) {
+        logger.info(`✅ CORS - Permitindo requisição sem Origin`);
+        return cb(null, true);
+      }
   
       const allowed = ALLOWLIST.includes(origin);
+      logger.info(`🔍 CORS - Origem ${origin} ${allowed ? 'PERMITIDA' : 'BLOQUEADA'}`);
+      
       // Não lance erro; retorne false para origem não permitida
       return cb(null, allowed);
     },
@@ -119,6 +127,14 @@ logger.info(`CORS allowlist => ${process.env.CORS_ORIGINS} -> ${JSON.stringify(A
   
 app.use(cors(corsOpts));
 app.options('*', cors(corsOpts));
+
+// Middleware de debug para todas as requisições
+app.use((req, res, next) => {
+  logger.info(`📨 ${req.method} ${req.url} - Origin: ${req.headers.origin || 'N/A'}`);
+  logger.info(`📨 Headers: ${JSON.stringify(req.headers, null, 2)}`);
+  next();
+});
+
 // ---- fim CORS ----
 
 

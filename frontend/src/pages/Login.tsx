@@ -15,8 +15,16 @@ export default function Login() {
     e.preventDefault();
     setIsLoading(true);
 
+    console.log('🔐 Iniciando processo de login...');
+    console.log('📧 Email:', email);
+    console.log('🌍 Current Origin:', window.location.origin);
+    console.log('🎯 Target API:', 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login');
+
     try {
+      console.log('📤 Enviando requisição de login...');
       const response = await authApi.login({ email, password });
+      
+      console.log('✅ Login bem-sucedido:', response);
       
       // Usar o método login do store em vez de salvar diretamente no localStorage
       login(response.token, response.user);
@@ -26,6 +34,11 @@ export default function Login() {
       // Redirecionar para o dashboard
       navigate('/dashboard');
     } catch (error) {
+      console.error('❌ Erro detalhado no login:', error);
+      console.error('❌ Error name:', (error as Error).name);
+      console.error('❌ Error message:', (error as Error).message);
+      console.error('❌ Error stack:', (error as Error).stack);
+      
       toast.error('Erro ao fazer login. Verifique suas credenciais.');
     } finally {
       setIsLoading(false);

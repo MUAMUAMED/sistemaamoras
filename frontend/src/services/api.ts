@@ -33,18 +33,35 @@ import {
 } from '../types';
 
 // Configuração base do Axios
+const baseURL = process.env.REACT_APP_API_URL || (
+  process.env.NODE_ENV === 'production' 
+    ? 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
+    : 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
+);
+
+console.log('🔧 API Configuration:');
+console.log('- Base URL:', baseURL);
+console.log('- Current Origin:', window.location.origin);
+console.log('- Environment:', process.env.NODE_ENV);
+console.log('- REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || (
-    process.env.NODE_ENV === 'production' 
-      ? 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
-      : 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
-  ),
+  baseURL,
   timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
 });
 
 // Interceptor para adicionar token de autenticação
 api.interceptors.request.use(
   (config) => {
+    console.log('🚀 Request Config:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      headers: config.headers,
+      origin: window.location.origin
+    });
+    
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -52,14 +69,34 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('❌ Request Error:', error);
     return Promise.reject(error);
   }
 );
 
 // Interceptor para tratamento de erros
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('✅ Response Success:', {
+      status: response.status,
+      url: response.config.url,
+      method: response.config.method?.toUpperCase()
+    });
+    return response;
+  },
   (error) => {
+    console.error('❌ Response Error:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      method: error.config?.method?.toUpperCase(),
+      headers: error.response?.headers,
+      data: error.response?.data,
+      code: error.code,
+      stack: error.stack
+    });
+    
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
