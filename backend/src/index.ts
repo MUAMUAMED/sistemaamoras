@@ -139,16 +139,19 @@ logger.info(`CORS allowlist => ${process.env.CORS_ORIGINS} -> ${JSON.stringify(A
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   logger.info(`🌐 Request: ${req.method} ${req.url} - Origin: ${origin || 'N/A'}`);
+  logger.info(`🔍 ALLOWLIST check: ${JSON.stringify(ALLOWLIST)}`);
   
   // Força headers CORS para todas as requisições de origens permitidas
   if (origin && ALLOWLIST.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
-    res.header('Access-Control-Max-Age', '86400');
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
+    res.setHeader('Access-Control-Max-Age', '86400');
     
     logger.info(`✅ CORS headers set for origin: ${origin}`);
+  } else if (origin) {
+    logger.info(`❌ Origin ${origin} not in allowlist: ${JSON.stringify(ALLOWLIST)}`);
   }
   
   if (req.method === 'OPTIONS') {
@@ -156,6 +159,13 @@ app.use((req, res, next) => {
     logger.info(`📋 Headers: ${JSON.stringify(req.headers, null, 2)}`);
     
     if (origin && ALLOWLIST.includes(origin)) {
+      // Garantir headers CORS no preflight
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      
       logger.info(`✅ Preflight approved for origin: ${origin}`);
       return res.status(200).end();
     } else {
