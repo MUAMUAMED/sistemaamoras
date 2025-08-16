@@ -120,20 +120,54 @@ logger.info(`CORS allowlist => ${process.env.CORS_ORIGINS} -> ${JSON.stringify(A
     },
     credentials: true,
     methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-    allowedHeaders: ['Content-Type','Authorization','X-Requested-With'],
-    optionsSuccessStatus: 204,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization', 
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Access-Control-Request-Method',
+      'Access-Control-Request-Headers'
+    ],
+    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
+    optionsSuccessStatus: 200, // Alterado de 204 para 200
     maxAge: 86400,
+    preflightContinue: false,
   };
-  
-app.use(cors(corsOpts));
-app.options('*', cors(corsOpts));
 
-// Middleware de debug para todas as requisições
+// Middleware customizado para CORS - Força headers para produção
 app.use((req, res, next) => {
-  logger.info(`📨 ${req.method} ${req.url} - Origin: ${req.headers.origin || 'N/A'}`);
-  logger.info(`📨 Headers: ${JSON.stringify(req.headers, null, 2)}`);
+  const origin = req.headers.origin;
+  logger.info(`🌐 Request: ${req.method} ${req.url} - Origin: ${origin || 'N/A'}`);
+  
+  // Força headers CORS para todas as requisições de origens permitidas
+  if (origin && ALLOWLIST.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
+    res.header('Access-Control-Max-Age', '86400');
+    
+    logger.info(`✅ CORS headers set for origin: ${origin}`);
+  }
+  
+  if (req.method === 'OPTIONS') {
+    logger.info(`✈️ Preflight request detected`);
+    logger.info(`📋 Headers: ${JSON.stringify(req.headers, null, 2)}`);
+    
+    if (origin && ALLOWLIST.includes(origin)) {
+      logger.info(`✅ Preflight approved for origin: ${origin}`);
+      return res.status(200).end();
+    } else {
+      logger.info(`❌ Preflight blocked for origin: ${origin}`);
+      return res.status(403).end();
+    }
+  }
+  
   next();
 });
+  
+app.use(cors(corsOpts));
 
 // ---- fim CORS ----
 
