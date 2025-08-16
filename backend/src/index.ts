@@ -93,7 +93,7 @@ app.use(helmet({
 
 
 // ---- CORS (allowlist do .env) ----
-const ALLOWLIST = (process.env.CORS_ORIGINS || '')
+const ALLOWLIST = (process.env.CORS_ORIGINS || 'https://amoras-sistema-gew.emebtn.easypanel.host,https://amoras-sistema-gew1.gbl2yq.easypanel.host')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
