@@ -92,61 +92,36 @@ app.use(helmet({
 }));
 
 
-// ---- CORS EMERGENCY FIX ----
+// ---- CORS ULTRA AGGRESSIVE FIX ----
 const FRONTEND_ORIGIN = 'https://amoras-sistema-gew.emebtn.easypanel.host';
-const BACKEND_ORIGIN = 'https://amoras-sistema-gew1.gbl2yq.easypanel.host';
 
-const ALLOWLIST = [
-  FRONTEND_ORIGIN,
-  BACKEND_ORIGIN,
-  'http://localhost:3000',
-  'http://127.0.0.1:3000'
-];
+logger.info(`🔥 ULTRA AGGRESSIVE CORS FIX ACTIVATED`);
+logger.info(`🔥 Frontend Origin: ${FRONTEND_ORIGIN}`);
 
-logger.info(`🚨 EMERGENCY CORS - ALLOWLIST: ${JSON.stringify(ALLOWLIST)}`);
-
-// Middleware CORS de emergência - força headers para TODAS as requisições
+// MIDDLEWARE 1: Headers em TODAS as requisições (PRIMEIRA PRIORIDADE)
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
+  // FORÇA headers imediatamente, sem condições
+  res.setHeader('Access-Control-Allow-Origin', '*'); // TEMPORÁRIO - permitir tudo
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
+  res.setHeader('Access-Control-Max-Age', '86400');
+  res.setHeader('Vary', 'Origin');
   
-  logger.info(`🚨 EMERGENCY CORS - ${req.method} ${req.url}`);
-  logger.info(`🚨 Origin: ${origin || 'N/A'}`);
+  logger.info(`🔥 ULTRA AGGRESSIVE - Headers forced for ${req.method} ${req.url} from ${req.headers.origin || 'N/A'}`);
   
-  // FORÇA headers CORS para frontend conhecido
-  if (origin === FRONTEND_ORIGIN || !origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin || FRONTEND_ORIGIN);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
-    res.setHeader('Access-Control-Max-Age', '86400');
-    res.setHeader('Vary', 'Origin');
-    
-    logger.info(`🚨 EMERGENCY CORS headers FORCED for: ${origin || 'N/A'}`);
-  }
-  
-  // Tratamento especial para OPTIONS (preflight)
+  // Para OPTIONS, responder imediatamente
   if (req.method === 'OPTIONS') {
-    logger.info(`🚨 EMERGENCY OPTIONS detected from: ${origin}`);
-    
-    // FORÇA headers para qualquer OPTIONS do frontend
-    if (origin === FRONTEND_ORIGIN || !origin) {
-      res.setHeader('Access-Control-Allow-Origin', origin || FRONTEND_ORIGIN);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
-      res.setHeader('Access-Control-Max-Age', '86400');
-      
-      logger.info(`🚨 EMERGENCY OPTIONS approved - headers set`);
-      return res.status(200).end();
-    }
+    logger.info(`🔥 ULTRA AGGRESSIVE - OPTIONS terminated for ${req.headers.origin || 'N/A'}`);
+    return res.status(200).end();
   }
   
   next();
 });
 
-// Configuração CORS padrão mais permissiva
-const corsOpts: cors.CorsOptions = {
-  origin: ALLOWLIST,
+// MIDDLEWARE 2: Configuração CORS padrão (BACKUP)
+app.use(cors({
+  origin: '*', // TEMPORÁRIO - permitir todas as origens
   credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: [
@@ -160,23 +135,34 @@ const corsOpts: cors.CorsOptions = {
   ],
   optionsSuccessStatus: 200,
   maxAge: 86400,
-};
+}));
 
-app.use(cors(corsOpts));
-
-// Middleware adicional para garantir headers em TODAS as respostas
+// MIDDLEWARE 3: Força headers na resposta (ÚLTIMA GARANTIA)
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Força headers na resposta final
+  // Override res.send para garantir headers
   const originalSend = res.send;
+  const originalJson = res.json;
+  const originalEnd = res.end;
+  
+  const forceHeaders = function() {
+    this.setHeader('Access-Control-Allow-Origin', '*');
+    this.setHeader('Access-Control-Allow-Credentials', 'true');
+    logger.info(`🔥 ULTRA AGGRESSIVE - Final headers forced in response`);
+  };
+  
   res.send = function(data) {
-    if (origin === FRONTEND_ORIGIN || !origin) {
-      this.setHeader('Access-Control-Allow-Origin', origin || FRONTEND_ORIGIN);
-      this.setHeader('Access-Control-Allow-Credentials', 'true');
-      logger.info(`🔄 Final headers forced on response for: ${origin || 'N/A'}`);
-    }
+    forceHeaders.call(this);
     return originalSend.call(this, data);
+  };
+  
+  res.json = function(data) {
+    forceHeaders.call(this);
+    return originalJson.call(this, data);
+  };
+  
+  res.end = function(data) {
+    forceHeaders.call(this);
+    return originalEnd.call(this, data);
   };
   
   next();
