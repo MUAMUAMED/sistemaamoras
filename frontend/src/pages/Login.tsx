@@ -33,13 +33,23 @@ export default function Login() {
       
       // Redirecionar para o dashboard
       navigate('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro detalhado no login:', error);
-      console.error('❌ Error name:', (error as Error).name);
-      console.error('❌ Error message:', (error as Error).message);
-      console.error('❌ Error stack:', (error as Error).stack);
+      console.error('❌ Error name:', error?.name);
+      console.error('❌ Error message:', error?.message);
+      console.error('❌ Error code:', error?.code);
+      console.error('❌ Error response:', error?.response);
+      console.error('❌ Error config:', error?.config);
       
-      toast.error('Erro ao fazer login. Verifique suas credenciais.');
+      // Verifica se é erro de CORS
+      if (error?.code === 'ERR_NETWORK' || error?.message === 'Network Error') {
+        console.error('🚨 ERRO DE CORS DETECTADO!');
+        console.error('🚨 O servidor backend ainda não foi atualizado com as correções CORS');
+        console.error('🚨 Aguarde alguns minutos para o deploy do EasyPanel ser concluído');
+        toast.error('Erro de conectividade. O servidor está sendo atualizado. Tente novamente em alguns minutos.');
+      } else {
+        toast.error('Erro ao fazer login. Verifique suas credenciais.');
+      }
     } finally {
       setIsLoading(false);
     }

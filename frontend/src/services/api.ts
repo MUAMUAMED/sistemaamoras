@@ -48,6 +48,12 @@ console.log('- REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
 const api = axios.create({
   baseURL,
   timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
+  // Configurações adicionais para tentar contornar CORS
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  }
 });
 
 // Interceptor para adicionar token de autenticação
