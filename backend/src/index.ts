@@ -92,92 +92,95 @@ app.use(helmet({
 }));
 
 
-// ---- CORS (allowlist do .env) ----
-const ALLOWLIST = (process.env.CORS_ORIGINS || 'https://amoras-sistema-gew.emebtn.easypanel.host,https://amoras-sistema-gew1.gbl2yq.easypanel.host')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
+// ---- CORS EMERGENCY FIX ----
+const FRONTEND_ORIGIN = 'https://amoras-sistema-gew.emebtn.easypanel.host';
+const BACKEND_ORIGIN = 'https://amoras-sistema-gew1.gbl2yq.easypanel.host';
 
-  // ✅ log depois de calcular ALLOWLIST
-logger.info(`CORS allowlist => ${process.env.CORS_ORIGINS} -> ${JSON.stringify(ALLOWLIST)}`);
+const ALLOWLIST = [
+  FRONTEND_ORIGIN,
+  BACKEND_ORIGIN,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
 
-  const corsOpts: cors.CorsOptions = {
-    origin(origin, cb) {
-      logger.info(`🔍 CORS - Verificando origem: ${origin}`);
-      logger.info(`🔍 CORS - ALLOWLIST: ${JSON.stringify(ALLOWLIST)}`);
-      
-      // Permite requisições sem Origin (curl/Postman)
-      if (!origin) {
-        logger.info(`✅ CORS - Permitindo requisição sem Origin`);
-        return cb(null, true);
-      }
-  
-      const allowed = ALLOWLIST.includes(origin);
-      logger.info(`🔍 CORS - Origem ${origin} ${allowed ? 'PERMITIDA' : 'BLOQUEADA'}`);
-      
-      // Não lance erro; retorne false para origem não permitida
-      return cb(null, allowed);
-    },
-    credentials: true,
-    methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization', 
-      'X-Requested-With',
-      'Accept',
-      'Origin',
-      'Access-Control-Request-Method',
-      'Access-Control-Request-Headers'
-    ],
-    exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar'],
-    optionsSuccessStatus: 200, // Alterado de 204 para 200
-    maxAge: 86400,
-    preflightContinue: false,
-  };
+logger.info(`🚨 EMERGENCY CORS - ALLOWLIST: ${JSON.stringify(ALLOWLIST)}`);
 
-// Middleware customizado para CORS - Força headers para produção
+// Middleware CORS de emergência - força headers para TODAS as requisições
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  logger.info(`🌐 Request: ${req.method} ${req.url} - Origin: ${origin || 'N/A'}`);
-  logger.info(`🔍 ALLOWLIST check: ${JSON.stringify(ALLOWLIST)}`);
   
-  // Força headers CORS para todas as requisições de origens permitidas
-  if (origin && ALLOWLIST.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  logger.info(`🚨 EMERGENCY CORS - ${req.method} ${req.url}`);
+  logger.info(`🚨 Origin: ${origin || 'N/A'}`);
+  
+  // FORÇA headers CORS para frontend conhecido
+  if (origin === FRONTEND_ORIGIN || !origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin || FRONTEND_ORIGIN);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
     res.setHeader('Access-Control-Max-Age', '86400');
+    res.setHeader('Vary', 'Origin');
     
-    logger.info(`✅ CORS headers set for origin: ${origin}`);
-  } else if (origin) {
-    logger.info(`❌ Origin ${origin} not in allowlist: ${JSON.stringify(ALLOWLIST)}`);
+    logger.info(`🚨 EMERGENCY CORS headers FORCED for: ${origin || 'N/A'}`);
   }
   
+  // Tratamento especial para OPTIONS (preflight)
   if (req.method === 'OPTIONS') {
-    logger.info(`✈️ Preflight request detected`);
-    logger.info(`📋 Headers: ${JSON.stringify(req.headers, null, 2)}`);
+    logger.info(`🚨 EMERGENCY OPTIONS detected from: ${origin}`);
     
-    if (origin && ALLOWLIST.includes(origin)) {
-      // Garantir headers CORS no preflight
-      res.setHeader('Access-Control-Allow-Origin', origin);
+    // FORÇA headers para qualquer OPTIONS do frontend
+    if (origin === FRONTEND_ORIGIN || !origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin || FRONTEND_ORIGIN);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers');
       res.setHeader('Access-Control-Max-Age', '86400');
       
-      logger.info(`✅ Preflight approved for origin: ${origin}`);
+      logger.info(`🚨 EMERGENCY OPTIONS approved - headers set`);
       return res.status(200).end();
-    } else {
-      logger.info(`❌ Preflight blocked for origin: ${origin}`);
-      return res.status(403).end();
     }
   }
   
   next();
 });
-  
+
+// Configuração CORS padrão mais permissiva
+const corsOpts: cors.CorsOptions = {
+  origin: ALLOWLIST,
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  optionsSuccessStatus: 200,
+  maxAge: 86400,
+};
+
 app.use(cors(corsOpts));
+
+// Middleware adicional para garantir headers em TODAS as respostas
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Força headers na resposta final
+  const originalSend = res.send;
+  res.send = function(data) {
+    if (origin === FRONTEND_ORIGIN || !origin) {
+      this.setHeader('Access-Control-Allow-Origin', origin || FRONTEND_ORIGIN);
+      this.setHeader('Access-Control-Allow-Credentials', 'true');
+      logger.info(`🔄 Final headers forced on response for: ${origin || 'N/A'}`);
+    }
+    return originalSend.call(this, data);
+  };
+  
+  next();
+});
 
 // ---- fim CORS ----
 
