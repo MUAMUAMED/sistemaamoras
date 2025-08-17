@@ -1,4 +1,4 @@
-# 🏭 Deploy - Status "Processando" para Produtos
+g# 🏭 Deploy - Status "Processando" para Produtos
 ## EasyPanel - Sistema Amoras Capital
 
 ---
