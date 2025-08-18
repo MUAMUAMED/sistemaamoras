@@ -207,7 +207,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   // Para OPTIONS, responder imediatamente
   if (req.method === 'OPTIONS') {
     logger.info(`🔥 ULTRA AGGRESSIVE - OPTIONS terminated for ${req.headers.origin || 'N/A'}`);
-    return res.status(200).end();
+    res.status(200).end();
+    return;
   }
   
   next();
@@ -238,26 +239,26 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   const originalJson = res.json;
   const originalEnd = res.end;
   
-  const forceHeaders = function() {
-    this.setHeader('Access-Control-Allow-Origin', '*');
-    this.setHeader('Access-Control-Allow-Credentials', 'true');
+  const forceHeaders = () => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     logger.info(`🔥 ULTRA AGGRESSIVE - Final headers forced in response`);
   };
   
-  res.send = function(data) {
-    forceHeaders.call(this);
+  res.send = function(data?: any) {
+    forceHeaders();
     return originalSend.call(this, data);
   };
   
-  res.json = function(data) {
-    forceHeaders.call(this);
+  res.json = function(data?: any) {
+    forceHeaders();
     return originalJson.call(this, data);
   };
   
-  res.end = function(data) {
-    forceHeaders.call(this);
-    return originalEnd.call(this, data);
-  };
+  res.end = function(this: Response, chunk?: any, encoding?: any, cb?: any) {
+    forceHeaders();
+    return originalEnd.call(this, chunk, encoding, cb);
+  } as any;
   
   next();
 });
