@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -100,11 +100,11 @@ console.log('🔥 SISTEMA DE DEBUG ATIVADO!');
 console.log('🔥 AGUARDANDO REQUISIÇÕES...');
 console.log('');
 
-const app = express();
+const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
 
 // === MIDDLEWARE DE DEBUG GLOBAL ===
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const timestamp = new Date().toISOString();
   const origin = req.headers.origin;
   const method = req.method;
@@ -193,7 +193,7 @@ logger.info(`🔥 ULTRA AGGRESSIVE CORS FIX ACTIVATED`);
 logger.info(`🔥 Frontend Origin: ${FRONTEND_ORIGIN}`);
 
 // MIDDLEWARE 1: Headers em TODAS as requisições (PRIMEIRA PRIORIDADE)
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   // FORÇA headers imediatamente, sem condições
   res.setHeader('Access-Control-Allow-Origin', '*'); // TEMPORÁRIO - permitir tudo
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -232,7 +232,7 @@ app.use(cors({
 }));
 
 // MIDDLEWARE 3: Força headers na resposta (ÚLTIMA GARANTIA)
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   // Override res.send para garantir headers
   const originalSend = res.send;
   const originalJson = res.json;
