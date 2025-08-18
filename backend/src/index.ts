@@ -55,7 +55,7 @@ console.log('');
 // === TIMESTAMP DETALHADO ===
 const startTime = new Date();
 const STARTUP_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
-const BUILD_VERSION = "COMMIT_05faaed_CRITICAL_DEPLOYMENT_FIXES";
+const BUILD_VERSION = "COMMIT_a393ff8_CORS_ENV_OVERRIDE_FIX";
 
 console.log('🔥🔥🔥 NOVA INICIALIZAÇÃO DETECTADA 🔥🔥🔥');
 console.log('⏰ STARTUP TIMESTAMP:', startTime.toISOString());
@@ -106,6 +106,14 @@ console.log('');
 
 console.log('🔥 SISTEMA DE DEBUG ATIVADO!');
 console.log('🔥 AGUARDANDO REQUISIÇÕES...');
+console.log('');
+
+console.log('🚨 ANULANDO VARIÁVEIS DE AMBIENTE QUE INTERFEREM NO CORS!');
+console.log('🚨 CORS_ORIGINS antes:', process.env.CORS_ORIGINS);
+// FORÇA a anulação da variável de ambiente que está interferindo
+delete process.env.CORS_ORIGINS;
+console.log('🚨 CORS_ORIGINS depois:', process.env.CORS_ORIGINS);
+console.log('🚨 AGORA USANDO CONFIGURAÇÃO ULTRA AGRESSIVA HARDCODED!');
 console.log('');
 
 const app: express.Application = express();
