@@ -54,9 +54,17 @@ console.log('');
 
 // === TIMESTAMP DETALHADO ===
 const startTime = new Date();
+const STARTUP_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
+const BUILD_VERSION = "COMMIT_05faaed_CRITICAL_DEPLOYMENT_FIXES";
+
+console.log('🔥🔥🔥 NOVA INICIALIZAÇÃO DETECTADA 🔥🔥🔥');
 console.log('⏰ STARTUP TIMESTAMP:', startTime.toISOString());
 console.log('⏰ STARTUP LOCAL:', startTime.toLocaleString('pt-BR'));
 console.log('⏰ UNIX TIMESTAMP:', Date.now());
+console.log(`🆔 STARTUP ID: ${STARTUP_ID}`);
+console.log(`🔄 BUILD VERSION: ${BUILD_VERSION}`);
+console.log('📋 ESTE LOG CONFIRMA: NOVO CÓDIGO ESTÁ RODANDO!');
+console.log('📋 SE VOCÊ VÊ ESTA MENSAGEM, O DEPLOY FOI APLICADO!');
 console.log('');
 
 // === INFORMAÇÕES DO SISTEMA ===
@@ -106,8 +114,11 @@ const PORT = process.env.PORT || 3001;
 // === CORS ABSOLUTAMENTE ULTRA MEGA AGRESSIVO ===
 // ANTES DE QUALQUER OUTRO MIDDLEWARE!
 app.use('*', (req: Request, res: Response, next: NextFunction) => {
+  const requestTime = new Date();
   console.log('🚨🚨🚨 MEGA CORS INTERCEPTOR ATIVADO 🚨🚨🚨');
   console.log(`🚨 Método: ${req.method} | URL: ${req.url} | Origin: ${req.headers.origin}`);
+  console.log(`🚨 Request Time: ${requestTime.toISOString()}`);
+  console.log(`🚨 Startup ID: ${STARTUP_ID} | Build: ${BUILD_VERSION}`);
   
   // FORÇA CORS headers ABSOLUTAMENTE SEMPRE
   res.header('Access-Control-Allow-Origin', '*');
@@ -373,6 +384,19 @@ async function startServer() {
     logger.info('🤖 Automações programadas inicializadas');
 
     app.listen(PORT, () => {
+      const serverReadyTime = new Date();
+      console.log('');
+      console.log('🚀🚀🚀 SERVIDOR TOTALMENTE INICIALIZADO 🚀🚀🚀');
+      console.log(`🎯 Servidor rodando na porta ${PORT}`);
+      console.log(`🕐 Server Ready Time: ${serverReadyTime.toISOString()}`);
+      console.log(`🕐 Server Ready Local: ${serverReadyTime.toLocaleString('pt-BR')}`);
+      console.log(`🆔 Startup ID: ${STARTUP_ID}`);
+      console.log(`🔄 Build Version: ${BUILD_VERSION}`);
+      console.log(`📋 PRONTO PARA RECEBER REQUISIÇÕES!`);
+      console.log(`📋 Documentação da API: http://localhost:${PORT}/api-docs`);
+      console.log('🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀');
+      console.log('');
+      
       logger.info(`🚀 Servidor rodando na porta ${PORT}`);
       logger.info(`📚 Documentação disponível em http://localhost:${PORT}/api-docs`);
       logger.info(`🏥 Health check disponível em http://localhost:${PORT}/health`);
