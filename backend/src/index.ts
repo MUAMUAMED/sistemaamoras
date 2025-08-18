@@ -55,7 +55,7 @@ console.log('');
 // === TIMESTAMP DETALHADO ===
 const startTime = new Date();
 const STARTUP_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
-const BUILD_VERSION = "COMMIT_a393ff8_CORS_ENV_OVERRIDE_FIX";
+const BUILD_VERSION = "COMMIT_6aefdf8_CORS_MIDDLEWARE_CONFLICT_FIX";
 
 console.log('🔥🔥🔥 NOVA INICIALIZAÇÃO DETECTADA 🔥🔥🔥');
 console.log('⏰ STARTUP TIMESTAMP:', startTime.toISOString());
@@ -262,23 +262,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// MIDDLEWARE 2: Configuração CORS padrão (BACKUP)
-app.use(cors({
-  origin: '*', // TEMPORÁRIO - permitir todas as origens
-  credentials: true,
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization', 
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  optionsSuccessStatus: 200,
-  maxAge: 86400,
-}));
+// MIDDLEWARE 2: CORS padrão REMOVIDO - estava conflitando!
+// app.use(cors({...})) - COMENTADO para evitar conflito
 
 // MIDDLEWARE 3: Força headers na resposta (ÚLTIMA GARANTIA)
 app.use((req: Request, res: Response, next: NextFunction) => {
