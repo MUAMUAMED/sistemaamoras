@@ -54,7 +54,7 @@ console.log('');
 // === TIMESTAMP DETALHADO ===
 const startTime = new Date();
 const STARTUP_ID = Math.random().toString(36).substring(2, 8).toUpperCase();
-const BUILD_VERSION = "COMMIT_CLEAN_CORS_IMPLEMENTATION";
+const BUILD_VERSION = "COMMIT_FORCE_IGNORE_CORS_ENV_VARS";
 
 console.log('🔥🔥🔥 NOVA INICIALIZAÇÃO DETECTADA 🔥🔥🔥');
 console.log('⏰ STARTUP TIMESTAMP:', startTime.toISOString());
@@ -84,7 +84,19 @@ console.log('- DATABASE_URL:', process.env.DATABASE_URL ? '[DEFINIDA]' : 'undefi
 console.log('- JWT_SECRET:', process.env.JWT_SECRET ? '[DEFINIDA]' : 'undefined');
 console.log('');
 
-console.log('🎯 CORS: Configuração simples ativada (permitir todas as origens)');
+// === ANULAR QUALQUER CONFIGURAÇÃO CORS DE AMBIENTE ===
+console.log('🚨 ANULANDO VARIÁVEIS DE AMBIENTE CORS (se existirem)');
+console.log('🚨 CORS_ORIGINS antes:', process.env.CORS_ORIGINS);
+console.log('🚨 CORS_ORIGIN antes:', process.env.CORS_ORIGIN);
+
+// FORÇA a remoção de qualquer configuração CORS de ambiente
+delete process.env.CORS_ORIGINS;
+delete process.env.CORS_ORIGIN;
+
+console.log('🚨 CORS_ORIGINS depois:', process.env.CORS_ORIGINS);
+console.log('🚨 CORS_ORIGIN depois:', process.env.CORS_ORIGIN);
+console.log('🎯 CORS: Configuração hardcoded ativada (permitir todas as origens)');
+console.log('');
 
 console.log('🔥 SISTEMA DE DEBUG ATIVADO!');
 console.log('🔥 AGUARDANDO REQUISIÇÕES...');
