@@ -103,6 +103,35 @@ console.log('');
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
 
+// === CORS ABSOLUTAMENTE ULTRA MEGA AGRESSIVO ===
+// ANTES DE QUALQUER OUTRO MIDDLEWARE!
+app.use('*', (req: Request, res: Response, next: NextFunction) => {
+  console.log('🚨🚨🚨 MEGA CORS INTERCEPTOR ATIVADO 🚨🚨🚨');
+  console.log(`🚨 Método: ${req.method} | URL: ${req.url} | Origin: ${req.headers.origin}`);
+  
+  // FORÇA CORS headers ABSOLUTAMENTE SEMPRE
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400');
+  res.header('Vary', 'Origin');
+  
+  console.log('🚨 CORS Headers forçados:', {
+    'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+    'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+    'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers')
+  });
+  
+  if (req.method === 'OPTIONS') {
+    console.log('🚨 OPTIONS interceptado - enviando 200 OK');
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+});
+
 // === MIDDLEWARE DE DEBUG GLOBAL ===
 app.use((req: Request, res: Response, next: NextFunction) => {
   const timestamp = new Date().toISOString();
