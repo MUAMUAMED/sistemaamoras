@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, PencilIcon, EyeIcon, FunnelIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, EyeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { leadService } from '../services/api';
 import { Lead, LeadStatus } from '../types';
 import toast from 'react-hot-toast';

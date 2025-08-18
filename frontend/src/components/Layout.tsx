@@ -11,7 +11,7 @@ import {
   ShoppingCartIcon,
   QrCodeIcon,
   UsersIcon,
-  ChartBarIcon,
+  // ChartBarIcon, // Removido - não utilizado
   TagIcon,
   FolderIcon,
   SwatchIcon,
