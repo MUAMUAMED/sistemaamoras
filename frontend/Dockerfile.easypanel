@@ -9,15 +9,15 @@ RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copiar package files
-COPY package*.json ./
+# Copiar package files do frontend
+COPY frontend/package*.json ./
 
 # Instalar dependências
 RUN npm ci --legacy-peer-deps && \
     npm cache clean --force
 
-# Copiar código fonte
-COPY . .
+# Copiar código fonte do frontend
+COPY frontend/ ./
 
 # Build Arguments
 ARG REACT_APP_API_URL
@@ -29,7 +29,7 @@ ENV NODE_ENV=$NODE_ENV
 ENV GENERATE_SOURCEMAP=false
 ENV INLINE_RUNTIME_CHUNK=false
 
-# Build da aplicação
+# Build da aplicação frontend
 RUN npm run build
 
 # Stage 2: Production com Nginx
