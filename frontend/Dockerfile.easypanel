@@ -42,8 +42,7 @@ RUN npm ci --legacy-peer-deps && npm cache clean --force
 # Copiar código fonte do backend
 COPY backend/ ./
 
-# Build do backend TypeScript
-RUN npm run build
+# Pular build por enquanto - usar ts-node
 
 # Stage 3: Production
 FROM node:20-alpine AS production
@@ -59,13 +58,14 @@ WORKDIR /app
 # Copiar build do frontend
 COPY --from=frontend-builder /app/frontend/build /var/www/html
 
-# Copiar build do backend
-COPY --from=backend-builder /app/backend/dist ./backend
+# Copiar código do backend (sem build)
+COPY --from=backend-builder /app/backend/src ./backend
 COPY --from=backend-builder /app/backend/package*.json ./
 COPY --from=backend-builder /app/backend/prisma ./prisma
+COPY --from=backend-builder /app/backend/node_modules ./node_modules
 
-# Instalar apenas dependências de produção do backend
-RUN npm ci --only=production && npm cache clean --force
+# Instalar ts-node para execução direta
+RUN npm install -g ts-node typescript
 
 # Configurar nginx
 RUN echo 'events { worker_connections 1024; } \
@@ -120,7 +120,7 @@ stderr_logfile=/var/log/supervisor/nginx.err.log \
 stdout_logfile=/var/log/supervisor/nginx.out.log \
 \
 [program:backend] \
-command=node backend/index.js \
+command=npx ts-node backend/index.ts \
 directory=/app \
 autostart=true \
 autorestart=true \
