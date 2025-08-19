@@ -106,27 +106,8 @@ http { \
     } \
 }' > /etc/nginx/nginx.conf
 
-# Configurar supervisor para rodar nginx e backend
-RUN echo '[supervisord] \
-nodaemon=true \
-logfile=/var/log/supervisor/supervisord.log \
-pidfile=/var/run/supervisord.pid \
-\
-[program:nginx] \
-command=nginx -g "daemon off;" \
-autostart=true \
-autorestart=true \
-stderr_logfile=/var/log/supervisor/nginx.err.log \
-stdout_logfile=/var/log/supervisor/nginx.out.log \
-\
-[program:backend] \
-command=npx ts-node backend/index.ts \
-directory=/app \
-autostart=true \
-autorestart=true \
-stderr_logfile=/var/log/supervisor/backend.err.log \
-stdout_logfile=/var/log/supervisor/backend.out.log \
-environment=NODE_ENV=production' > /etc/supervisor/conf.d/supervisord.conf
+# Copiar configuração do supervisor
+COPY frontend/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Build arguments para runtime
 ARG DATABASE_URL
