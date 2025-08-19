@@ -1,4 +1,3 @@
-
 // === SISTEMA DE DEBUG ULTRA-ATIVO NO FRONTEND ===
 let requestCounter = 0;
 
@@ -70,9 +69,7 @@ const api = axios.create({
   }
 });
 
-// Interceptor para adicionar token de autenticação
-
-// Request interceptor with ultra debug
+// === REQUEST INTERCEPTOR ===
 api.interceptors.request.use(
   (config) => {
     requestCounter++;
@@ -99,6 +96,12 @@ api.interceptors.request.use(
       console.log('🔐 Se não aparecer logs no backend, o problema é de rede/proxy');
     }
     
+    // Adicionar token se disponível
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     console.log('🚀🚀🚀 FIM INTERCEPTOR REQUEST 🚀🚀🚀');
     console.log('');
     
@@ -115,22 +118,8 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-    
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    console.error('❌ Request Error:', error);
-    return Promise.reject(error);
-  }
-);
 
-// Interceptor para tratamento de erros
-
-// Response interceptor with ultra debug
+// === RESPONSE INTERCEPTOR ===
 api.interceptors.response.use(
   (response) => {
     const timestamp = new Date().toISOString();
@@ -205,32 +194,16 @@ api.interceptors.response.use(
       console.log('🌐 4. Firewall/proxy bloqueando');
     }
     
-    console.log('❌❌❌ FIM RESPONSE ERROR ❌❌❌');
-    console.log('');
-    
-    return Promise.reject(error);
-  }
-);
-    return response;
-  },
-  (error) => {
-    console.error('❌ Response Error:', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      url: error.config?.url,
-      method: error.config?.method?.toUpperCase(),
-      headers: error.response?.headers,
-      data: error.response?.data,
-      code: error.code,
-      stack: error.stack
-    });
-    
+    // Logout automático se 401
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+    
+    console.log('❌❌❌ FIM RESPONSE ERROR ❌❌❌');
+    console.log('');
+    
     return Promise.reject(error);
   }
 );
@@ -902,4 +875,4 @@ export const dashboardService = {
   getStockMetrics: dashboardApi.getStockMetrics,
 };
 
-export default api; 
+export default api;
