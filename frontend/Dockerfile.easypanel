@@ -67,6 +67,9 @@ COPY --from=backend-builder /app/backend/node_modules ./node_modules
 # Instalar ts-node para execução direta
 RUN npm install -g ts-node typescript
 
+# Gerar cliente Prisma
+RUN npx prisma generate
+
 # Configurar nginx
 RUN echo 'events { worker_connections 1024; } \
 http { \
