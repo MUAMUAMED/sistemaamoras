@@ -1,0 +1,82 @@
+# Backend Dockerfile para EasyPanel
+# Multi-stage build otimizado para produção
+
+# Stage 1: Dependencies
+FROM node:20-alpine AS dependencies
+
+# Instalar dependências do sistema
+RUN apk add --no-cache \
+    openssl \
+    libc6-compat \
+    curl \
+    git
+
+WORKDIR /app
+
+# Copiar package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Instalar dependências
+RUN npm ci --only=production --legacy-peer-deps && \
+    npm cache clean --force
+
+# Gerar Prisma Client
+RUN npx prisma generate
+
+# Stage 2: Build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copiar dependências do stage anterior
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=dependencies /app/package*.json ./
+
+# Copiar código fonte
+COPY . .
+
+# Instalar dependências de desenvolvimento
+RUN npm install --legacy-peer-deps
+
+# Compilar TypeScript
+RUN npm run build
+
+# Stage 3: Production
+FROM node:20-alpine AS production
+
+# Instalar dependências do sistema para produção
+RUN apk add --no-cache \
+    openssl \
+    curl \
+    dumb-init \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -S nextjs -u 1001
+
+WORKDIR /app
+
+# Copiar apenas arquivos necessários
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package*.json ./
+
+# Criar diretórios necessários
+RUN mkdir -p uploads logs temp && \
+    chown -R nextjs:nodejs /app
+
+# Configurar usuário não-root
+USER nextjs
+
+# Expor porta
+EXPOSE 3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+# Usar dumb-init para gerenciamento de processos
+ENTRYPOINT ["dumb-init", "--"]
+
+# Script de inicialização
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
