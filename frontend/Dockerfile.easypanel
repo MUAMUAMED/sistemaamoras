@@ -56,7 +56,7 @@ RUN mkdir -p /app /var/log/supervisor /run/nginx /etc/supervisor/conf.d
 WORKDIR /app
 
 # Copiar build do frontend
-COPY --from=frontend-builder ./build /var/www/html
+COPY --from=frontend-builder /app/frontend/build /var/www/html
 
 # Copiar código do backend (sem build)
 COPY --from=backend-builder /app/backend/src ./backend
