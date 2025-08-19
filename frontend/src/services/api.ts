@@ -1,3 +1,17 @@
+
+// === SISTEMA DE DEBUG ULTRA-ATIVO NO FRONTEND ===
+let requestCounter = 0;
+
+// Heartbeat do frontend
+setInterval(() => {
+  console.log('💓 [FRONTEND HEARTBEAT]', new Date().toISOString(), '- Sistema ativo, aguardando requisições');
+}, 15000); // A cada 15 segundos
+
+console.log('🚨🚨🚨 FRONTEND DEBUG SYSTEM ATIVO 🚨🚨🚨');
+console.log('⏰ Frontend carregado em:', new Date().toISOString());
+console.log('🔄 Sistema de debug ativo - logs aparecerão constantemente');
+console.log('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
+
 import axios from 'axios';
 import {
   User,
@@ -57,16 +71,50 @@ const api = axios.create({
 });
 
 // Interceptor para adicionar token de autenticação
+
+// Request interceptor with ultra debug
 api.interceptors.request.use(
   (config) => {
-    console.log('🚀 Request Config:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`,
-      headers: config.headers,
-      origin: window.location.origin
-    });
+    requestCounter++;
+    const timestamp = new Date().toISOString();
+    
+    console.log('');
+    console.log('🚀🚀🚀 INTERCEPTOR REQUEST ATIVADO 🚀🚀🚀');
+    console.log('🔢 Request #:', requestCounter);
+    console.log('⏰ Timestamp:', timestamp);
+    console.log('🔄 Método:', config.method?.toUpperCase());
+    console.log('🔄 URL:', config.url);
+    console.log('🔄 Base URL:', config.baseURL);
+    console.log('🔄 Full URL:', `${config.baseURL}${config.url}`);
+    console.log('🔄 Headers enviados:', JSON.stringify(config.headers, null, 2));
+    console.log('🔄 Data/Body:', config.data);
+    console.log('🔄 Params:', config.params);
+    console.log('🔄 Timeout:', config.timeout);
+    console.log('🔄 WithCredentials:', config.withCredentials);
+    
+    // Log especial para login
+    if (config.url?.includes('/auth/login')) {
+      console.log('🔐🔐🔐 REQUISIÇÃO DE LOGIN SENDO ENVIADA! 🔐🔐🔐');
+      console.log('🔐 Esta requisição DEVE chegar no backend!');
+      console.log('🔐 Se não aparecer logs no backend, o problema é de rede/proxy');
+    }
+    
+    console.log('🚀🚀🚀 FIM INTERCEPTOR REQUEST 🚀🚀🚀');
+    console.log('');
+    
+    return config;
+  },
+  (error) => {
+    console.log('');
+    console.log('❌❌❌ ERRO NO REQUEST INTERCEPTOR ❌❌❌');
+    console.log('❌ Erro:', error);
+    console.log('❌ Message:', error.message);
+    console.log('❌ Stack:', error.stack);
+    console.log('❌❌❌ FIM ERRO REQUEST ❌❌❌');
+    console.log('');
+    return Promise.reject(error);
+  }
+);
     
     const token = localStorage.getItem('token');
     if (token) {
@@ -81,13 +129,88 @@ api.interceptors.request.use(
 );
 
 // Interceptor para tratamento de erros
+
+// Response interceptor with ultra debug
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ Response Success:', {
-      status: response.status,
-      url: response.config.url,
-      method: response.config.method?.toUpperCase()
+    const timestamp = new Date().toISOString();
+    
+    console.log('');
+    console.log('📥📥📥 INTERCEPTOR RESPONSE SUCCESS 📥📥📥');
+    console.log('⏰ Timestamp:', timestamp);
+    console.log('📊 Status:', response.status);
+    console.log('📊 Status Text:', response.statusText);
+    console.log('🔄 URL:', response.config?.url);
+    console.log('🔄 Método:', response.config?.method?.toUpperCase());
+    console.log('📋 Headers de resposta:', JSON.stringify(response.headers, null, 2));
+    console.log('💾 Data recebida:', response.data);
+    
+    // Verificar CORS headers especificamente
+    const corsHeaders = {
+      'access-control-allow-origin': response.headers['access-control-allow-origin'],
+      'access-control-allow-methods': response.headers['access-control-allow-methods'],
+      'access-control-allow-headers': response.headers['access-control-allow-headers'],
+      'access-control-allow-credentials': response.headers['access-control-allow-credentials']
+    };
+    
+    console.log('🌐 CORS Headers recebidos:', corsHeaders);
+    
+    if (corsHeaders['access-control-allow-origin']) {
+      console.log('✅ CORS OK: Access-Control-Allow-Origin presente!');
+    } else {
+      console.log('❌ CORS PROBLEMA: Access-Control-Allow-Origin ausente!');
+    }
+    
+    console.log('📥📥📥 FIM RESPONSE SUCCESS 📥📥📥');
+    console.log('');
+    
+    return response;
+  },
+  (error) => {
+    const timestamp = new Date().toISOString();
+    
+    console.log('');
+    console.log('❌❌❌ INTERCEPTOR RESPONSE ERROR ❌❌❌');
+    console.log('⏰ Timestamp:', timestamp);
+    console.log('❌ Error completo:', error);
+    console.log('❌ Error name:', error?.name);
+    console.log('❌ Error message:', error?.message);
+    console.log('❌ Error code:', error?.code);
+    console.log('❌ Error status:', error?.response?.status);
+    console.log('❌ Error statusText:', error?.response?.statusText);
+    console.log('❌ Error data:', error?.response?.data);
+    console.log('❌ Error headers:', error?.response?.headers);
+    console.log('❌ Error config:', error?.config);
+    console.log('❌ Request que falhou:', {
+      method: error?.config?.method,
+      url: error?.config?.url,
+      baseURL: error?.config?.baseURL,
+      fullURL: `${error?.config?.baseURL}${error?.config?.url}`
     });
+    
+    // Análise específica de CORS
+    if (error?.message?.includes('CORS') || error?.message?.includes('Access-Control')) {
+      console.log('🚨🚨🚨 ERRO DE CORS DETECTADO! 🚨🚨🚨');
+      console.log('🚨 Este é um erro de CORS policy');
+      console.log('🚨 O browser bloqueou a requisição');
+      console.log('🚨 Verificar se backend está enviando headers corretos');
+    }
+    
+    if (error?.code === 'ERR_NETWORK') {
+      console.log('🌐🌐🌐 ERRO DE REDE DETECTADO! 🌐🌐🌐');
+      console.log('🌐 Possíveis causas:');
+      console.log('🌐 1. Backend não está rodando');
+      console.log('🌐 2. Problema de CORS (mais provável)');
+      console.log('🌐 3. Problema de rede/DNS');
+      console.log('🌐 4. Firewall/proxy bloqueando');
+    }
+    
+    console.log('❌❌❌ FIM RESPONSE ERROR ❌❌❌');
+    console.log('');
+    
+    return Promise.reject(error);
+  }
+);
     return response;
   },
   (error) => {

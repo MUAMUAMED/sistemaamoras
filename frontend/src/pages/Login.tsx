@@ -4,6 +4,15 @@ import { authApi } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
 
+
+// === DEBUG SYSTEM PARA LOGIN ===
+let loginAttempts = 0;
+
+// Log inicial da página de login
+console.log('🔐🔐🔐 PÁGINA DE LOGIN CARREGADA 🔐🔐🔐');
+console.log('⏰ Login page timestamp:', new Date().toISOString());
+console.log('🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐');
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

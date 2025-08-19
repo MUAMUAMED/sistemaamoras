@@ -38,6 +38,19 @@ import paymentGatewayRoutes from './routes/payment-gateway.service';
 import path from 'path';
 import dotenv from 'dotenv';
 
+// === SISTEMA DE DEBUG ULTRA-ATIVO ===
+setInterval(() => {
+  console.log('🔄 [BACKEND HEARTBEAT]', new Date().toISOString(), '- Sistema ativo e rodando');
+}, 10000); // A cada 10 segundos
+
+// Log inicial do sistema
+console.log('🚨🚨🚨 SISTEMA DE DEBUG ULTRA-ATIVO INICIADO 🚨🚨🚨');
+console.log('⏰ Timestamp inicial:', new Date().toISOString());
+console.log('🔄 Este log aparecerá nos logs do EasyPanel');
+console.log('🔄 Heartbeat será exibido a cada 10 segundos');
+console.log('🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨');
+
+
 // Carrega o .env a partir da raiz do backend, mesmo quando o CWD muda (supervisor/Docker)
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -105,9 +118,20 @@ console.log('');
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
 
+
 // === CORS SIMPLES E FUNCIONAL ===
 app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`🌐 CORS: ${req.method} ${req.url} | Origin: ${req.headers.origin || 'N/A'}`);
+  const timestamp = new Date().toISOString();
+  
+  // LOGS ULTRA-DETALHADOS SEMPRE
+  console.log('');
+  console.log('🌐🌐🌐 MIDDLEWARE CORS ATIVADO 🌐🌐🌐');
+  console.log('⏰ Timestamp:', timestamp);
+  console.log('🔄 Método:', req.method);
+  console.log('🔄 URL:', req.url);
+  console.log('🔄 Origin:', req.headers.origin || 'N/A');
+  console.log('🔄 User-Agent:', req.headers['user-agent'] || 'N/A');
+  console.log('🔄 Headers completos:', JSON.stringify(req.headers, null, 2));
   
   // Headers CORS básicos e funcionais
   res.header('Access-Control-Allow-Origin', '*');
@@ -115,13 +139,71 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With,Accept,Origin');
   res.header('Access-Control-Allow-Credentials', 'true');
   
+  console.log('✅ Headers CORS definidos:');
+  console.log('  - Access-Control-Allow-Origin: *');
+  console.log('  - Access-Control-Allow-Methods: GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  console.log('  - Access-Control-Allow-Headers: Content-Type,Authorization,X-Requested-With,Accept,Origin');
+  console.log('  - Access-Control-Allow-Credentials: true');
+  
   // Se for OPTIONS, responder imediatamente
   if (req.method === 'OPTIONS') {
-    console.log('✅ CORS: OPTIONS request handled');
+    console.log('🚨 OPTIONS REQUEST DETECTADO!');
+    console.log('🚨 Enviando resposta 200 OK para preflight');
+    console.log('🚨 Headers que serão enviados:', {
+      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+      'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+      'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+      'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+    });
     res.status(200).end();
+    console.log('✅ OPTIONS response enviada com sucesso!');
+    console.log('🌐🌐🌐 FIM MIDDLEWARE CORS (OPTIONS) 🌐🌐🌐');
+    console.log('');
     return;
   }
   
+  console.log('➡️ Continuando para próximo middleware...');
+  console.log('🌐🌐🌐 FIM MIDDLEWARE CORS (NORMAL) 🌐🌐🌐');
+  console.log('');
+  
+  next();
+});
+
+// === DEBUG TODAS AS REQUISIÇÕES ===
+app.use('*', (req: Request, res: Response, next: NextFunction) => {
+  const timestamp = new Date().toISOString();
+  console.log('');
+  console.log('📨📨📨 NOVA REQUISIÇÃO INTERCEPTADA 📨📨📨');
+  console.log('⏰ Timestamp:', timestamp);
+  console.log('🔄 Método:', req.method);
+  console.log('🔄 URL completa:', req.originalUrl);
+  console.log('🔄 Path:', req.path);
+  console.log('🔄 Query:', JSON.stringify(req.query));
+  console.log('🔄 Body:', JSON.stringify(req.body));
+  console.log('🔄 Origin:', req.headers.origin);
+  console.log('🔄 Referer:', req.headers.referer);
+  console.log('🔄 X-Forwarded-For:', req.headers['x-forwarded-for']);
+  console.log('🔄 Remote Address:', req.connection.remoteAddress);
+  
+  // Log especial para login
+  if (req.originalUrl.includes('/auth/login')) {
+    console.log('🔐🔐🔐 REQUISIÇÃO DE LOGIN DETECTADA! 🔐🔐🔐');
+    console.log('🔐 Esta é a requisição que deve funcionar!');
+  }
+  
+  // Override res.end para log de resposta
+  const originalEnd = res.end;
+  res.end = function(...args) {
+    console.log('📤📤📤 RESPOSTA SENDO ENVIADA 📤📤📤');
+    console.log('📤 Status:', res.statusCode);
+    console.log('📤 Headers de resposta:', JSON.stringify(res.getHeaders(), null, 2));
+    console.log('📤📤📤 FIM RESPOSTA 📤📤📤');
+    console.log('');
+    return originalEnd.apply(this, args);
+  };
+  
+  console.log('📨📨📨 FIM INTERCEPTAÇÃO 📨📨📨');
+  console.log('');
   next();
 });
 
