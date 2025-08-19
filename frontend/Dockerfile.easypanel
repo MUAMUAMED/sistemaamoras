@@ -1,26 +1,22 @@
-# Frontend Dockerfile para EasyPanel
-# Build otimizado para React em produção
+# Fullstack Dockerfile para EasyPanel
+# Frontend React + Backend Node.js com Nginx
 
-# Stage 1: Build
-FROM node:20-alpine AS builder
+# Stage 1: Build Frontend
+FROM node:20-alpine AS frontend-builder
 
-# Instalar dependências do sistema
-RUN apk add --no-cache git
-
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Copiar package files do frontend
 COPY frontend/package*.json ./
 
-# Instalar dependências
-RUN npm ci --legacy-peer-deps && \
-    npm cache clean --force
+# Instalar dependências do frontend
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 # Copiar código fonte do frontend
 COPY frontend/ ./
 
 # Build Arguments
-ARG REACT_APP_API_URL
+ARG REACT_APP_API_URL=/api
 ARG NODE_ENV=production
 
 # Configurar variáveis de ambiente para build
@@ -32,46 +28,117 @@ ENV INLINE_RUNTIME_CHUNK=false
 # Build da aplicação frontend
 RUN npm run build
 
-# Stage 2: Production com Nginx
-FROM nginx:1.25-alpine AS production
+# Stage 2: Build Backend
+FROM node:20-alpine AS backend-builder
 
-# Instalar curl para health check
-RUN apk add --no-cache curl
+WORKDIR /app/backend
 
-# Remover configuração padrão do nginx
-RUN rm -rf /etc/nginx/conf.d/default.conf
+# Copiar package files do backend
+COPY backend/package*.json ./
 
-# Copiar arquivos de build
-COPY --from=builder /app/build /usr/share/nginx/html
+# Instalar dependências do backend
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
-# Configuração básica do nginx para SPA
-RUN echo 'server { \
-    listen 80; \
-    server_name _; \
-    root /usr/share/nginx/html; \
-    index index.html; \
+# Copiar código fonte do backend
+COPY backend/ ./
+
+# Build do backend TypeScript
+RUN npm run build
+
+# Stage 3: Production
+FROM node:20-alpine AS production
+
+# Instalar nginx e dependências
+RUN apk add --no-cache nginx curl supervisor
+
+# Criar diretórios necessários
+RUN mkdir -p /app /var/log/supervisor /run/nginx
+
+WORKDIR /app
+
+# Copiar build do frontend
+COPY --from=frontend-builder /app/frontend/build /var/www/html
+
+# Copiar build do backend
+COPY --from=backend-builder /app/backend/dist ./backend
+COPY --from=backend-builder /app/backend/package*.json ./
+COPY --from=backend-builder /app/backend/prisma ./prisma
+
+# Instalar apenas dependências de produção do backend
+RUN npm ci --only=production && npm cache clean --force
+
+# Configurar nginx
+RUN echo 'events { worker_connections 1024; } \
+http { \
+    include /etc/nginx/mime.types; \
+    default_type application/octet-stream; \
     \
-    location / { \
-        try_files $uri $uri/ /index.html; \
+    upstream backend { \
+        server 127.0.0.1:3001; \
     } \
     \
-    location /api/ { \
-        proxy_pass http://backend:3001/; \
-        proxy_set_header Host $host; \
-        proxy_set_header X-Real-IP $remote_addr; \
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
-        proxy_set_header X-Forwarded-Proto $scheme; \
+    server { \
+        listen 80; \
+        server_name _; \
+        root /var/www/html; \
+        index index.html; \
+        \
+        # Frontend - SPA routing \
+        location / { \
+            try_files $uri $uri/ /index.html; \
+        } \
+        \
+        # Backend API \
+        location /api/ { \
+            proxy_pass http://backend/; \
+            proxy_set_header Host $host; \
+            proxy_set_header X-Real-IP $remote_addr; \
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+            proxy_set_header X-Forwarded-Proto $scheme; \
+        } \
+        \
+        # Health check \
+        location /health { \
+            access_log off; \
+            return 200 "healthy"; \
+            add_header Content-Type text/plain; \
+        } \
     } \
-    \
-    location /health { \
-        access_log off; \
-        return 200 "healthy\\n"; \
-        add_header Content-Type text/plain; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+}' > /etc/nginx/nginx.conf
 
-# Configurar permissões
-RUN chmod 644 /etc/nginx/conf.d/default.conf
+# Configurar supervisor para rodar nginx e backend
+RUN echo '[supervisord] \
+nodaemon=true \
+logfile=/var/log/supervisor/supervisord.log \
+pidfile=/var/run/supervisord.pid \
+\
+[program:nginx] \
+command=nginx -g "daemon off;" \
+autostart=true \
+autorestart=true \
+stderr_logfile=/var/log/supervisor/nginx.err.log \
+stdout_logfile=/var/log/supervisor/nginx.out.log \
+\
+[program:backend] \
+command=node backend/index.js \
+directory=/app \
+autostart=true \
+autorestart=true \
+stderr_logfile=/var/log/supervisor/backend.err.log \
+stdout_logfile=/var/log/supervisor/backend.out.log \
+environment=NODE_ENV=production' > /etc/supervisor/conf.d/supervisord.conf
+
+# Build arguments para runtime
+ARG DATABASE_URL
+ARG JWT_SECRET=your-super-secret-jwt-key-change-in-production
+ARG CORS_ORIGINS=*
+
+# Variáveis de ambiente
+ENV DATABASE_URL=$DATABASE_URL
+ENV JWT_SECRET=$JWT_SECRET
+ENV CORS_ORIGINS=$CORS_ORIGINS
+ENV NODE_ENV=production
+ENV PORT=3001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
@@ -81,4 +148,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 EXPOSE 80
 
 # Comando de inicialização
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
