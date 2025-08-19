@@ -51,7 +51,7 @@ FROM node:20-alpine AS production
 RUN apk add --no-cache nginx curl supervisor
 
 # Criar diretórios necessários
-RUN mkdir -p /app /var/log/supervisor /run/nginx
+RUN mkdir -p /app /var/log/supervisor /run/nginx /etc/supervisor/conf.d
 
 WORKDIR /app
 
