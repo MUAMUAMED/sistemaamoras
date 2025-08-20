@@ -12,7 +12,7 @@ echo JWT_SECRET="sua_chave_secreta_jwt_super_segura_para_desenvolvimento" >> .en
 echo JWT_EXPIRES_IN="7d" >> .env
 echo PORT=3001 >> .env
 echo NODE_ENV="development" >> .env
-echo CORS_ORIGIN="http://localhost:3000" >> .env
+echo CORS_ORIGINS="http://localhost:3000" >> .env
 
 cd ..
 

@@ -33,8 +33,8 @@ Write-Host ""
 Write-Host "✅ Sistema iniciado com sucesso!" -ForegroundColor Green
 Write-Host ""
 Write-Host "🌐 Frontend: http://localhost:3000" -ForegroundColor Blue
-Write-Host "🔧 Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host" -ForegroundColor Blue
-Write-Host "📚 API Docs: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs" -ForegroundColor Blue
+Write-Host "🔧 Backend: http://https://amoras-sistema-gew1.emebtn.easypanel.host" -ForegroundColor Blue
+Write-Host "📚 API Docs: http://https://amoras-sistema-gew1.emebtn.easypanel.host/api-docs" -ForegroundColor Blue
 Write-Host ""
 Write-Host "Pressione qualquer tecla para fechar..." -ForegroundColor Gray
 $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") 

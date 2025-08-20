@@ -163,10 +163,10 @@ echo ===============================================
 echo.
 echo 🎉 SISTEMA AMORAS CAPITAL INICIADO COM SUCESSO!
 echo.
-echo 🖥️  Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+echo 🖥️  Backend: http://https://amoras-sistema-gew1.emebtn.easypanel.host
 echo 🌐 Frontend: http://localhost:3000
-echo 📚 Documentação: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
-echo 🏥 Health Check: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
+echo 📚 Documentação: http://https://amoras-sistema-gew1.emebtn.easypanel.host/api-docs
+echo 🏥 Health Check: http://https://amoras-sistema-gew1.emebtn.easypanel.host/health
 echo.
 echo 👤 CONTAS PARA TESTE:
 echo    ADMIN: admin@amorascapital.com / admin123

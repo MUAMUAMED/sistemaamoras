@@ -19,8 +19,8 @@ echo.
 echo ✅ Sistema iniciado com sucesso!
 echo.
 echo 🌐 Frontend: http://localhost:3000
-echo 🔧 Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
-echo 📚 API Docs: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
+echo 🔧 Backend: http://https://amoras-sistema-gew1.emebtn.easypanel.host
+echo 📚 API Docs: http://https://amoras-sistema-gew1.emebtn.easypanel.host/api-docs
 echo.
 echo Pressione qualquer tecla para fechar...
 pause > nul 

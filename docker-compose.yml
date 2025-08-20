@@ -29,7 +29,7 @@ services:
       JWT_SECRET: sua_chave_jwt_super_secreta_aqui
       JWT_EXPIRES_IN: 7d
       PORT: 3001
-      CORS_ORIGIN: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000
     ports:
       - "3001:3001"
     depends_on:

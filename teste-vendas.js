@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const API_BASE = 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api';
+const API_BASE = 'http://https://amoras-sistema-gew1.emebtn.easypanel.host/api';
 
 // Função para fazer login e obter token
 async function login() {

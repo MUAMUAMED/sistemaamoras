@@ -25,15 +25,15 @@ echo ========================================
 echo.
 
 echo 🔑 Testando ADMIN...
-powershell -Command "$response = try { Invoke-RestMethod -Uri 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login' -Method Post -Body '{\"email\":\"admin@amorascapital.com\",\"password\":\"admin123\"}' -ContentType 'application/json'; 'SUCESSO' } catch { 'ERRO' }; $response"
+powershell -Command "$response = try { Invoke-RestMethod -Uri 'http://https://amoras-sistema-gew1.emebtn.easypanel.host/api/auth/login' -Method Post -Body '{\"email\":\"admin@amorascapital.com\",\"password\":\"admin123\"}' -ContentType 'application/json'; 'SUCESSO' } catch { 'ERRO' }; $response"
 echo.
 
 echo 🔑 Testando ATENDENTE...
-powershell -Command "$response = try { Invoke-RestMethod -Uri 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login' -Method Post -Body '{\"email\":\"atendente@amorascapital.com\",\"password\":\"atendente123\"}' -ContentType 'application/json'; 'SUCESSO' } catch { 'ERRO' }; $response"
+powershell -Command "$response = try { Invoke-RestMethod -Uri 'http://https://amoras-sistema-gew1.emebtn.easypanel.host/api/auth/login' -Method Post -Body '{\"email\":\"atendente@amorascapital.com\",\"password\":\"atendente123\"}' -ContentType 'application/json'; 'SUCESSO' } catch { 'ERRO' }; $response"
 echo.
 
 echo 🔑 Testando GERENTE...
-powershell -Command "$response = try { Invoke-RestMethod -Uri 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login' -Method Post -Body '{\"email\":\"gerente@amorascapital.com\",\"password\":\"gerente123\"}' -ContentType 'application/json'; 'SUCESSO' } catch { 'ERRO' }; $response"
+powershell -Command "$response = try { Invoke-RestMethod -Uri 'http://https://amoras-sistema-gew1.emebtn.easypanel.host/api/auth/login' -Method Post -Body '{\"email\":\"gerente@amorascapital.com\",\"password\":\"gerente123\"}' -ContentType 'application/json'; 'SUCESSO' } catch { 'ERRO' }; $response"
 echo.
 
 echo ========================================
