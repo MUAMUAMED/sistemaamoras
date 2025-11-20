@@ -33,12 +33,25 @@ import {
 } from '../types';
 
 // Configuração base do Axios
+// Usa variável de ambiente ou URL relativa (proxy)
+const getBaseURL = () => {
+  // Se REACT_APP_API_URL estiver definida, usa ela
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Em desenvolvimento, usa proxy relativo
+  if (process.env.NODE_ENV === 'development') {
+    return '/api';
+  }
+  
+  // Em produção, usa URL relativa (mesmo domínio) ou variável de ambiente
+  // O Zeabur vai rotear /api para o backend automaticamente
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || (
-    process.env.NODE_ENV === 'production' 
-      ? 'https://amoras-sistema-gew1.emebtn.easypanel.host/api'
-      : 'https://amoras-sistema-gew1.emebtn.easypanel.host/api'
-  ),
+  baseURL: getBaseURL(),
   timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
 });
 

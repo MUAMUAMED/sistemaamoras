@@ -24,6 +24,7 @@ import {
 } from '../services/api';
 import api from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
+import { getImageUrl } from '../utils/imageUrl';
 
 const Products: React.FC = () => {
   const queryClient = useQueryClient();
@@ -720,7 +721,7 @@ const Products: React.FC = () => {
                           <div className="relative h-48 bg-gray-100 overflow-hidden">
                             {product.images && product.images.length > 0 ? (
                               <img
-                                src={`https://amoras-sistema-gew1.emebtn.easypanel.host${product.images[0].url}`}
+                                src={getImageUrl(product.images[0].url)}
                                 alt={product.name}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
@@ -730,7 +731,7 @@ const Products: React.FC = () => {
                               />
                             ) : product.imageUrl ? (
                               <img
-                                src={`https://amoras-sistema-gew1.emebtn.easypanel.host${product.imageUrl}`}
+                                src={getImageUrl(product.imageUrl)}
                                 alt={product.name}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                               />
@@ -1794,7 +1795,7 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
                   <p className="text-sm text-gray-700 mb-1">Imagens da Roupa</p>
                   <div className="grid grid-cols-3 gap-2">
                     {product.images.filter(img => img.type === 'ROUPA').map(img => (
-                      <img key={img.id} src={`https://amoras-sistema-gew1.emebtn.easypanel.host${img.url}`} alt="Imagem Roupa" className="w-full h-24 object-cover rounded" />
+                      <img key={img.id} src={getImageUrl(img.url)} alt="Imagem Roupa" className="w-full h-24 object-cover rounded" />
                     ))}
                   </div>
                 </div>
@@ -1804,14 +1805,14 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
                   <p className="text-sm text-gray-700 mb-1">Imagens IA</p>
                   <div className="grid grid-cols-3 gap-2">
                     {product.images.filter(img => img.type === 'IA').map(img => (
-                      <img key={img.id} src={`https://amoras-sistema-gew1.emebtn.easypanel.host${img.url}`} alt="Imagem IA" className="w-full h-24 object-cover rounded" />
+                      <img key={img.id} src={getImageUrl(img.url)} alt="Imagem IA" className="w-full h-24 object-cover rounded" />
                     ))}
                   </div>
                 </div>
               ) : null}
               {(!product.images || product.images.length === 0) && product.imageUrl && (
                 <img 
-                  src={`https://amoras-sistema-gew1.emebtn.easypanel.host${product.imageUrl}`}
+                  src={product.imageUrl?.startsWith('http') ? product.imageUrl : `${process.env.REACT_APP_API_URL?.replace('/api', '') || ''}${product.imageUrl}`}
                   alt={product.name}
                   className="w-full h-48 object-contain rounded-lg"
                 />

@@ -1,18 +1,15 @@
-# Backend Dockerfile para Produção
-# Multi-stage build otimizado para produção
+# Dockerfile Otimizada para Zeabur
+# Funciona com Build Path: ./backend
 
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
-# Instalar dependências do sistema
-RUN apk add --no-cache \
-    openssl \
-    libc6-compat \
-    curl
+# Instalar apenas dependências essenciais
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
-# Copiar package files
+# Copiar arquivos de dependências primeiro (cache layer)
 COPY package*.json ./
 COPY prisma ./prisma/
 
@@ -29,21 +26,17 @@ COPY . .
 # Compilar TypeScript
 RUN npm run build
 
-# Stage 3: Production
+# Stage 2: Production
 FROM node:20-alpine AS production
 
-# Instalar dependências do sistema para produção
-RUN apk add --no-cache \
-    openssl \
-    curl \
-    dumb-init \
-    && addgroup -g 1001 -S nodejs \
-    && adduser -S nodejs -u 1001
+# Instalar dependências do sistema
+RUN apk add --no-cache openssl curl dumb-init && \
+    addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
 
 WORKDIR /app
 
-# Copiar apenas arquivos necessários
-# Instalar apenas dependências de produção
+# Copiar package files e instalar apenas dependências de produção
 COPY --from=builder /app/package*.json ./
 RUN npm ci --only=production --legacy-peer-deps --prefer-offline --no-audit && \
     npm cache clean --force
@@ -63,7 +56,7 @@ RUN mkdir -p uploads/products uploads/temp logs && \
 # Configurar usuário não-root
 USER nodejs
 
-# Expor porta
+# Expor porta (Zeabur usa variável PORT do ambiente)
 EXPOSE 8080
 
 # Health check

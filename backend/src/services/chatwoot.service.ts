@@ -500,7 +500,11 @@ export class ChatwootService {
       throw new Error('Configuração do sistema não encontrada');
     }
 
-    const baseUrl = process.env.APP_URL || 'http://https://amoras-sistema-gew1.emebtn.easypanel.host';
+    // APP_URL deve ser configurado via variável de ambiente
+    const baseUrl = process.env.APP_URL;
+    if (!baseUrl) {
+      throw new Error('APP_URL não configurado. Configure a variável de ambiente APP_URL com a URL base da aplicação.');
+    }
     const webhookUrl = `${baseUrl}/api/webhooks/chatwoot`;
 
     return {

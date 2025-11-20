@@ -10,7 +10,8 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Instalar dependências do frontend
-RUN npm ci --legacy-peer-deps && npm cache clean --force
+RUN npm ci --legacy-peer-deps --prefer-offline --no-audit && \
+    npm cache clean --force
 
 # Copiar código fonte do frontend
 COPY frontend/ ./
@@ -37,7 +38,8 @@ WORKDIR /app/backend
 COPY backend/package*.json ./
 
 # Instalar dependências do backend
-RUN npm ci --legacy-peer-deps && npm cache clean --force
+RUN npm ci --legacy-peer-deps --prefer-offline --no-audit && \
+    npm cache clean --force
 
 # Copiar código fonte do backend
 COPY backend/ ./
