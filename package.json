@@ -28,7 +28,7 @@
   "scripts": {
     "dev": "vite",
     "start": "vite",
-    "build": "tsc && npx vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "echo \"Tests não configurados ainda\" && exit 0"
   },

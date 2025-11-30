@@ -30,13 +30,17 @@ COPY . .
 # Instalar dependência opcional do rollup para Alpine Linux
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
 
-# Verificar que vite e plugin-react estão disponíveis no node_modules
-RUN test -d node_modules/vite && test -d node_modules/@vitejs/plugin-react || \
-    npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps
+# Garantir que vite e plugin-react estão instalados e disponíveis
+RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps && \
+    test -d node_modules/vite && \
+    test -d node_modules/@vitejs/plugin-react && \
+    test -f node_modules/.bin/vite
 
-# Build usando npm run build (npm automaticamente adiciona node_modules/.bin ao PATH)
-# O script "build" usa "vite build" que usa o vite local do node_modules
-RUN npm run build
+# Garantir que node_modules/.bin está no PATH
+ENV PATH="/app/node_modules/.bin:${PATH}"
+
+# Build usando o vite local diretamente (sem npx)
+RUN npx tsc && ./node_modules/.bin/vite build
 
 # Etapa 2: Servidor estático
 FROM node:20-alpine
