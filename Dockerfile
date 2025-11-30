@@ -35,23 +35,26 @@ RUN echo "📄 Verificando package.json..." && \
 RUN echo "📥 Instalando dependências (incluindo devDependencies)..." && \
     echo "🔍 Verificando se vite está no package.json..." && \
     (grep -q '"vite"' package.json && echo "✅ Vite encontrado no package.json" || echo "❌ Vite NÃO encontrado no package.json") && \
+    rm -rf node_modules package-lock.json 2>/dev/null || true && \
     npm install --legacy-peer-deps --no-audit && \
+    echo "📦 Verificando se vite foi instalado:" && \
+    (test -d node_modules/vite && echo "✅ Vite instalado" || echo "❌ Vite NÃO instalado após npm install") && \
     npm cache clean --force && \
     echo "✅ Dependências instaladas com sucesso"
 
-# Forçar instalação do vite se não estiver instalado
+# Garantir que vite está instalado - instalar explicitamente se não estiver
 RUN echo "🔍 Verificando instalação do vite..." && \
     if [ ! -d "node_modules/vite" ]; then \
-        echo "⚠️ Vite não encontrado, forçando instalação..." && \
-        rm -rf node_modules/vite node_modules/@vitejs 2>/dev/null || true && \
-        npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps --force && \
-        echo "📦 Após instalação, verificando:" && \
-        ls -la node_modules/ | grep vite || echo "⚠️ Ainda não encontrado após instalação"; \
+        echo "⚠️ Vite não encontrado, instalando explicitamente..." && \
+        npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps --no-save && \
+        echo "📦 Após instalação explícita:" && \
+        (test -d node_modules/vite && echo "✅ Vite agora está instalado" || echo "❌ Vite ainda não instalado") && \
+        ls -la node_modules/ | grep -E "vite|@vitejs" || echo "⚠️ Nenhum vite encontrado"; \
     else \
         echo "✅ Vite já está instalado"; \
     fi && \
-    echo "📦 Listando conteúdo de node_modules:" && \
-    ls -la node_modules/ | head -20 || true && \
+    echo "📦 Conteúdo de node_modules (primeiros 25):" && \
+    ls -la node_modules/ | head -25 || true && \
     echo "✅ Verificação do vite concluída"
 
 # Copiar todos os arquivos do frontend (incluindo vite.config.ts)
