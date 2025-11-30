@@ -1,0 +1,62 @@
+# Docker Compose para TESTE LOCAL (simula VPS)
+# Use: docker-compose -f docker-compose.test.yml up --build
+
+version: '3.8'
+
+services:
+  # PostgreSQL para teste
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: amoras-postgres-test
+    environment:
+      POSTGRES_DB: amoras_capital
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5433:5432"  # Porta diferente para não conflitar
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    networks:
+      - amoras-test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API - TESTE
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: amoras-backend-test
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres123@postgres-test:5432/amoras_capital}
+      JWT_SECRET: ${JWT_SECRET:-test_jwt_secret_key_for_local_testing_only_change_in_production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      PORT: ${PORT:-3001}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      APP_URL: ${APP_URL:-http://localhost:3002}
+    ports:
+      - "3002:3001"  # Porta diferente para não conflitar
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      - amoras-test-network
+    restart: "no"  # Não reiniciar automaticamente para ver erros
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+    command: sh -c "echo 'Waiting for DB...' && sleep 10 && npx prisma migrate deploy || echo 'Migration check done' && node dist/index.js"
+
+volumes:
+  postgres_test_data:
+
+networks:
+  amoras-test-network:
+    driver: bridge
+
+
+

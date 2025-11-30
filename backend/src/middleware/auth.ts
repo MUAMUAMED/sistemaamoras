@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { prisma } from '../config/database';
+import { logger } from '../config/logger';
 
 interface JwtPayload {
   userId: string;
@@ -34,9 +35,14 @@ export const authenticateToken = async (
       return;
     }
 
+    const jwtSecret = process.env.JWT_SECRET || 'secret';
+    if (!jwtSecret || jwtSecret === 'secret') {
+      logger.warn('JWT_SECRET não configurado ou usando valor padrão inseguro');
+    }
+
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET || 'secret'
+      jwtSecret
     ) as JwtPayload;
 
     // Buscar usuário no banco

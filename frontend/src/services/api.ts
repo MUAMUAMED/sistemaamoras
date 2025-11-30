@@ -35,24 +35,42 @@ import {
 // Configuração base do Axios
 // Usa variável de ambiente ou URL relativa (proxy)
 const getBaseURL = () => {
-  // Se REACT_APP_API_URL estiver definida, usa ela
-  if (process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
+  // Em Vite, variáveis de ambiente são expostas via import.meta.env
+  // Prioridade: REACT_APP_API_URL > VITE_API_URL > process.env.REACT_APP_API_URL
+  const apiUrl = 
+    import.meta.env.REACT_APP_API_URL || 
+    import.meta.env.VITE_API_URL || 
+    process.env.REACT_APP_API_URL;
+  
+  // Se REACT_APP_API_URL ou VITE_API_URL estiverem definidas, usa elas (OBRIGATÓRIO em produção)
+  if (apiUrl) {
+    // Garantir que termina com /api se não terminar
+    if (apiUrl.endsWith('/api')) {
+      return apiUrl;
+    }
+    // Se não terminar com /api, adicionar
+    return apiUrl.endsWith('/') ? `${apiUrl}api` : `${apiUrl}/api`;
   }
   
   // Em desenvolvimento, usa proxy relativo
-  if (process.env.NODE_ENV === 'development') {
+  if ((import.meta.env.DEV === true) || process.env.NODE_ENV === 'development') {
     return '/api';
   }
   
-  // Em produção, usa URL relativa (mesmo domínio) ou variável de ambiente
-  // O Zeabur vai rotear /api para o backend automaticamente
+  // Em produção SEM variável de ambiente definida, usar proxy relativo
+  // Isso assume que há um proxy reverso (nginx) configurado
+  console.warn('⚠️ REACT_APP_API_URL ou VITE_API_URL não definida! Usando proxy relativo.');
   return '/api';
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
+  timeout: parseInt(
+    import.meta.env.REACT_APP_API_TIMEOUT || 
+    import.meta.env.VITE_API_TIMEOUT || 
+    process.env.REACT_APP_API_TIMEOUT || 
+    '30000'
+  ),
 });
 
 // Interceptor para adicionar token de autenticação
@@ -73,11 +91,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Não redirecionar automaticamente para login se já estiver na página de login
+    // Isso evita loops de redirecionamento
+    if (error.response?.status === 401 && window.location.pathname !== '/login') {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+    // Sempre rejeitar o erro para que seja tratado no catch
     return Promise.reject(error);
   }
 );
@@ -85,7 +106,16 @@ api.interceptors.response.use(
 // Serviços de autenticação
 export const authApi = {
   login: async (data: LoginData): Promise<LoginResponse> => {
+    // O axios já lança exceção para status 4xx/5xx, então só precisamos tratar sucesso
     const response = await api.post('/auth/login', data);
+    
+    // Se chegou aqui, é sucesso (status 200)
+    // Validar se a resposta tem o formato esperado
+    if (!response.data || !response.data.token || !response.data.user) {
+      console.error('Resposta inválida do servidor:', response.data);
+      throw new Error('Resposta inválida do servidor. Tente novamente.');
+    }
+    
     return response.data;
   },
   
@@ -97,6 +127,16 @@ export const authApi = {
   
   me: async (): Promise<User> => {
     const response = await api.get('/auth/me');
+    return response.data;
+  },
+
+  checkFirstUser: async (): Promise<{ hasUsers: boolean; canCreateAccount: boolean }> => {
+    const response = await api.get('/auth/check-first-user');
+    return response.data;
+  },
+
+  register: async (data: { name: string; email: string; password: string; role?: string }): Promise<{ message: string; user: User; isFirstUser?: boolean }> => {
+    const response = await api.post('/auth/register', data);
     return response.data;
   },
 };

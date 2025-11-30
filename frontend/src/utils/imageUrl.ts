@@ -16,7 +16,7 @@ export const getImageUrl = (url: string | null | undefined): string => {
   }
   
   // Caso contrário, constrói URL baseada na API URL
-  const apiUrl = process.env.REACT_APP_API_URL || '';
+  const apiUrl = import.meta.env.REACT_APP_API_URL || import.meta.env.VITE_API_URL || process.env.REACT_APP_API_URL || '';
   if (apiUrl) {
     // Remove /api do final se existir
     const baseUrl = apiUrl.replace(/\/api\/?$/, '');

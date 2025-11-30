@@ -4,7 +4,7 @@ import { logger } from '../config/logger';
 interface CustomError extends Error {
   statusCode?: number;
   code?: string;
-  meta?: any;
+  meta?: Record<string, unknown>;
 }
 
 export const errorHandler = (

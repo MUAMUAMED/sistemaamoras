@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken } from '../middleware/auth';
 import { BarcodeService } from '../services/barcode.service';
+import { prisma } from '../config/database';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 /**
  * @swagger

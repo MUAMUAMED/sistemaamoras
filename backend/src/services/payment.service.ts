@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database';
 
 export interface PaymentGateway {
   id: string;

@@ -8,7 +8,7 @@ SERVER_NAME=${SERVER_NAME:-localhost}
 # Criar configuração do servidor
 cat > /etc/nginx/conf.d/default.conf << EOL
 upstream frontend {
-    server ${FRONTEND_HOST}:80;
+    server ${FRONTEND_HOST}:8080;
 }
 
 upstream backend {

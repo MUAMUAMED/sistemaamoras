@@ -66,7 +66,9 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Função para log de requests HTTP
-export const logRequest = (req: any, res: any, next: any) => {
+import { Request, Response, NextFunction } from 'express';
+
+export const logRequest = (req: Request, res: Response, next: NextFunction): void => {
   const start = Date.now();
   
   res.on('finish', () => {

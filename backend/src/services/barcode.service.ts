@@ -1,7 +1,5 @@
 import QRCode from 'qrcode';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database';
 
 export interface ProductCodeData {
   sizeId: string;

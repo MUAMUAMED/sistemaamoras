@@ -10,9 +10,16 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, checkAuth, isLoading } = useAuthStore();
 
   useEffect(() => {
+    // Verificar autenticação ao montar o componente
     checkAuth();
   }, [checkAuth]);
 
+  // Verificar diretamente no localStorage como fallback
+  const token = localStorage.getItem('token');
+  const userString = localStorage.getItem('user');
+  const hasAuthInStorage = !!(token && userString);
+
+  // Mostrar loading apenas se estiver verificando
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -21,8 +28,18 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (!isAuthenticated) {
+  // Se não estiver autenticado no store E não houver dados no localStorage, redirecionar
+  if (!isAuthenticated && !hasAuthInStorage) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Se houver dados no localStorage mas o store não atualizou, considerar autenticado
+  // (isso resolve problemas de timing após login)
+  if (!isAuthenticated && hasAuthInStorage) {
+    // Forçar atualização do store
+    checkAuth();
+    // Permitir acesso enquanto atualiza (evita loop de redirecionamento)
+    return <>{children}</>;
   }
 
   return <>{children}</>;

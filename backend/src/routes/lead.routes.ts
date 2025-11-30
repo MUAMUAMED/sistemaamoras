@@ -1,11 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { logger } from '../config/logger';
+import { prisma } from '../config/database';
 import * as Joi from 'joi';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Schema de validação para leads
 const leadSchema = Joi.object({

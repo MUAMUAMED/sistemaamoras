@@ -40,15 +40,17 @@ import { notFoundHandler } from "./middleware/notFoundHandler";
 // Variáveis de ambiente
 dotenv.config();
 
+// Importar configurações validadas
+import { env } from './config/env';
+
 const app: Application = express();
-const PORT = process.env.PORT || 8080;
+const PORT = env.PORT;
 
 // === ORIGENS PERMITIDAS ===
 // Lê de variável de ambiente ou usa padrões
-const corsOriginsEnv = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "";
-const allowedOrigins: string[] = corsOriginsEnv
-  ? corsOriginsEnv.split(",").map(origin => origin.trim())
-  : process.env.NODE_ENV === 'development'
+const allowedOrigins: string[] = env.CORS_ORIGINS
+  ? env.CORS_ORIGINS.split(",").map(origin => origin.trim())
+  : env.NODE_ENV === 'development'
     ? ["http://localhost:3000", "http://127.0.0.1:3000"]
     : []; // Em produção, DEVE ser configurado via CORS_ORIGINS
 
@@ -91,7 +93,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: process.env.APP_URL || `http://localhost:${PORT}`,
+        url: env.APP_URL,
         description: "Servidor de desenvolvimento",
       },
     ],
@@ -113,8 +115,8 @@ const specs = swaggerJsdoc(swaggerOptions);
 // === Segurança (Helmet) ===
 app.use(
   helmet({
-    contentSecurityPolicy:
-      process.env.NODE_ENV === "production"
+      contentSecurityPolicy:
+      env.NODE_ENV === "production"
         ? {
             directives: {
               defaultSrc: ["'self'"],
@@ -131,12 +133,12 @@ app.use(
 
 // === Rate Limiting ===
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000"),
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || "1000"),
+  windowMs: env.RATE_LIMIT_WINDOW_MS,
+  max: env.RATE_LIMIT_MAX_REQUESTS,
   message: "Muitas requisições. Tente novamente em 1 minuto.",
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "development",
+  skip: () => env.NODE_ENV === "development",
 });
 
 app.use("/api", limiter);
@@ -158,7 +160,7 @@ app.get("/health", (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     service: "amoras-capital-api",
     version: process.env.npm_package_version || "1.0.0",
-    environment: process.env.NODE_ENV || "development",
+    environment: env.NODE_ENV,
   });
 });
 
@@ -197,15 +199,13 @@ async function startServer() {
 
     logger.info("🤖 Automações programadas inicializadas");
 
-    const serverPort = parseInt(process.env.PORT || String(PORT), 10);
-    app.listen(serverPort, '0.0.0.0', () => {
-      logger.info(`🚀 Servidor rodando na porta ${serverPort}`);
-      const appUrl = process.env.APP_URL || `http://localhost:${serverPort}`;
+    app.listen(PORT, '0.0.0.0', () => {
+      logger.info(`🚀 Servidor rodando na porta ${PORT}`);
       logger.info(
-        `📚 Documentação disponível em ${appUrl}/api-docs`
+        `📚 Documentação disponível em ${env.APP_URL}/api-docs`
       );
       logger.info(
-        `🏥 Health check disponível em ${appUrl}/health`
+        `🏥 Health check disponível em ${env.APP_URL}/health`
       );
     });
   } catch (error) {

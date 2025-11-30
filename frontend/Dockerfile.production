@@ -13,7 +13,19 @@ RUN npm ci --legacy-peer-deps --prefer-offline --no-audit && \
 # Copiar código fonte
 COPY . .
 
-# Build da aplicação
+# Build Arguments para Vite
+ARG REACT_APP_API_URL
+ARG VITE_API_URL
+ARG NODE_ENV=production
+
+# Configurar variáveis de ambiente para build
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV NODE_ENV=$NODE_ENV
+ENV GENERATE_SOURCEMAP=false
+ENV INLINE_RUNTIME_CHUNK=false
+
+# Build da aplicação com Vite
 RUN npm run build
 
 # Estágio de produção
@@ -22,15 +34,15 @@ FROM nginx:alpine
 # Instalar curl para health check
 RUN apk add --no-cache curl
 
-# Copiar arquivos de build
-COPY --from=builder /app/build /usr/share/nginx/html
+# Copiar arquivos de build (Vite usa 'dist' em vez de 'build')
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Configuração do Nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
+  CMD curl -f http://localhost/health || exit 1
 
 # Expor porta
 EXPOSE 8080

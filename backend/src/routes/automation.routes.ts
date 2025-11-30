@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import { authenticateToken } from '../middleware/auth';
 import AutomationService from '../services/automation.service';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../config/database';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Processar automação específica
 router.post('/process', authenticateToken, async (req, res) => {
