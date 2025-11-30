@@ -21,14 +21,16 @@ COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps --no-audit && \
     npm cache clean --force
 
-# Instalar explicitamente vite e dependências de build (devDependencies)
-RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 typescript@^5.8.3 --save-dev --legacy-peer-deps
-
 # Copiar todos os arquivos do frontend (já estão na raiz)
 COPY . .
 
 # Instalar dependência opcional do rollup para Alpine Linux
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
+
+# Garantir que vite e todas as devDependencies necessárias estejam instaladas
+# O vite precisa estar instalado para que o vite.config.ts possa ser carregado
+RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps && \
+    npm install --legacy-peer-deps --no-audit
 
 # Build da aplicação frontend usando npm run build (usa o script do package.json)
 RUN npm run build
