@@ -77,15 +77,16 @@ RUN echo "🔍 Verificando caminho do vite antes do build..." && \
     ls -la node_modules/.bin/ | grep vite || echo "⚠️ Nenhum binário vite encontrado em .bin/" && \
     echo "✅ Verificação do vite concluída"
 
-# Build: primeiro compila TypeScript, depois executa vite usando node diretamente
-# Isso garante que o vite.config.ts consegue importar o módulo vite do node_modules
+# Build: primeiro compila TypeScript, depois executa vite build
+# Usar npm run build que vai usar o script do package.json
 RUN echo "🔨 Iniciando build..." && \
     echo "📝 Passo 1: Compilando TypeScript..." && \
     npx tsc && \
     echo "✅ TypeScript compilado com sucesso" && \
-    echo "📝 Passo 2: Executando vite build..." && \
-    echo "🔧 Comando: node ./node_modules/vite/bin/vite.js build" && \
-    node ./node_modules/vite/bin/vite.js build && \
+    echo "📝 Passo 2: Executando vite build via npm run build..." && \
+    echo "🔧 O script 'build' no package.json executa: tsc && vite build" && \
+    echo "🔧 Como o tsc já foi executado, vamos usar apenas: npx vite build" && \
+    npx vite build && \
     echo "✅ Build concluído com sucesso!" && \
     echo "📂 Verificando dist/..." && \
     ls -la dist/ | head -10 || echo "⚠️ Pasta dist/ não encontrada"
