@@ -21,6 +21,9 @@ COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps --no-audit && \
     npm cache clean --force
 
+# Verificar que vite foi instalado (debug)
+RUN npm list vite || (echo "ERRO: vite não foi instalado!" && npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps)
+
 # Copiar todos os arquivos do frontend (já estão na raiz)
 COPY . .
 
@@ -28,7 +31,6 @@ COPY . .
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
 
 # Build da aplicação frontend usando npm run build (usa o script do package.json)
-# O vite e typescript já devem estar instalados via devDependencies acima
 RUN npm run build
 
 # Etapa 2: Servidor estático
