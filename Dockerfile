@@ -33,9 +33,9 @@ RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps
 # Verificar que vite está instalado e disponível antes do build
 RUN test -f node_modules/vite/bin/vite.js || npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps
 
-# Build executando diretamente usando node para garantir que o vite local seja usado
-# Isso permite que o vite.config.ts importe o módulo vite corretamente
-RUN npx tsc && node node_modules/vite/bin/vite.js build
+# Build: primeiro compila TypeScript, depois executa vite usando node diretamente
+# Isso garante que o vite.config.ts consegue importar o módulo vite do node_modules
+RUN npx tsc && node ./node_modules/vite/bin/vite.js build
 
 # Etapa 2: Servidor estático
 FROM node:20-alpine
