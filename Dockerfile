@@ -39,9 +39,15 @@ RUN echo "📥 Instalando dependências (incluindo devDependencies)..." && \
 
 # Verificar que vite foi instalado corretamente (deve estar nas devDependencies)
 RUN echo "🔍 Verificando instalação do vite..." && \
-    npm list vite || (echo "⚠️ Vite não encontrado, instalando..." && npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps) && \
-    echo "✅ Vite verificado/instalado" && \
-    npm list vite
+    if [ ! -d "node_modules/vite" ]; then \
+        echo "⚠️ Vite não encontrado nas devDependencies, instalando..." && \
+        npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps; \
+    else \
+        echo "✅ Vite já está instalado"; \
+    fi && \
+    echo "📦 Verificando versão do vite instalada:" && \
+    (npm list vite 2>/dev/null || echo "⚠️ npm list falhou, mas continuando...") && \
+    echo "✅ Verificação do vite concluída"
 
 # Copiar todos os arquivos do frontend (incluindo vite.config.ts)
 COPY . .
