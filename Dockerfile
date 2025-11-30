@@ -18,8 +18,12 @@ COPY package.json package-lock.json* ./
 
 # Instalar todas as dependências (incluindo devDependencies para o build)
 # Não usar --production para garantir que devDependencies sejam instaladas
-RUN npm install --legacy-peer-deps --prefer-offline --no-audit && \
+# Remover --prefer-offline para garantir download das dependências
+RUN npm install --legacy-peer-deps --no-audit && \
     npm cache clean --force
+
+# Garantir que vite e suas dependências estejam instaladas (devDependencies)
+RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps
 
 # Copiar todos os arquivos do frontend (já estão na raiz)
 COPY . .
@@ -27,11 +31,8 @@ COPY . .
 # Instalar dependência opcional do rollup para Alpine Linux
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
 
-# Verificar se vite e typescript foram instalados (devDependencies)
-RUN npm list vite typescript || npm install vite typescript --save-dev --legacy-peer-deps
-
-# Build da aplicação frontend usando npx para garantir que os comandos sejam encontrados
-RUN npx tsc && npx vite build
+# Build da aplicação frontend usando npm run build (usa o script do package.json)
+RUN npm run build
 
 # Etapa 2: Servidor estático
 FROM node:20-alpine
