@@ -18,12 +18,11 @@ COPY package.json package-lock.json* ./
 
 # Instalar todas as dependências (incluindo devDependencies para o build)
 # Não usar --production para garantir que devDependencies sejam instaladas
-# Remover --prefer-offline para garantir download das dependências
 RUN npm install --legacy-peer-deps --no-audit && \
     npm cache clean --force
 
-# Garantir que vite e suas dependências estejam instaladas (devDependencies)
-RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps
+# Instalar explicitamente vite e dependências de build (devDependencies)
+RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 typescript@^5.8.3 --save-dev --legacy-peer-deps
 
 # Copiar todos os arquivos do frontend (já estão na raiz)
 COPY . .
