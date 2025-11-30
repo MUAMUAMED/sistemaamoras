@@ -21,7 +21,7 @@ COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps --no-audit && \
     npm cache clean --force
 
-# Verificar que vite foi instalado corretamente
+# Verificar que vite foi instalado corretamente (deve estar nas devDependencies)
 RUN npm list vite || npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps
 
 # Copiar todos os arquivos do frontend (incluindo vite.config.ts)
@@ -30,17 +30,11 @@ COPY . .
 # Instalar dependência opcional do rollup para Alpine Linux
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
 
-# Garantir que vite e plugin-react estão instalados e disponíveis
-RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps && \
-    test -d node_modules/vite && \
-    test -d node_modules/@vitejs/plugin-react && \
-    test -f node_modules/.bin/vite
-
-# Garantir que node_modules/.bin está no PATH
+# Garantir que node_modules/.bin está no PATH para que 'vite' funcione sem npx
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# Build usando o vite local diretamente (sem npx)
-RUN npx tsc && ./node_modules/.bin/vite build
+# Build usando tsc e vite diretamente (sem npx, usando o PATH)
+RUN npx tsc && vite build
 
 # Etapa 2: Servidor estático
 FROM node:20-alpine
