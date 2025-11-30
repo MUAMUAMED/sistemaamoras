@@ -33,20 +33,25 @@ RUN echo "📄 Verificando package.json..." && \
 # Instalar TODAS as dependências (incluindo devDependencies)
 # IMPORTANTE: Não definir NODE_ENV=production para garantir que devDependencies sejam instaladas
 RUN echo "📥 Instalando dependências (incluindo devDependencies)..." && \
+    echo "🔍 Verificando se vite está no package.json..." && \
+    (grep -q '"vite"' package.json && echo "✅ Vite encontrado no package.json" || echo "❌ Vite NÃO encontrado no package.json") && \
     npm install --legacy-peer-deps --no-audit && \
     npm cache clean --force && \
     echo "✅ Dependências instaladas com sucesso"
 
-# Verificar que vite foi instalado corretamente (deve estar nas devDependencies)
+# Forçar instalação do vite se não estiver instalado
 RUN echo "🔍 Verificando instalação do vite..." && \
     if [ ! -d "node_modules/vite" ]; then \
-        echo "⚠️ Vite não encontrado nas devDependencies, instalando..." && \
-        npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps; \
+        echo "⚠️ Vite não encontrado, forçando instalação..." && \
+        rm -rf node_modules/vite node_modules/@vitejs 2>/dev/null || true && \
+        npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps --force && \
+        echo "📦 Após instalação, verificando:" && \
+        ls -la node_modules/ | grep vite || echo "⚠️ Ainda não encontrado após instalação"; \
     else \
         echo "✅ Vite já está instalado"; \
     fi && \
-    echo "📦 Verificando versão do vite instalada:" && \
-    (npm list vite 2>/dev/null || echo "⚠️ npm list falhou, mas continuando...") && \
+    echo "📦 Listando conteúdo de node_modules:" && \
+    ls -la node_modules/ | head -20 || true && \
     echo "✅ Verificação do vite concluída"
 
 # Copiar todos os arquivos do frontend (incluindo vite.config.ts)
