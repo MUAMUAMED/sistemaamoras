@@ -24,8 +24,7 @@ COPY . .
 # Instalar dependência opcional do rollup para Alpine Linux (necessário para vite build)
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
 
-# Verificar instalação do vite e build da aplicação
-RUN npm list vite
+# Build da aplicação
 RUN npm run build
 
 # Etapa 2: Servidor estático
