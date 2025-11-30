@@ -27,12 +27,8 @@ COPY . .
 # Instalar dependência opcional do rollup para Alpine Linux
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
 
-# Garantir que vite e todas as devDependencies necessárias estejam instaladas
-# O vite precisa estar instalado para que o vite.config.ts possa ser carregado
-RUN npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps && \
-    npm install --legacy-peer-deps --no-audit
-
 # Build da aplicação frontend usando npm run build (usa o script do package.json)
+# O vite e typescript já devem estar instalados via devDependencies acima
 RUN npm run build
 
 # Etapa 2: Servidor estático
@@ -46,4 +42,3 @@ COPY --from=build /app/dist ./dist
 EXPOSE 8080
 
 CMD ["serve", "-s", "dist", "-l", "8080"]
-
