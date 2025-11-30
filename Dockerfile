@@ -22,7 +22,7 @@ RUN npm install --legacy-peer-deps --no-audit && \
     npm cache clean --force
 
 # Verificar que vite foi instalado corretamente
-RUN npm list vite || (echo "ERRO: vite não foi instalado!" && exit 1)
+RUN npm list vite || (echo "ERRO: vite não foi instalado!" && npm install vite@^7.0.1 @vitejs/plugin-react@^5.1.1 --save-dev --legacy-peer-deps)
 
 # Copiar todos os arquivos do frontend
 COPY . .
@@ -30,10 +30,10 @@ COPY . .
 # Instalar dependência opcional do rollup para Alpine Linux
 RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps || true
 
-# Garantir que node_modules/.bin está no PATH
-ENV PATH="/app/node_modules/.bin:${PATH}"
+# Verificar novamente que vite está instalado e disponível
+RUN ls -la node_modules/.bin/vite || npm install vite@^7.0.1 --save-dev --legacy-peer-deps
 
-# Build usando npm run build (vai usar o vite local do node_modules)
+# Build usando npm run build (npm automaticamente adiciona node_modules/.bin ao PATH)
 RUN npm run build
 
 # Etapa 2: Servidor estático
