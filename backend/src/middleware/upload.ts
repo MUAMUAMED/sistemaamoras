@@ -2,12 +2,14 @@ import multer from 'multer';
 import path from 'path';
 import { Request } from 'express';
 
+type MulterFile = Express.Multer.File;
+
 // Configuração do armazenamento
 const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
+  destination: (req: Request, file: MulterFile, cb: (error: Error | null, destination: string) => void) => {
     cb(null, 'uploads/products/');
   },
-  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+  filename: (req: Request, file: MulterFile, cb: (error: Error | null, filename: string) => void) => {
     // Gerar nome único para o arquivo
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
@@ -16,7 +18,7 @@ const storage = multer.diskStorage({
 });
 
 // Filtro para aceitar apenas imagens
-const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (req: Request, file: MulterFile, cb: multer.FileFilterCallback) => {
   if (file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {

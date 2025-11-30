@@ -1178,7 +1178,7 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
     }
 
     const remainingSlots = Math.max(0, 6 - currentImageCount);
-    const filesToProcess = files.slice(0, remainingSlots);
+    const filesToProcess: Express.Multer.File[] = files.slice(0, remainingSlots);
 
     if (filesToProcess.length < files.length) {
       return res.status(400).json({ 
@@ -1189,7 +1189,7 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
 
     let created: any[] = [];
     try {
-      created = await prisma.$transaction(filesToProcess.map((file, index) =>
+      created = await prisma.$transaction(filesToProcess.map((file: Express.Multer.File, index) =>
         (prisma as any).productImage.create({
           data: {
             productId: id,
