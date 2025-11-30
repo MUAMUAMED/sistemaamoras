@@ -47,7 +47,7 @@ const Categories: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: categoriesApi.delete,
+    mutationFn: (id: string) => categoriesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success('Categoria excluída com sucesso!');
