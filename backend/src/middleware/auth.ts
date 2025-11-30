@@ -9,7 +9,8 @@ interface JwtPayload {
   role: string;
 }
 
-export interface AuthenticatedRequest extends Request {
+// Definir AuthenticatedRequest como uma extensão de Request que preserva todas as propriedades
+export type AuthenticatedRequest = Request & {
   user?: {
     id: string;
     email: string;

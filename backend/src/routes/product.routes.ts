@@ -1,17 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
 import { prisma } from '../config/database';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-  };
-}
 
 const router = Router();
 
@@ -1167,7 +1158,7 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
 
-    const files = req.files as Express.Multer.File[];
+    const files = (req.files as Express.Multer.File[]) || [];
     
     // Verificar limite atual de imagens do produto
     let currentImageCount = 0;
