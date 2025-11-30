@@ -33,8 +33,9 @@ RUN npm install @rollup/rollup-linux-x64-musl --save-optional --legacy-peer-deps
 # Garantir que node_modules/.bin está no PATH para que 'vite' funcione sem npx
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# Build usando tsc e vite diretamente (sem npx, usando o PATH)
-RUN npx tsc && vite build
+# Build executando diretamente (sem usar npm run build para evitar problemas)
+# Usar node para executar o vite diretamente do node_modules
+RUN npx tsc && node node_modules/vite/bin/vite.js build
 
 # Etapa 2: Servidor estático
 FROM node:20-alpine
