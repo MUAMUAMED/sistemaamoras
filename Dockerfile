@@ -102,8 +102,15 @@ RUN echo "🔍 Verificando TypeScript após COPY..." && \
     (which tsc && echo "✅ tsc no PATH" || echo "⚠️ tsc não no PATH") && \
     (npx tsc --version && echo "✅ npx tsc ainda funciona" || echo "❌ npx tsc não funciona mais")
 
-# Compilar TypeScript usando npx para garantir que encontra
+# Compilar TypeScript - usar npx diretamente para garantir que encontra
 RUN echo "🔨 Compilando TypeScript..." && \
+    echo "📦 Verificando instalação do TypeScript..." && \
+    npm list typescript || echo "⚠️ TypeScript não listado no npm list" && \
+    test -d node_modules/typescript && echo "✅ node_modules/typescript existe" || echo "❌ node_modules/typescript NÃO existe" && \
+    test -f node_modules/.bin/tsc && echo "✅ node_modules/.bin/tsc existe" || echo "❌ node_modules/.bin/tsc NÃO existe" && \
+    echo "📦 Tentando usar npx tsc..." && \
+    npx --yes typescript@latest --version || echo "⚠️ npx --yes typescript falhou" && \
+    node_modules/.bin/tsc --version || echo "⚠️ node_modules/.bin/tsc não encontrado" && \
     npx tsc --version && \
     npx tsc && \
     echo "✅ TypeScript compilado com sucesso!"
