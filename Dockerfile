@@ -121,9 +121,9 @@ COPY --from=backend-builder /app/backend/dist ./backend/dist
 COPY --from=backend-builder /app/backend/package*.json ./backend/
 COPY --from=backend-builder /app/backend/prisma ./backend/prisma
 
-# Copiar scripts do backend
-COPY backend/scripts ./backend/scripts
-COPY backend/docker-entrypoint.sh ./backend/docker-entrypoint.sh
+# Copiar apenas os scripts JavaScript necessários (não TypeScript)
+# wait-for-db.js é necessário e já está como .js
+COPY backend/scripts/wait-for-db.js ./backend/scripts/wait-for-db.js
 
 # Instalar APENAS dependências de produção do backend
 WORKDIR /app/backend
