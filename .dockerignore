@@ -8,13 +8,8 @@ build
 **/dist
 **/build
 
-# TypeScript source files (should never be in production image)
-**/*.ts
-!**/*.d.ts
-backend/src
-frontend/src
-**/src/**/*.ts
-**/src/**/*.tsx
+# Não excluir src/ do backend durante o BUILD - só na produção
+# O .dockerignore aqui é para o contexto de build completo
 
 # TypeScript source files (should never be in production)
 **/src/**/*.ts

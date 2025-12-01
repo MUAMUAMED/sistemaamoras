@@ -15,19 +15,8 @@ COPY frontend/package*.json ./
 RUN npm ci --legacy-peer-deps && \
     npm cache clean --force
 
-# Verificar instalação do vite
-RUN echo "🔍 Verificando instalação do vite..." && \
-    (test -d node_modules/vite && echo "✅ vite instalado" || echo "❌ vite NÃO instalado") && \
-    (test -f node_modules/vite/bin/vite.js && echo "✅ vite.js encontrado" || echo "❌ vite.js NÃO encontrado") && \
-    ls -la node_modules/.bin/ | grep vite || echo "⚠️ Verificando .bin"
-
 # Copiar código fonte do frontend
 COPY frontend/ ./
-
-# Re-verificar após COPY
-RUN echo "🔍 Verificando após COPY..." && \
-    (test -d node_modules/vite && echo "✅ vite ainda existe" || echo "❌ vite foi removido!") && \
-    (test -f node_modules/vite/bin/vite.js && echo "✅ vite.js ainda existe" || echo "❌ vite.js foi removido!")
 
 # Build Arguments para variáveis de ambiente no build-time
 ARG REACT_APP_API_URL=/api
@@ -45,14 +34,7 @@ ENV INLINE_RUNTIME_CHUNK=false
 ENV PATH="/app/frontend/node_modules/.bin:${PATH}"
 
 # Build da aplicação frontend com Vite
-RUN echo "🔨 Iniciando build..." && \
-    echo "📦 PATH: $PATH" && \
-    echo "📦 Verificando vite:" && \
-    (which vite && echo "✅ vite encontrado no PATH" || echo "⚠️ vite não no PATH, usando npx") && \
-    (npx vite --version && echo "✅ npx vite funciona" || echo "❌ npx vite falhou") && \
-    npm run build && \
-    echo "✅ Build concluído!" && \
-    (test -d dist && echo "✅ Pasta dist/ criada" || echo "❌ Pasta dist/ NÃO criada")
+RUN npm run build
 
 # Stage 2: Build Backend (Node.js + TypeScript)
 FROM node:20-alpine AS backend-builder
@@ -79,14 +61,15 @@ COPY backend/prisma ./prisma/
 # Gerar Prisma Client (necessário antes do build)
 RUN npx prisma generate
 
-# Copiar código fonte do backend completo (incluindo src/ para compilar)
-COPY backend/ ./ 
+# Copiar código fonte do backend
+COPY backend/src ./src/
+COPY backend/tsconfig.json ./
 
-# Compilar TypeScript
+# Compilar TypeScript para JavaScript
 RUN npm run build
 
 # Verificar se o build foi bem-sucedido
-RUN test -d dist && test -f dist/index.js || (echo "Build failed!" && exit 1)
+RUN test -d dist && test -f dist/index.js || (echo "Build failed! dist/index.js não encontrado" && exit 1)
 
 # Stage 3: Production (Nginx + Node.js + Supervisor)
 FROM node:20-alpine AS production
@@ -116,13 +99,12 @@ WORKDIR /app
 # Copiar build do frontend (Vite usa 'dist')
 COPY --from=frontend-builder /app/frontend/dist /var/www/html
 
-# Copiar build do backend
+# Copiar APENAS código compilado do backend (JavaScript)
 COPY --from=backend-builder /app/backend/dist ./backend/dist
 COPY --from=backend-builder /app/backend/package*.json ./backend/
 COPY --from=backend-builder /app/backend/prisma ./backend/prisma
 
-# Copiar apenas os scripts JavaScript necessários (não TypeScript)
-# wait-for-db.js é necessário e já está como .js
+# Copiar apenas os scripts JavaScript necessários
 COPY backend/scripts/wait-for-db.js ./backend/scripts/wait-for-db.js
 
 # Instalar APENAS dependências de produção do backend
@@ -142,8 +124,7 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-entrypoint-fullstack.sh /app/docker-entrypoint-fullstack.sh
 
 # Tornar scripts executáveis
-RUN chmod +x /app/docker-entrypoint-fullstack.sh && \
-    chmod +x /app/backend/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint-fullstack.sh
 
 # Criar usuário não-root
 RUN addgroup -g 1001 -S nodejs && \
