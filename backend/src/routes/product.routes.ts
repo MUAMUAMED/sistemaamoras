@@ -1,17 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
 import { prisma } from '../config/database';
-import { authenticateToken } from '../middleware/auth';
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-  };
-}
 
 const router = Router();
 

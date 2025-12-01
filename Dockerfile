@@ -15,8 +15,19 @@ COPY frontend/package*.json ./
 RUN npm ci --legacy-peer-deps && \
     npm cache clean --force
 
+# Verificar instalação do vite
+RUN echo "🔍 Verificando instalação do vite..." && \
+    (test -d node_modules/vite && echo "✅ vite instalado" || echo "❌ vite NÃO instalado") && \
+    (test -f node_modules/vite/bin/vite.js && echo "✅ vite.js encontrado" || echo "❌ vite.js NÃO encontrado") && \
+    ls -la node_modules/.bin/ | grep vite || echo "⚠️ Verificando .bin"
+
 # Copiar código fonte do frontend
 COPY frontend/ ./
+
+# Re-verificar após COPY
+RUN echo "🔍 Verificando após COPY..." && \
+    (test -d node_modules/vite && echo "✅ vite ainda existe" || echo "❌ vite foi removido!") && \
+    (test -f node_modules/vite/bin/vite.js && echo "✅ vite.js ainda existe" || echo "❌ vite.js foi removido!")
 
 # Build Arguments para variáveis de ambiente no build-time
 ARG REACT_APP_API_URL=/api
@@ -30,8 +41,18 @@ ENV NODE_ENV=${NODE_ENV}
 ENV GENERATE_SOURCEMAP=false
 ENV INLINE_RUNTIME_CHUNK=false
 
+# Adicionar node_modules/.bin ao PATH para encontrar vite
+ENV PATH="/app/frontend/node_modules/.bin:${PATH}"
+
 # Build da aplicação frontend com Vite
-RUN npm run build
+RUN echo "🔨 Iniciando build..." && \
+    echo "📦 PATH: $PATH" && \
+    echo "📦 Verificando vite:" && \
+    (which vite && echo "✅ vite encontrado no PATH" || echo "⚠️ vite não no PATH, usando npx") && \
+    (npx vite --version && echo "✅ npx vite funciona" || echo "❌ npx vite falhou") && \
+    npm run build && \
+    echo "✅ Build concluído!" && \
+    (test -d dist && echo "✅ Pasta dist/ criada" || echo "❌ Pasta dist/ NÃO criada")
 
 # Stage 2: Build Backend (Node.js + TypeScript)
 FROM node:20-alpine AS backend-builder
