@@ -1,0 +1,7 @@
+# TypeScript Ignore File
+# Este arquivo força o TypeScript a ignorar completamente estas pastas
+
+pasta-frontend/
+**/pasta-frontend/**
+pasta-frontend/**/*
+

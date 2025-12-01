@@ -15,3 +15,6 @@ pasta-frontend/
 # Ignorar outras pastas desnecessárias
 napshot-sistema-atual
 
+# Ignorar tudo relacionado a pasta-frontend
+pasta-frontend
+

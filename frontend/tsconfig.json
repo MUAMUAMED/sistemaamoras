@@ -25,5 +25,11 @@
     }
   },
   "include": ["src", "index.html"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "../pasta-frontend",
+    "../pasta-frontend/**"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 } 

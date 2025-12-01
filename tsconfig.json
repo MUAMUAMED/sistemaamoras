@@ -14,12 +14,16 @@
     "**/pasta-frontend",
     "**/pasta-frontend/**",
     "**/*.test.ts",
-    "**/*.test.tsx"
+    "**/*.test.tsx",
+    "**/pasta-frontend/**/*.ts",
+    "**/pasta-frontend/**/*.tsx",
+    "**/pasta-frontend/**/*.json"
   ],
   "references": [
     { "path": "./backend" },
     { "path": "./frontend" }
   ]
 }
+
 
 
