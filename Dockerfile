@@ -71,7 +71,11 @@ COPY backend/package*.json ./
 
 # Instalar TODAS as dependências (incluindo devDependencies para build)
 RUN npm ci --legacy-peer-deps && \
-    npm cache clean --force
+    npm cache clean --force && \
+    echo "✅ Dependências instaladas" && \
+    echo "📦 Verificando TypeScript após instalação..." && \
+    (test -d node_modules/typescript && echo "✅ TypeScript instalado" || (echo "❌ TypeScript NÃO instalado, instalando..." && npm install typescript --save-dev)) && \
+    (test -f node_modules/.bin/tsc && echo "✅ tsc disponível" || echo "❌ tsc não encontrado")
 
 # Verificar instalação do TypeScript
 RUN echo "🔍 Verificando TypeScript..." && \
