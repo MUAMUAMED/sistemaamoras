@@ -48,23 +48,42 @@ RUN echo "📥 Instalando dependências com npm ci..." && \
     (test -d node_modules/vite && echo "   ✅ Vite instalado em node_modules/vite" || echo "   ❌ Vite NÃO instalado") && \
     (test -f node_modules/vite/bin/vite.js && echo "   ✅ vite.js encontrado" || echo "   ❌ vite.js NÃO encontrado") && \
     echo "📦 Verificando instalação do typescript:" && \
-    (test -d node_modules/typescript && echo "   ✅ TypeScript instalado" || echo "   ❌ TypeScript NÃO instalado")
+    (test -d node_modules/typescript && echo "   ✅ TypeScript instalado" || echo "   ❌ TypeScript NÃO instalado") && \
+    echo "📦 Verificando node_modules/.bin:" && \
+    (test -f node_modules/.bin/vite && echo "   ✅ vite bin encontrado" || echo "   ❌ vite bin NÃO encontrado") && \
+    ls -la node_modules/.bin/ | grep -E "vite|tsc" || echo "   ⚠️ Listando .bin"
 
-# Copiar todos os arquivos do frontend
+# Adicionar node_modules/.bin ao PATH para garantir que os binários sejam encontrados
+ENV PATH="/app/node_modules/.bin:${PATH}"
+
+# Copiar todos os arquivos do frontend (excluindo node_modules via .dockerignore)
 COPY . .
 
-# LOG: Verificar arquivos importantes
+# Re-configurar PATH após COPY para garantir que está ativo
+ENV PATH="/app/node_modules/.bin:${PATH}"
+
+# LOG: Verificar arquivos importantes E verificar se node_modules ainda existe após COPY
 RUN echo "📂 Verificando arquivos do frontend..." && \
     echo "   vite.config.ts existe: $(test -f vite.config.ts && echo 'SIM' || echo 'NÃO')" && \
     echo "   tsconfig.json existe: $(test -f tsconfig.json && echo 'SIM' || echo 'NÃO')" && \
     echo "   src/ existe: $(test -d src && echo 'SIM' || echo 'NÃO')" && \
     echo "   public/ existe: $(test -d public && echo 'SIM' || echo 'NÃO')" && \
-    echo "✅ Arquivos do frontend copiados"
+    echo "✅ Arquivos do frontend copiados" && \
+    echo "" && \
+    echo "🔍 Verificando node_modules após COPY..." && \
+    (test -d node_modules && echo "   ✅ node_modules ainda existe" || echo "   ❌ node_modules NÃO existe!") && \
+    (test -d node_modules/vite && echo "   ✅ node_modules/vite existe" || echo "   ❌ node_modules/vite NÃO existe!") && \
+    (test -f node_modules/.bin/vite && echo "   ✅ node_modules/.bin/vite existe" || echo "   ❌ node_modules/.bin/vite NÃO existe!") && \
+    echo "🔍 Verificando PATH:" && \
+    echo "   PATH atual: $PATH" && \
+    echo "   which vite: $(which vite || echo 'não encontrado')" && \
+    echo "   npx vite --version: $(npx vite --version || echo 'erro ao executar')"
 
 # Build da aplicação
 RUN echo "🔨 Iniciando build da aplicação..." && \
     echo "📝 Executando: npm run build" && \
-    echo "   O script 'build' executa: tsc && vite build" && \
+    echo "   O script 'build' executa: tsc && node node_modules/vite/bin/vite.js build" && \
+    echo "   PATH: $PATH" && \
     npm run build && \
     echo "✅ Build concluído com sucesso!" && \
     echo "📂 Verificando pasta dist/..." && \
