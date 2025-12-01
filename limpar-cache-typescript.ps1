@@ -32,9 +32,11 @@ foreach ($cachePath in $cachePaths) {
     }
 }
 
-Write-Host "`n✅ Limpeza concluída!" -ForegroundColor Green
-Write-Host "`n📝 Próximos passos:" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "✅ Limpeza concluída!" -ForegroundColor Green
+Write-Host ""
+Write-Host "📝 Próximos passos:" -ForegroundColor Cyan
 Write-Host "   1. Feche e reabra o VS Code/Cursor" -ForegroundColor White
 Write-Host "   2. Ou pressione Ctrl+Shift+P e digite: 'TypeScript: Restart TS Server'" -ForegroundColor White
-Write-Host "`n"
+Write-Host ""
 
