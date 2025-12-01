@@ -1,6 +1,17 @@
 # Ignorar pasta frontend antiga que não é usada
 pasta-frontend/
+**/pasta-frontend/**
 
 # Ignorar arquivos de configuração do Cursor
 .cursor/
+**/.cursor/**
+
+# Ignorar erros do TypeScript relacionados a pastas antigas
+**/pasta-frontend/**/*.ts
+**/pasta-frontend/**/*.tsx
+**/pasta-frontend/**/*.json
+**/pasta-frontend/**/*.js
+
+# Ignorar outras pastas desnecessárias
+napshot-sistema-atual
 

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "skipLibCheck": true,
+    "strict": false
+  },
+  "files": [],
+  "include": [],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "pasta-frontend",
+    "**/pasta-frontend",
+    "**/pasta-frontend/**",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
+  "references": [
+    { "path": "./backend" },
+    { "path": "./frontend" }
+  ]
+}
+
+
