@@ -71,4 +71,7 @@ amoras-frontend-repo/
 
 # Temporary files
 tmp/
-temp/ 
+temp/
+
+# Pasta frontend antiga (não usada na branch full-stack)
+pasta-frontend/ 

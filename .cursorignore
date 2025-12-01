@@ -1,0 +1,6 @@
+# Ignorar pasta frontend antiga que não é usada
+pasta-frontend/
+
+# Ignorar arquivos de configuração do Cursor
+.cursor/
+
