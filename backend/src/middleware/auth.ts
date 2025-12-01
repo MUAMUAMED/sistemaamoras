@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
-import '../types/express'; // Importar tipos do Express para garantir que estão disponíveis
 
 interface JwtPayload {
   userId: string;
