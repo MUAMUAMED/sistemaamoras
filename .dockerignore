@@ -8,6 +8,20 @@ build
 **/dist
 **/build
 
+# TypeScript source files (should never be in production image)
+**/*.ts
+!**/*.d.ts
+backend/src
+frontend/src
+**/src/**/*.ts
+**/src/**/*.tsx
+
+# TypeScript source files (should never be in production)
+**/src/**/*.ts
+**/src/**/*.tsx
+backend/src
+frontend/src
+
 # Environment files
 .env
 .env.*

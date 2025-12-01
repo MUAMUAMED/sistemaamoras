@@ -79,8 +79,13 @@ COPY backend/prisma ./prisma/
 # Gerar Prisma Client (necessário antes do build)
 RUN npx prisma generate
 
-# Copiar código fonte do backend
-COPY backend/ ./
+# Copiar código fonte do backend (excluindo node_modules via .dockerignore)
+# IMPORTANTE: .dockerignore já exclui src/**/*.ts, mas garantimos que só copiamos o necessário
+COPY backend/package*.json ./
+COPY backend/tsconfig.json ./
+COPY backend/prisma ./prisma/
+COPY backend/src ./src/
+COPY backend/scripts ./scripts/
 
 # Compilar TypeScript
 RUN npm run build
