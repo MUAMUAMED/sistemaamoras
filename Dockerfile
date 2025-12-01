@@ -88,10 +88,13 @@ COPY backend/prisma ./prisma/
 # Gerar Prisma Client (necessário antes do build)
 RUN npx prisma generate
 
-# Copiar código fonte do backend (mas NÃO sobrescrever node_modules)
+# Copiar código fonte do backend
+# IMPORTANTE: Copiar apenas arquivos necessários, NÃO node_modules
 COPY backend/src ./src/
 COPY backend/tsconfig.json ./
 COPY backend/scripts ./scripts/
+
+# NÃO copiar backend/node_modules aqui - já foi instalado acima
 
 # Verificar novamente após COPY
 RUN echo "🔍 Verificando TypeScript após COPY..." && \
