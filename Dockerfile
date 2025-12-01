@@ -70,12 +70,15 @@ RUN apk add --no-cache \
 COPY backend/package*.json ./
 
 # Instalar TODAS as dependências (incluindo devDependencies para build)
-RUN npm ci --legacy-peer-deps && \
+# IMPORTANTE: npm ci instala devDependencies por padrão, mas vamos garantir
+RUN npm ci --legacy-peer-deps --include=dev && \
     npm cache clean --force && \
-    echo "✅ Dependências instaladas" && \
+    echo "✅ Dependências instaladas (incluindo dev)" && \
     echo "📦 Verificando TypeScript após instalação..." && \
-    (test -d node_modules/typescript && echo "✅ TypeScript instalado" || (echo "❌ TypeScript NÃO instalado, instalando..." && npm install typescript --save-dev)) && \
-    (test -f node_modules/.bin/tsc && echo "✅ tsc disponível" || echo "❌ tsc não encontrado")
+    (test -d node_modules/typescript && echo "✅ TypeScript instalado" || (echo "❌ TypeScript NÃO instalado, instalando explicitamente..." && npm install typescript@^5.9.2 --save-dev --legacy-peer-deps)) && \
+    (test -f node_modules/.bin/tsc && echo "✅ tsc disponível" || echo "❌ tsc não encontrado, instalando TypeScript..." && npm install typescript@^5.9.2 --save-dev --legacy-peer-deps) && \
+    echo "📦 Listando TypeScript instalado:" && \
+    npm list typescript 2>&1 | head -3
 
 # Verificar instalação do TypeScript
 RUN echo "🔍 Verificando TypeScript..." && \
