@@ -73,17 +73,37 @@ COPY backend/package*.json ./
 RUN npm ci --legacy-peer-deps && \
     npm cache clean --force
 
+# Verificar instalação do TypeScript
+RUN echo "🔍 Verificando TypeScript..." && \
+    (test -d node_modules/typescript && echo "✅ typescript instalado" || echo "❌ typescript NÃO instalado") && \
+    (test -f node_modules/.bin/tsc && echo "✅ tsc encontrado" || echo "❌ tsc NÃO encontrado") && \
+    (npx tsc --version && echo "✅ npx tsc funciona" || echo "❌ npx tsc falhou")
+
+# Adicionar node_modules/.bin ao PATH
+ENV PATH="/app/backend/node_modules/.bin:${PATH}"
+
 # Copiar schema Prisma
 COPY backend/prisma ./prisma/
 
 # Gerar Prisma Client (necessário antes do build)
 RUN npx prisma generate
 
-# Copiar código fonte do backend completo
-COPY backend/ ./ 
+# Copiar código fonte do backend (mas NÃO sobrescrever node_modules)
+COPY backend/src ./src/
+COPY backend/tsconfig.json ./
+COPY backend/scripts ./scripts/
 
-# Compilar TypeScript
-RUN npm run build
+# Verificar novamente após COPY
+RUN echo "🔍 Verificando TypeScript após COPY..." && \
+    (test -d node_modules/typescript && echo "✅ typescript ainda instalado" || echo "❌ typescript foi removido!") && \
+    (which tsc && echo "✅ tsc no PATH" || echo "⚠️ tsc não no PATH") && \
+    (npx tsc --version && echo "✅ npx tsc ainda funciona" || echo "❌ npx tsc não funciona mais")
+
+# Compilar TypeScript usando npx para garantir que encontra
+RUN echo "🔨 Compilando TypeScript..." && \
+    npx tsc --version && \
+    npx tsc && \
+    echo "✅ TypeScript compilado com sucesso!"
 
 # Verificar se o build foi bem-sucedido
 RUN test -d dist && test -f dist/index.js || (echo "Build failed!" && exit 1)
@@ -142,8 +162,7 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker-entrypoint-fullstack.sh /app/docker-entrypoint-fullstack.sh
 
 # Tornar scripts executáveis
-RUN chmod +x /app/docker-entrypoint-fullstack.sh && \
-    chmod +x /app/backend/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint-fullstack.sh
 
 # Criar usuário não-root
 RUN addgroup -g 1001 -S nodejs && \
