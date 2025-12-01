@@ -70,8 +70,8 @@ RUN apk add --no-cache \
 COPY backend/package*.json ./
 
 # Instalar TODAS as dependências (incluindo devDependencies para build)
-# IMPORTANTE: npm ci instala devDependencies por padrão, mas vamos garantir
-RUN npm ci --legacy-peer-deps --include=dev && \
+# IMPORTANTE: Garantir que NODE_ENV não seja production para instalar devDependencies
+RUN NODE_ENV=development npm ci --legacy-peer-deps && \
     npm cache clean --force && \
     echo "✅ Dependências instaladas (incluindo dev)" && \
     echo "📦 Verificando TypeScript após instalação..." && \
