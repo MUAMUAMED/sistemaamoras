@@ -12,8 +12,11 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Instalar dependências do frontend (incluindo devDependencies para build)
-RUN npm ci --legacy-peer-deps && \
-    npm cache clean --force
+# IMPORTANTE: Não permitir que NODE_ENV=production bloqueie devDependencies
+RUN unset NODE_ENV && \
+    npm ci --legacy-peer-deps && \
+    npm cache clean --force && \
+    echo "✅ Dependências do frontend instaladas (incluindo dev)"
 
 # Verificar instalação do vite
 RUN echo "🔍 Verificando instalação do vite..." && \
@@ -30,14 +33,16 @@ RUN echo "🔍 Verificando após COPY..." && \
     (test -f node_modules/vite/bin/vite.js && echo "✅ vite.js ainda existe" || echo "❌ vite.js foi removido!")
 
 # Build Arguments para variáveis de ambiente no build-time
+# IMPORTANTE: NODE_ENV só é usado DURANTE o build do Vite, NÃO durante npm ci
 ARG REACT_APP_API_URL=/api
 ARG VITE_API_URL=/api
-ARG NODE_ENV=production
+ARG NODE_ENV_BUILD=production
 
 # Configurar variáveis de ambiente para build (Vite precisa no build time)
+# Mas só APÓS as dependências já estarem instaladas
 ENV REACT_APP_API_URL=${REACT_APP_API_URL}
 ENV VITE_API_URL=${VITE_API_URL}
-ENV NODE_ENV=${NODE_ENV}
+ENV NODE_ENV=${NODE_ENV_BUILD}
 ENV GENERATE_SOURCEMAP=false
 ENV INLINE_RUNTIME_CHUNK=false
 
@@ -70,16 +75,16 @@ RUN apk add --no-cache \
 COPY backend/package*.json ./
 
 # Instalar TODAS as dependências (incluindo devDependencies para build)
-# IMPORTANTE: npm ci instala devDependencies por padrão, a menos que NODE_ENV=production
-# Vamos garantir que não há NODE_ENV=production definido aqui
+# CRÍTICO: Remover qualquer NODE_ENV=production que possa vir do ambiente do Zeabur
+# Isso garante que devDependencies (TypeScript) sejam instaladas
 RUN unset NODE_ENV && \
+    echo "🔍 NODE_ENV atual: ${NODE_ENV:-não definido}" && \
     npm ci --legacy-peer-deps && \
     npm cache clean --force && \
-    echo "✅ Dependências instaladas" && \
+    echo "✅ Dependências do backend instaladas" && \
     echo "📦 Verificando TypeScript..." && \
-    (test -d node_modules/typescript && echo "✅ TypeScript encontrado" || echo "❌ TypeScript não encontrado, instalando...") && \
-    (test -d node_modules/typescript || npm install typescript@^5.9.2 --save-dev --legacy-peer-deps) && \
-    (test -f node_modules/.bin/tsc && echo "✅ tsc disponível" || echo "❌ tsc não encontrado") && \
+    (test -d node_modules/typescript && echo "✅ TypeScript encontrado" || (echo "❌ TypeScript não encontrado, instalando..." && npm install typescript@^5.9.2 --save-dev --legacy-peer-deps)) && \
+    (test -f node_modules/.bin/tsc && echo "✅ tsc disponível" || (echo "❌ tsc não encontrado, instalando TypeScript..." && npm install typescript@^5.9.2 --save-dev --legacy-peer-deps)) && \
     echo "📦 Versão do TypeScript:" && \
     npm list typescript 2>&1 | head -2
 
