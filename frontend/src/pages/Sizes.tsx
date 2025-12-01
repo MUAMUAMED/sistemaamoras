@@ -47,7 +47,7 @@ const Sizes: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: sizesApi.delete,
+    mutationFn: (id: string) => sizesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sizes'] });
       toast.success('Tamanho excluído com sucesso!');

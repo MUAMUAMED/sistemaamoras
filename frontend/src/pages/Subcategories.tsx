@@ -53,7 +53,7 @@ const Subcategories: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: subcategoriesApi.delete,
+    mutationFn: (id: string) => subcategoriesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subcategories'] });
       toast.success('Subcategoria excluída com sucesso!');

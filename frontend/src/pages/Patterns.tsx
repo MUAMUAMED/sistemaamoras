@@ -47,7 +47,7 @@ const Patterns: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: patternsApi.delete,
+    mutationFn: (id: string) => patternsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patterns'] });
       toast.success('Estampa excluída com sucesso!');
