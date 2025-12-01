@@ -10,9 +10,9 @@ interface JwtPayload {
   role: string;
 }
 
-// Definir AuthenticatedRequest usando intersection type para garantir todas as propriedades do Request
-// Isso é necessário porque interface extends pode não preservar todas as propriedades em alguns contextos
-export type AuthenticatedRequest = Request & {
+// Definir AuthenticatedRequest como interface que estende Request
+// Todas as propriedades do Request (params, body, query, headers, etc.) estão disponíveis
+export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
