@@ -9,7 +9,7 @@ interface JwtPayload {
   role: string;
 }
 
-export interface AuthenticatedRequest extends Request {
+export type AuthenticatedRequest = Request & {
   user?: {
     id: string;
     email: string;
