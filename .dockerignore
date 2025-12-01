@@ -2,20 +2,12 @@
 node_modules
 **/node_modules
 
-# Build outputs
-dist
-build
-**/dist
-**/build
-
-# Não excluir src/ do backend durante o BUILD - só na produção
-# O .dockerignore aqui é para o contexto de build completo
-
-# TypeScript source files (should never be in production)
-**/src/**/*.ts
-**/src/**/*.tsx
-backend/src
-frontend/src
+# Build outputs - excluir apenas dist/build existentes do contexto
+# Mas permitir que sejam criados durante o build
+dist/
+build/
+!backend/dist/
+!frontend/dist/
 
 # Environment files
 .env
@@ -61,6 +53,7 @@ snapshot-sistema-atual
 docker-compose*.yml
 Dockerfile.*
 !Dockerfile
+!Dockerfile.zeabur
 
 # Test files
 *.test.ts
@@ -80,4 +73,3 @@ yarn-debug.log*
 yarn-error.log*
 .npm
 .eslintcache
-
