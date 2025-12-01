@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
+import '../types/express'; // Importar tipos do Express para garantir que estão disponíveis
 
 interface JwtPayload {
   userId: string;
@@ -9,6 +10,8 @@ interface JwtPayload {
   role: string;
 }
 
+// Definir AuthenticatedRequest usando intersection type para garantir todas as propriedades do Request
+// Isso é necessário porque interface extends pode não preservar todas as propriedades em alguns contextos
 export type AuthenticatedRequest = Request & {
   user?: {
     id: string;
