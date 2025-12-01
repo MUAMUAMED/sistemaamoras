@@ -46,38 +46,55 @@ import { env } from './config/env';
 const app: Application = express();
 const PORT = env.PORT;
 
-// === ORIGENS PERMITIDAS ===
-// Lê de variável de ambiente ou usa padrões
-const allowedOrigins: string[] = env.CORS_ORIGINS
-  ? env.CORS_ORIGINS.split(",").map(origin => origin.trim())
-  : env.NODE_ENV === 'development'
-    ? ["http://localhost:3000", "http://127.0.0.1:3000"]
-    : []; // Em produção, DEVE ser configurado via CORS_ORIGINS
-
 // === CONFIG CORS ===
-// usamos Parameters<typeof cors>[0] em vez de CorsOptions
-const corsOptions: Parameters<typeof cors>[0] = {
-  origin: (
-    origin: string | undefined,
-    callback: (err: Error | null, allow?: boolean) => void
-  ) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
+// Em modo full-stack, aceita requisições do mesmo domínio (via Nginx proxy)
+// Em modo standalone, usa configuração de origens específicas
+const isFullStackMode = process.env.FULLSTACK_MODE === 'true';
+
+const corsOptions: Parameters<typeof cors>[0] = isFullStackMode
+  ? {
+      // Modo full-stack: aceita requisições do mesmo domínio (Nginx faz proxy)
+      origin: true, // Permite qualquer origem (Nginx já filtra)
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+      ],
+      maxAge: 86400,
     }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "Origin",
-  ],
-  maxAge: 86400,
-};
+  : {
+      // Modo standalone: usa configuração de origens específicas
+      origin: (
+        origin: string | undefined,
+        callback: (err: Error | null, allow?: boolean) => void
+      ) => {
+        const allowedOrigins: string[] = env.CORS_ORIGINS
+          ? env.CORS_ORIGINS.split(",").map(origin => origin.trim())
+          : env.NODE_ENV === 'development'
+            ? ["http://localhost:3000", "http://127.0.0.1:3000"]
+            : []; // Em produção standalone, DEVE ser configurado via CORS_ORIGINS
+
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+      ],
+      maxAge: 86400,
+    };
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
@@ -199,8 +216,15 @@ async function startServer() {
 
     logger.info("🤖 Automações programadas inicializadas");
 
-    app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`🚀 Servidor rodando na porta ${PORT}`);
+    // Em modo full-stack, bind apenas em localhost (Nginx faz proxy)
+    // Em modo standalone, bind em 0.0.0.0 para aceitar conexões externas
+    const bindAddress = isFullStackMode ? '127.0.0.1' : '0.0.0.0';
+    
+    app.listen(PORT, bindAddress, () => {
+      logger.info(`🚀 Servidor rodando na porta ${PORT} (${bindAddress})`);
+      if (isFullStackMode) {
+        logger.info('📦 Modo Full-Stack: Backend acessível apenas via Nginx proxy');
+      }
       logger.info(
         `📚 Documentação disponível em ${env.APP_URL}/api-docs`
       );
