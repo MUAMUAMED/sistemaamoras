@@ -122,10 +122,10 @@ model Product {
   updatedAt       DateTime @updatedAt
 
   // Relacionamentos
-  category       Category        @relation(fields: [categoryId], references: [id])
+  category       Category?       @relation(fields: [categoryId], references: [id])
   subcategory    Subcategory?    @relation(fields: [subcategoryId], references: [id])
   size           Size            @relation(fields: [sizeId], references: [id])
-  pattern        Pattern         @relation(fields: [patternId], references: [id])
+  pattern        Pattern?        @relation(fields: [patternId], references: [id])
   saleItems      SaleItem[]
   stockMovements StockMovement[]
 
