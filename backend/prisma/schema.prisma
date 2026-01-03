@@ -100,12 +100,12 @@ model Size {
 // Produtos (roupas)
 model Product {
   id            String   @id @default(cuid())
-  name          String
-  categoryId    String
+  name          String?
+  categoryId    String?
   subcategoryId String?  // Opcional - subcategoria do produto
   sizeId        String   // Relação com o modelo Size
-  patternId     String
-  price         Float
+  patternId     String?
+  price         Float?
   stock         Int      @default(0) // Estoque total (para compatibilidade)
   stockLoja     Int      @default(0) // Estoque na Loja
   stockArmazem  Int      @default(0) // Estoque no Armazém

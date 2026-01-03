@@ -3,9 +3,9 @@ import { prisma } from '../config/database';
 
 export interface ProductCodeData {
   sizeId: string;
-  categoryId: string;
+  categoryId?: string;
   subcategoryId?: string;
-  patternId: string;
+  patternId?: string;
 }
 
 export interface GeneratedCodes {

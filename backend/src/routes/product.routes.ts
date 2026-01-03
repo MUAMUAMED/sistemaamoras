@@ -265,21 +265,13 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
  *           schema:
  *             type: object
  *             required:
- *               - name
- *               - categoryId
- *               - size
- *               - sizeCode
- *               - patternId
- *               - price
- *               - stock
+ *               - sizeId
  *             properties:
  *               name:
  *                 type: string
  *               categoryId:
  *                 type: string
- *               size:
- *                 type: string
- *               sizeCode:
+ *               sizeId:
  *                 type: string
  *               patternId:
  *                 type: string
@@ -320,27 +312,26 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     });
 
     // Validar dados obrigatórios
-    if (!name || !categoryId || !sizeId || !patternId || !price || stock === undefined) {
-      console.log('❌ [PRODUTO CREATE] Dados obrigatórios faltando:', {
-        name: !!name,
-        categoryId: !!categoryId,
-        sizeId: !!sizeId,
-        patternId: !!patternId,
-        price: !!price,
-        stock: stock !== undefined
-      });
+    // Apenas sizeId é obrigatório para criação inicial (regra de negócio relaxada)
+    if (!sizeId) {
+      console.log('❌ [PRODUTO CREATE] SizeId obrigatório faltando');
       return res.status(400).json({
         error: 'Dados obrigatórios',
-        message: 'Nome, categoria, tamanho, estampa, preço e estoque são obrigatórios',
+        message: 'Tamanho é obrigatório',
       });
     }
 
     // Buscar categoria, subcategoria (se informada), tamanho e estampa para gerar código de barras
+    const categoryPromise = categoryId ? prisma.category.findUnique({ where: { id: categoryId } }) : Promise.resolve(null);
+    const subcategoryPromise = subcategoryId ? prisma.subcategory.findUnique({ where: { id: subcategoryId } }) : Promise.resolve(null);
+    const sizePromise = prisma.size.findUnique({ where: { id: sizeId } });
+    const patternPromise = patternId ? prisma.pattern.findUnique({ where: { id: patternId } }) : Promise.resolve(null);
+
     const [category, subcategory, size, pattern] = await Promise.all([
-      prisma.category.findUnique({ where: { id: categoryId } }),
-      subcategoryId ? prisma.subcategory.findUnique({ where: { id: subcategoryId } }) : null,
-      prisma.size.findUnique({ where: { id: sizeId } }),
-      prisma.pattern.findUnique({ where: { id: patternId } }),
+      categoryPromise,
+      subcategoryPromise,
+      sizePromise,
+      patternPromise,
     ]);
 
     console.log('📋 [PRODUTO CREATE] Dados encontrados:', {
@@ -350,16 +341,16 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       pattern: pattern ? { id: pattern.id, name: pattern.name, code: pattern.code } : null
     });
 
-    if (!category || !size || !pattern) {
-      console.log('❌ [PRODUTO CREATE] Dados inválidos - categoria, tamanho ou estampa não encontrada');
+    if (!size) {
+      console.log('❌ [PRODUTO CREATE] Tamanho não encontrado');
       return res.status(400).json({
-        error: 'Categoria, tamanho ou estampa inválida',
-        message: 'Categoria, tamanho ou estampa não encontrada',
+        error: 'Tamanho inválido',
+        message: 'Tamanho não encontrado',
       });
     }
 
     // Se subcategoria foi informada, verificar se ela existe e pertence à categoria
-    if (subcategoryId) {
+    if (subcategoryId && categoryId) {
       if (!subcategory) {
         console.log('❌ [PRODUTO CREATE] Subcategoria não encontrada:', subcategoryId);
         return res.status(400).json({
@@ -382,12 +373,16 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     }
 
     // Gerar código de barras
-    const barcode = generateBarcode(size.code, category.code, subcategory?.code || null, pattern.code);
+    // Usar '00' para categoria e '0000' para estampa se não informados
+    const categoryCode = category?.code || '00';
+    const patternCode = pattern?.code || '0000';
+    const barcode = generateBarcode(size.code, categoryCode, subcategory?.code || null, patternCode);
+    
     console.log('🏷️ [PRODUTO CREATE] Código de barras gerado:', {
       sizeCode: size.code,
-      categoryCode: category.code,
+      categoryCode,
       subcategoryCode: subcategory?.code || null,
-      patternCode: pattern.code,
+      patternCode,
       barcode
     });
 
