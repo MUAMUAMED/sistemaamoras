@@ -1258,26 +1258,17 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Nome é obrigatório';
-    }
-
-    if (!formData.price || parseCurrency(formData.price) <= 0) {
-      newErrors.price = 'Preço deve ser maior que zero';
-    }
-
-    if (!formData.categoryId) {
-      newErrors.categoryId = 'Categoria é obrigatória';
-    }
-
-    // Subcategoria é opcional - removida validação obrigatória
-
-    if (!formData.patternId) {
-      newErrors.patternId = 'Estampa é obrigatória';
-    }
-
     if (!formData.sizeId) {
       newErrors.sizeId = 'Tamanho é obrigatório';
+    }
+
+    // Validar se pelo menos uma imagem foi adicionada (Roupa ou IA)
+    const hasImages = (formData.imageFilesRoupa && formData.imageFilesRoupa.length > 0) || 
+                      (formData.imageFilesIA && formData.imageFilesIA.length > 0);
+    
+    if (!hasImages) {
+      newErrors.images = 'Pelo menos uma foto é obrigatória';
+      toast.error('Pelo menos uma foto é obrigatória');
     }
 
     setErrors(newErrors);
@@ -1360,7 +1351,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nome *
+                Nome
               </label>
               <input
                 type="text"
@@ -1377,7 +1368,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Preço *
+                Preço
               </label>
               <input
                 type="text"
@@ -1564,6 +1555,13 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             />
 
             <div className="space-y-4">
+              {errors.images && (
+                <div className="bg-red-50 text-red-600 p-3 rounded-lg border border-red-200 text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  {errors.images}
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Imagem Principal (opcional)</label>
                 <input
