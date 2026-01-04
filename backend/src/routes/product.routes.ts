@@ -544,12 +544,16 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
 
       // Salvar imagens
       if (files && files.length > 0) {
+        console.log('📸 [PRODUTO CREATE] Salvando imagens:', files.length);
         const imagesData = files.map((file, index) => ({
           productId: product.id,
           url: `/uploads/products/${file.filename}`,
+          isMain: index === 0,
           type: ProductImageType.ROUPA,
           position: index
         }));
+
+        console.log('📸 [PRODUTO CREATE] Dados das imagens:', imagesData);
 
         await prisma.productImage.createMany({
           data: imagesData
@@ -681,10 +685,10 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
  *       404:
  *         description: Produto não encontrado
  */
-router.put('/:id', authenticateToken, async (req, res, next) => {
+router.put('/:id', authenticateToken, uploadProductImage.array('files', 6), async (req: AuthenticatedRequest, res, next) => {
   try {
     const { id } = req.params;
-    const { 
+    let { 
       name, 
       price, 
       description, 
@@ -697,6 +701,42 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       minStock,
       cost
     } = req.body;
+
+    // Funções de sanitização para PUT (lidar com multipart/form-data)
+    const sanitizeId = (val: any) => {
+      if (val === undefined) return undefined;
+      if (val === null || val === 'null' || val === 'undefined' || val === '') return null;
+      return val;
+    };
+
+    const parseNumber = (val: any) => {
+      if (val === undefined) return undefined;
+      if (val === null || val === 'null' || val === 'undefined' || val === '') return null;
+      const strVal = val.toString();
+      const parsed = parseFloat(strVal.replace(',', '.'));
+      return isNaN(parsed) ? undefined : parsed;
+    };
+
+    const parseIntVal = (val: any) => {
+      if (val === undefined) return undefined;
+      if (val === null || val === 'null' || val === 'undefined' || val === '') return null;
+      const strVal = val.toString();
+      const parsed = parseInt(strVal, 10);
+      return isNaN(parsed) ? undefined : parsed;
+    };
+
+    // Aplicar sanitização
+    categoryId = sanitizeId(categoryId);
+    subcategoryId = sanitizeId(subcategoryId);
+    sizeId = sanitizeId(sizeId);
+    patternId = sanitizeId(patternId);
+    price = parseNumber(price);
+    cost = parseNumber(cost);
+    stock = parseIntVal(stock);
+    minStock = parseIntVal(minStock);
+    
+    if (active === 'true') active = true;
+    if (active === 'false') active = false;
 
     console.log('🔍 [PRODUTO UPDATE] Dados recebidos:', {
       id,
@@ -828,6 +868,34 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
         return res.status(400).json({
           error: 'Código de barras já existe',
           message: 'Já existe um produto com essa combinação de categoria, tamanho e estampa',
+        });
+      }
+    }
+
+    // Processar novas imagens
+    const files = req.files as Express.Multer.File[];
+    if (files && files.length > 0) {
+      console.log('📸 [PRODUTO UPDATE] Processando novas imagens:', files.length);
+      
+      const existingImagesCount = await prisma.productImage.count({ where: { productId: id } });
+      
+      const imagesData = files.map((file, index) => ({
+        productId: id,
+        url: `/uploads/products/${file.filename}`,
+        isMain: existingImagesCount === 0 && index === 0,
+        type: ProductImageType.ROUPA,
+        position: existingImagesCount + index
+      }));
+
+      await prisma.productImage.createMany({
+        data: imagesData
+      });
+
+      // Se o produto não tinha imagem principal, atualizar
+      if (!product.imageUrl) {
+        await prisma.product.update({
+          where: { id },
+          data: { imageUrl: `/uploads/products/${files[0].filename}` }
         });
       }
     }
