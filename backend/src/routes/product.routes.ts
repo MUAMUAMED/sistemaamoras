@@ -318,9 +318,17 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
       return isNaN(parsed) ? null : parsed;
     };
 
+    const parseOptionalInt = (val: any, defaultVal = 0) => {
+      if (!val) return defaultVal;
+      const strVal = val.toString();
+      if (strVal === 'undefined' || strVal === 'null' || strVal.trim() === '') return defaultVal;
+      const parsed = parseInt(strVal, 10);
+      return isNaN(parsed) ? defaultVal : parsed;
+    };
+
     const sanitizedPrice = parseOptionalFloat(price);
     const sanitizedCost = parseOptionalFloat(cost);
-    const sanitizedStock = stock ? parseInt(stock.toString()) : 0;
+    const sanitizedStock = parseOptionalInt(stock, 0);
 
     console.log('🆕 [PRODUTO CREATE] Dados recebidos:', {
       name,
@@ -595,12 +603,12 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
     });
 
     // Registrar movimentação de estoque inicial
-    if (stock > 0) {
+    if (sanitizedStock > 0) {
       await prisma.stockMovement.create({
         data: {
           productId: foundProduct.id,
           type: 'ENTRY',
-          quantity: stock,
+          quantity: sanitizedStock,
           reason: 'Estoque inicial',
           location: initialLocation || 'LOJA', // Usar localização escolhida
           userId: req.user!.id,
@@ -613,11 +621,15 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
       ...foundProduct,
       message: 'Produto criado com sucesso',
     });
-  } catch (error) {
-    console.error('💥 [PRODUTO CREATE] Erro:', error);
-    return next(error);
+  } catch (error: any) {
+    console.error('💥 [PRODUTO CREATE] Erro fatal:', error);
+    // Retornar erro detalhado para debug em produção temporariamente
+    return res.status(500).json({
+      error: 'Erro interno do servidor',
+      message: error.message || 'Algo deu errado',
+      details: process.env.NODE_ENV === 'production' ? error.message : error.stack
+    });
   }
-  return;
 });
 
 /**

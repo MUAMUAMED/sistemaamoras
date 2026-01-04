@@ -43,6 +43,24 @@ dotenv.config();
 // Importar configurações validadas
 import { env } from './config/env';
 
+// Garantir diretórios de upload na inicialização
+const uploadDirs = [
+  'uploads',
+  'uploads/products',
+  'uploads/avatars'
+];
+
+uploadDirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`✅ Diretório criado: ${dir}`);
+    } catch (error) {
+      console.error(`❌ Erro ao criar diretório ${dir}:`, error);
+    }
+  }
+});
+
 const app: Application = express();
 const PORT = env.PORT;
 
