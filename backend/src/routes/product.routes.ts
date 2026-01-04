@@ -343,10 +343,26 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
     }
 
     // Buscar categoria, subcategoria (se informada), tamanho e estampa para gerar código de barras
-    const categoryPromise = sanitizedCategoryId ? prisma.category.findUnique({ where: { id: sanitizedCategoryId } }) : Promise.resolve(null);
-    const subcategoryPromise = sanitizedSubcategoryId ? prisma.subcategory.findUnique({ where: { id: sanitizedSubcategoryId } }) : Promise.resolve(null);
-    const sizePromise = prisma.size.findUnique({ where: { id: sizeId } });
-    const patternPromise = sanitizedPatternId ? prisma.pattern.findUnique({ where: { id: sanitizedPatternId } }) : Promise.resolve(null);
+    // Adicionamos .catch(() => null) para evitar erros 500 caso o ID seja inválido (ex: "waddwa")
+    const categoryPromise = sanitizedCategoryId ? prisma.category.findUnique({ where: { id: sanitizedCategoryId } }).catch((e) => {
+      console.error('❌ [PRODUTO CREATE] Erro ao buscar categoria:', e.message);
+      return null;
+    }) : Promise.resolve(null);
+    
+    const subcategoryPromise = sanitizedSubcategoryId ? prisma.subcategory.findUnique({ where: { id: sanitizedSubcategoryId } }).catch((e) => {
+      console.error('❌ [PRODUTO CREATE] Erro ao buscar subcategoria:', e.message);
+      return null;
+    }) : Promise.resolve(null);
+    
+    const sizePromise = prisma.size.findUnique({ where: { id: sizeId } }).catch((e) => {
+      console.error('❌ [PRODUTO CREATE] Erro ao buscar tamanho:', e.message);
+      return null;
+    });
+    
+    const patternPromise = sanitizedPatternId ? prisma.pattern.findUnique({ where: { id: sanitizedPatternId } }).catch((e) => {
+      console.error('❌ [PRODUTO CREATE] Erro ao buscar estampa:', e.message);
+      return null;
+    }) : Promise.resolve(null);
 
     const [category, subcategory, size, pattern] = await Promise.all([
       categoryPromise,
@@ -473,10 +489,11 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
 
     const createData: any = {
         name: sanitizedName,
-        categoryId: sanitizedCategoryId,
-      subcategoryId: sanitizedSubcategoryId,
+        // Usar IDs validados (null se não encontrado ou inválido) para evitar erro de Foreign Key
+        categoryId: category ? category.id : null,
+        subcategoryId: subcategory ? subcategory.id : null,
         sizeId,
-        patternId: sanitizedPatternId,
+        patternId: pattern ? pattern.id : null,
         price: sanitizedPrice,
         stock: sanitizedStock,
         stockLoja: initialLocation === 'LOJA' ? sanitizedStock : 0,
