@@ -138,6 +138,7 @@ model ProductImage {
   id        String            @id @default(cuid())
   productId String
   url       String
+  isMain    Boolean           @default(false)
   type      ProductImageType  // Tipo da imagem (roupa ou IA)
   position  Int               @default(0) // Ordenação simples
   createdAt DateTime          @default(now())
