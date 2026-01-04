@@ -755,10 +755,10 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 
       // Buscar dados para validação e geração do código de barras
       const [category, subcategory, size, pattern] = await Promise.all([
-        prisma.category.findUnique({ where: { id: finalCategoryId } }),
+        finalCategoryId ? prisma.category.findUnique({ where: { id: finalCategoryId } }) : null,
         finalSubcategoryId ? prisma.subcategory.findUnique({ where: { id: finalSubcategoryId } }) : null,
-        prisma.size.findUnique({ where: { id: finalSizeId } }),
-        prisma.pattern.findUnique({ where: { id: finalPatternId } }),
+        finalSizeId ? prisma.size.findUnique({ where: { id: finalSizeId } }) : null,
+        finalPatternId ? prisma.pattern.findUnique({ where: { id: finalPatternId } }) : null,
       ]);
 
       console.log('📋 [PRODUTO UPDATE] Dados encontrados:', {
@@ -768,11 +768,11 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
         pattern: pattern ? { id: pattern.id, name: pattern.name, code: pattern.code } : null
       });
 
-      if (!category || !size || !pattern) {
-        console.log('❌ [PRODUTO UPDATE] Dados inválidos - categoria, tamanho ou estampa não encontrada');
+      if (!size) {
+        console.log('❌ [PRODUTO UPDATE] Tamanho não encontrado');
         return res.status(400).json({
-          error: 'Categoria, tamanho ou estampa inválida',
-          message: 'Categoria, tamanho ou estampa não encontrada',
+          error: 'Tamanho inválido',
+          message: 'Tamanho não encontrado',
         });
       }
 
@@ -786,7 +786,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
           });
         }
 
-        if (subcategory.categoryId !== finalCategoryId) {
+        if (finalCategoryId && subcategory.categoryId !== finalCategoryId) {
           console.log('❌ [PRODUTO UPDATE] Subcategoria não pertence à categoria:', {
             subcategoryId: subcategory.id,
             subcategoryCategoryId: subcategory.categoryId,
@@ -800,12 +800,14 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       }
 
       // Gerar novo código de barras
-      newBarcode = generateBarcode(size.code, category.code, subcategory?.code || null, pattern.code);
+      const categoryCode = category?.code || '00';
+      const patternCode = pattern?.code || '0000';
+      newBarcode = generateBarcode(size.code, categoryCode, subcategory?.code || null, patternCode);
       console.log('🏷️ [PRODUTO UPDATE] Novo código de barras gerado:', {
         sizeCode: size.code,
-        categoryCode: category.code,
+        categoryCode,
         subcategoryCode: subcategory?.code || null,
-        patternCode: pattern.code,
+        patternCode,
         newBarcode
       });
 
