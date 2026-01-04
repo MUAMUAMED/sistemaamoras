@@ -222,20 +222,45 @@ const Products: React.FC = () => {
     // Buscar o objeto do tamanho selecionado
     const selectedSize = sizes.find(s => s.id === data.sizeId);
     console.log('🔍 [FRONTEND CREATE] Tamanho selecionado:', selectedSize);
+
+    // Auto-fill optional fields for backend compatibility
+    const finalName = data.name.trim() || (selectedSize ? `Produto ${selectedSize.name}` : 'Novo Produto');
+    const finalPrice = data.price || 0;
+    const finalStock = data.stock || 0;
+    const finalMinStock = data.minStock || 0;
     
+    let finalCategoryId = data.categoryId;
+    if (!finalCategoryId && categories.length > 0) {
+      finalCategoryId = categories[0].id;
+      console.log('⚠️ [FRONTEND CREATE] Usando categoria padrão:', categories[0].name);
+    } else if (!finalCategoryId && categories.length === 0) {
+      toast.error('É necessário ter pelo menos uma categoria cadastrada no sistema.');
+      return;
+    }
+    
+    let finalPatternId = data.patternId;
+    if (!finalPatternId && patterns.length > 0) {
+      finalPatternId = patterns[0].id;
+      console.log('⚠️ [FRONTEND CREATE] Usando estampa padrão:', patterns[0].name);
+    } else if (!finalPatternId && patterns.length === 0) {
+      // Se não tiver estampa, vamos tentar enviar sem. Se falhar, o usuário terá que criar.
+      // Mas provavelmente o backend exige.
+      console.warn('⚠️ [FRONTEND CREATE] Nenhuma estampa encontrada. Enviando sem estampa.');
+    }
+
     // Create FormData
     const formData = new FormData();
-    formData.append('name', data.name);
+    formData.append('name', finalName);
     formData.append('description', data.description || '');
-    formData.append('price', data.price.toString());
+    formData.append('price', finalPrice.toString());
     if (data.cost) formData.append('cost', data.cost.toString());
-    formData.append('stock', data.stock.toString());
-    formData.append('minStock', data.minStock.toString());
+    formData.append('stock', finalStock.toString());
+    formData.append('minStock', finalMinStock.toString());
     
-    if (data.categoryId) formData.append('categoryId', data.categoryId);
+    if (finalCategoryId) formData.append('categoryId', finalCategoryId);
     if (data.subcategoryId) formData.append('subcategoryId', data.subcategoryId);
     formData.append('sizeId', data.sizeId);
-    if (data.patternId) formData.append('patternId', data.patternId);
+    if (finalPatternId) formData.append('patternId', finalPatternId);
     
     formData.append('size', selectedSize ? selectedSize.name : '');
     formData.append('sizeCode', selectedSize ? selectedSize.code : '');
