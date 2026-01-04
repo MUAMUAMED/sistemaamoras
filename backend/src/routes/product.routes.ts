@@ -295,6 +295,7 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
       sizeId,
       patternId,
       price,
+      cost,
       stock,
       description,
       initialLocation,
@@ -306,9 +307,19 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
     const sanitizedSubcategoryId = subcategoryId === '' || subcategoryId === 'undefined' || subcategoryId === 'null' ? null : subcategoryId;
     const sanitizedPatternId = patternId === '' || patternId === 'undefined' || patternId === 'null' ? null : patternId;
     const sanitizedName = name === '' ? null : name;
+    const sanitizedDescription = description === '' || description === 'undefined' || description === 'null' ? null : description;
     
     // Converter campos numéricos (multer retorna strings)
-    const sanitizedPrice = price ? parseFloat(price.toString().replace(',', '.')) : 0;
+    const parseOptionalFloat = (val: any) => {
+      if (!val) return null;
+      const strVal = val.toString();
+      if (strVal === 'undefined' || strVal === 'null' || strVal.trim() === '') return null;
+      const parsed = parseFloat(strVal.replace(',', '.'));
+      return isNaN(parsed) ? null : parsed;
+    };
+
+    const sanitizedPrice = parseOptionalFloat(price);
+    const sanitizedCost = parseOptionalFloat(cost);
     const sanitizedStock = stock ? parseInt(stock.toString()) : 0;
 
     console.log('🆕 [PRODUTO CREATE] Dados recebidos:', {
@@ -449,8 +460,9 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
           stock: newStock,
           stockLoja: initialLocation === 'LOJA' ? (existingProduct.stockLoja || 0) + sanitizedStock : existingProduct.stockLoja,
           stockArmazem: initialLocation === 'ARMAZEM' ? (existingProduct.stockArmazem || 0) + sanitizedStock : existingProduct.stockArmazem,
-          price: sanitizedPrice, // Atualizar preço também
-          description: description || existingProduct.description, // Manter descrição existente se não informada
+          price: sanitizedPrice !== null ? sanitizedPrice : existingProduct.price, // Atualizar preço se fornecido
+          cost: sanitizedCost !== null ? sanitizedCost : (existingProduct as any).cost, // Atualizar custo se fornecido
+          description: sanitizedDescription || existingProduct.description, // Manter descrição existente se não informada
         },
         include: {
           category: true,
@@ -495,12 +507,13 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
         sizeId,
         patternId: pattern ? pattern.id : null,
         price: sanitizedPrice,
+        cost: sanitizedCost,
         stock: sanitizedStock,
         stockLoja: initialLocation === 'LOJA' ? sanitizedStock : 0,
         stockArmazem: initialLocation === 'ARMAZEM' ? sanitizedStock : 0,
         barcode,
         qrcodeUrl,
-        description,
+        description: sanitizedDescription,
         // inProduction: true, // Temporariamente removido até migration ser aplicada
         // status: 'PROCESSANDO', // Produtos começam sempre como PROCESSANDO (será adicionado após migration)
     };

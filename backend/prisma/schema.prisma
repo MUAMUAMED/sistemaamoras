@@ -106,7 +106,8 @@ model Product {
   sizeId        String   // Relação com o modelo Size
   patternId     String?
   price         Float?
-  stock         Int      @default(0) // Estoque total (para compatibilidade)
+      cost          Float?   // Custo do produto
+      stock         Int      @default(0) // Estoque total (para compatibilidade)
   stockLoja     Int      @default(0) // Estoque na Loja
   stockArmazem  Int      @default(0) // Estoque no Armazém
   minStock      Int      @default(5)
