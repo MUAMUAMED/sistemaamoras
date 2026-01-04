@@ -70,6 +70,7 @@ export const errorHandler = (
   // Erro interno do servidor
   return res.status(500).json({
     error: 'Erro interno do servidor',
-    message: 'Algo deu errado. Tente novamente mais tarde.',
+    message: error.message || 'Algo deu errado. Tente novamente mais tarde.',
+    stack: error.stack,
   });
 }; 
