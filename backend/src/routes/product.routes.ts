@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { prisma } from '../config/database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
+import { ProductImageType } from '@prisma/client';
 
 const router = Router();
 
@@ -482,6 +483,26 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
           pattern: true,
         },
       });
+
+      // Salvar imagens
+      if (files && files.length > 0) {
+        const imagesData = files.map((file, index) => ({
+          productId: product.id,
+          url: `/uploads/products/${file.filename}`,
+          type: ProductImageType.ROUPA,
+          position: index
+        }));
+
+        await prisma.productImage.createMany({
+          data: imagesData
+        });
+
+        // Atualizar imagem principal (compatibilidade)
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { imageUrl: `/uploads/products/${files[0].filename}` }
+        });
+      }
       
       console.log('✅ [PRODUTO CREATE] Produto criado no banco com sucesso:', product.id);
     } catch (createError: any) {
