@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import fs from 'fs';
 import QRCode from 'qrcode';
 import { prisma } from '../config/database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
@@ -1141,83 +1142,102 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
  *       404:
  *         description: Produto não encontrado
  */
-router.post('/:id/image', authenticateToken, uploadProductImage.single('image'), async (req, res, next) => {
+router.post('/:id/image', authenticateToken, uploadProductImage.any(), async (req, res, next) => {
   try {
     const { id } = req.params;
+    console.log('📸 [PRODUTO IMAGE UPLOAD] Iniciando upload para produto:', id);
     
-    if (!req.file) {
+    const files = req.files as Express.Multer.File[];
+    
+    if (!files || files.length === 0) {
+      console.log('❌ [PRODUTO IMAGE UPLOAD] Nenhuma imagem recebida');
       return res.status(400).json({
         error: 'Nenhuma imagem enviada',
-        message: 'É necessário enviar uma imagem',
+        message: 'É necessário enviar pelo menos uma imagem',
       });
     }
+
+    console.log(`📸 [PRODUTO IMAGE UPLOAD] Recebidos ${files.length} arquivos`);
 
     const product = await prisma.product.findUnique({
       where: { id },
     });
 
     if (!product) {
+      console.log('❌ [PRODUTO IMAGE UPLOAD] Produto não encontrado');
+      // Apagar arquivos enviados se produto não existe
+      files.forEach(f => {
+         try { fs.unlinkSync(f.path); } catch(e) {} 
+      });
       return res.status(404).json({
         error: 'Produto não encontrado',
         message: 'O produto solicitado não foi encontrado',
       });
     }
 
-    // Construir URL da imagem
-    const imageUrl = `/uploads/products/${req.file.filename}`;
-
     // Compat: se vier query main=true, salvar também em imageUrl
     const setAsMain = (req.query.main as string) === 'true';
     const typeParam = (req.query.type as string)?.toUpperCase();
     const imageType = typeParam === 'IA' ? 'IA' : 'ROUPA';
 
-    // Criar registro em ProductImage (com fallback se tabela não existir)
-    let createdImage = null;
-    try {
-      createdImage = await (prisma as any).productImage.create({
-        data: {
-          productId: id,
-          url: imageUrl,
-          type: imageType as any,
-          position: 0,
-        },
-      });
-    } catch (error: any) {
-      console.warn('⚠️ ProductImage table not found, skipping image record creation:', error.message);
+    // Determinar posição inicial
+    const existingCount = await prisma.productImage.count({ where: { productId: id } });
+
+    // Salvar todas as imagens
+    const createdImages = [];
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const imageUrl = `/uploads/products/${file.filename}`;
+        const isFirst = i === 0;
+        
+        // Criar registro
+        try {
+            const newImage = await prisma.productImage.create({
+                data: {
+                    productId: id,
+                    url: imageUrl,
+                    type: imageType as any,
+                    position: existingCount + i,
+                    isMain: (existingCount === 0 && isFirst) || (setAsMain && isFirst) // Define como main se for a primeira do produto ou se solicitado
+                }
+            });
+            createdImages.push(newImage);
+            
+            // Se for main, atualizar produto
+            if ((existingCount === 0 && isFirst) || (setAsMain && isFirst)) {
+                await prisma.product.update({
+                    where: { id },
+                    data: { imageUrl }
+                });
+            }
+        } catch (error: any) {
+             console.error('❌ [PRODUTO IMAGE UPLOAD] Erro ao salvar imagem no banco:', error.message);
+        }
     }
 
-    // Se desejar setar como principal, atualizar campo legacy imageUrl
-    let updatedProduct: any = null;
-    if (setAsMain) {
-      updatedProduct = await prisma.product.update({
-        where: { id },
-        data: { imageUrl },
-        include: { category: true, pattern: true },
-      });
-    } else {
-      updatedProduct = await prisma.product.findUnique({
-        where: { id },
-        include: { category: true, pattern: true },
-      });
-    }
+    // Retornar estado atualizado
+    const allImages = await prisma.productImage.findMany({ 
+        where: { productId: id }, 
+        orderBy: { position: 'asc' } 
+    });
 
-    let images: any[] = [];
-    try {
-      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
-    } catch (error: any) {
-      console.warn('⚠️ ProductImage table not found, returning empty images array:', error.message);
-    }
+    const updatedProduct = await prisma.product.findUnique({
+        where: { id },
+        include: { category: true, pattern: true },
+    });
 
     return res.json({
-      message: 'Imagem carregada com sucesso',
-      product: { ...(updatedProduct as any), images },
-      image: createdImage,
-      imageUrl,
+      message: 'Imagens carregadas com sucesso',
+      product: { ...updatedProduct, images: allImages },
+      images: createdImages,
+      count: createdImages.length
     });
+
   } catch (error) {
+    console.error('💥 [PRODUTO IMAGE UPLOAD] Erro fatal:', error);
     return next(error);
   }
-  return;
 });
 
 /**
