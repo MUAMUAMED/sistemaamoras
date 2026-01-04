@@ -229,25 +229,6 @@ const Products: React.FC = () => {
     const finalStock = data.stock || 0;
     const finalMinStock = data.minStock || 0;
     
-    let finalCategoryId = data.categoryId;
-    if (!finalCategoryId && categories.length > 0) {
-      finalCategoryId = categories[0].id;
-      console.log('⚠️ [FRONTEND CREATE] Usando categoria padrão:', categories[0].name);
-    } else if (!finalCategoryId && categories.length === 0) {
-      toast.error('É necessário ter pelo menos uma categoria cadastrada no sistema.');
-      return;
-    }
-    
-    let finalPatternId = data.patternId;
-    if (!finalPatternId && patterns.length > 0) {
-      finalPatternId = patterns[0].id;
-      console.log('⚠️ [FRONTEND CREATE] Usando estampa padrão:', patterns[0].name);
-    } else if (!finalPatternId && patterns.length === 0) {
-      // Se não tiver estampa, vamos tentar enviar sem. Se falhar, o usuário terá que criar.
-      // Mas provavelmente o backend exige.
-      console.warn('⚠️ [FRONTEND CREATE] Nenhuma estampa encontrada. Enviando sem estampa.');
-    }
-
     // Create FormData
     const formData = new FormData();
     formData.append('name', finalName);
@@ -257,10 +238,10 @@ const Products: React.FC = () => {
     formData.append('stock', finalStock.toString());
     formData.append('minStock', finalMinStock.toString());
     
-    if (finalCategoryId) formData.append('categoryId', finalCategoryId);
+    if (data.categoryId) formData.append('categoryId', data.categoryId);
     if (data.subcategoryId) formData.append('subcategoryId', data.subcategoryId);
     formData.append('sizeId', data.sizeId);
-    if (finalPatternId) formData.append('patternId', finalPatternId);
+    if (data.patternId) formData.append('patternId', data.patternId);
     
     formData.append('size', selectedSize ? selectedSize.name : '');
     formData.append('sizeCode', selectedSize ? selectedSize.code : '');
@@ -1554,7 +1535,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium text-gray-700">
-                  Estampa *
+                  Estampa
               </label>
                 <button
                   type="button"
