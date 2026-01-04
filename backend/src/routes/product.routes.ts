@@ -286,7 +286,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
  *       201:
  *         description: Produto criado com sucesso
  */
-router.post('/', authenticateToken, uploadProductImage.array('images', 6), async (req: AuthenticatedRequest, res, next) => {
+router.post('/', authenticateToken, uploadProductImage.array('files', 6), async (req: AuthenticatedRequest, res, next) => {
   try {
     const {
       name,
@@ -299,6 +299,17 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
       description,
       initialLocation,
     } = req.body;
+
+    // Sanitizar campos opcionais que podem vir como string vazia do frontend
+    // Isso evita erro de Foreign Key Constraint no Prisma
+    const sanitizedCategoryId = categoryId === '' || categoryId === 'undefined' || categoryId === 'null' ? null : categoryId;
+    const sanitizedSubcategoryId = subcategoryId === '' || subcategoryId === 'undefined' || subcategoryId === 'null' ? null : subcategoryId;
+    const sanitizedPatternId = patternId === '' || patternId === 'undefined' || patternId === 'null' ? null : patternId;
+    const sanitizedName = name === '' ? null : name;
+    
+    // Converter campos numéricos (multer retorna strings)
+    const sanitizedPrice = price ? parseFloat(price.toString().replace(',', '.')) : 0;
+    const sanitizedStock = stock ? parseInt(stock.toString()) : 0;
 
     console.log('🆕 [PRODUTO CREATE] Dados recebidos:', {
       name,
@@ -332,10 +343,10 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
     }
 
     // Buscar categoria, subcategoria (se informada), tamanho e estampa para gerar código de barras
-    const categoryPromise = categoryId ? prisma.category.findUnique({ where: { id: categoryId } }) : Promise.resolve(null);
-    const subcategoryPromise = subcategoryId ? prisma.subcategory.findUnique({ where: { id: subcategoryId } }) : Promise.resolve(null);
+    const categoryPromise = sanitizedCategoryId ? prisma.category.findUnique({ where: { id: sanitizedCategoryId } }) : Promise.resolve(null);
+    const subcategoryPromise = sanitizedSubcategoryId ? prisma.subcategory.findUnique({ where: { id: sanitizedSubcategoryId } }) : Promise.resolve(null);
     const sizePromise = prisma.size.findUnique({ where: { id: sizeId } });
-    const patternPromise = patternId ? prisma.pattern.findUnique({ where: { id: patternId } }) : Promise.resolve(null);
+    const patternPromise = sanitizedPatternId ? prisma.pattern.findUnique({ where: { id: sanitizedPatternId } }) : Promise.resolve(null);
 
     const [category, subcategory, size, pattern] = await Promise.all([
       categoryPromise,
@@ -360,20 +371,20 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
     }
 
     // Se subcategoria foi informada, verificar se ela existe e pertence à categoria
-    if (subcategoryId && categoryId) {
+    if (sanitizedSubcategoryId && sanitizedCategoryId) {
       if (!subcategory) {
-        console.log('❌ [PRODUTO CREATE] Subcategoria não encontrada:', subcategoryId);
+        console.log('❌ [PRODUTO CREATE] Subcategoria não encontrada:', sanitizedSubcategoryId);
         return res.status(400).json({
           error: 'Subcategoria inválida',
           message: 'Subcategoria não encontrada',
         });
       }
 
-      if (subcategory.categoryId !== categoryId) {
+      if (subcategory.categoryId !== sanitizedCategoryId) {
         console.log('❌ [PRODUTO CREATE] Subcategoria não pertence à categoria:', {
           subcategoryId: subcategory.id,
           subcategoryCategoryId: subcategory.categoryId,
-          categoryId
+          categoryId: sanitizedCategoryId
         });
         return res.status(400).json({
           error: 'Subcategoria inválida',
@@ -410,19 +421,19 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
         existingProductId: existingProduct.id,
         existingProductName: existingProduct.name,
         currentStock: existingProduct.stock,
-        addingStock: stock,
-        newStock: existingProduct.stock + stock
+        addingStock: sanitizedStock,
+        newStock: existingProduct.stock + sanitizedStock
       });
       // Se produto já existe, adicionar ao estoque existente
-      const newStock = existingProduct.stock + stock;
+      const newStock = existingProduct.stock + sanitizedStock;
       
       const updatedProduct = await prisma.product.update({
         where: { id: existingProduct.id },
         data: {
           stock: newStock,
-          stockLoja: initialLocation === 'LOJA' ? (existingProduct.stockLoja || 0) + stock : existingProduct.stockLoja,
-          stockArmazem: initialLocation === 'ARMAZEM' ? (existingProduct.stockArmazem || 0) + stock : existingProduct.stockArmazem,
-          price, // Atualizar preço também
+          stockLoja: initialLocation === 'LOJA' ? (existingProduct.stockLoja || 0) + sanitizedStock : existingProduct.stockLoja,
+          stockArmazem: initialLocation === 'ARMAZEM' ? (existingProduct.stockArmazem || 0) + sanitizedStock : existingProduct.stockArmazem,
+          price: sanitizedPrice, // Atualizar preço também
           description: description || existingProduct.description, // Manter descrição existente se não informada
         },
         include: {
@@ -434,12 +445,12 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
       });
 
       // Registrar movimentação de entrada de estoque
-      if (stock > 0) {
+      if (sanitizedStock > 0) {
         await prisma.stockMovement.create({
           data: {
             productId: existingProduct.id,
             type: 'ENTRY',
-            quantity: stock,
+            quantity: sanitizedStock,
             reason: 'Adição de estoque via criação de produto',
             location: initialLocation || 'LOJA', // Usar localização escolhida
             userId: req.user!.id,
@@ -452,7 +463,7 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
       return res.status(200).json({
         ...updatedProduct,
         message: `Estoque adicionado ao produto existente. Novo estoque: ${newStock}`,
-        stockAdded: stock,
+        stockAdded: sanitizedStock,
       });
     }
 
@@ -461,15 +472,15 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
     console.log('📱 [PRODUTO CREATE] QR Code gerado');
 
     const createData: any = {
-        name,
-        categoryId,
-      subcategoryId,
+        name: sanitizedName,
+        categoryId: sanitizedCategoryId,
+      subcategoryId: sanitizedSubcategoryId,
         sizeId,
-        patternId,
-        price,
-        stock,
-        stockLoja: initialLocation === 'LOJA' ? stock : 0,
-        stockArmazem: initialLocation === 'ARMAZEM' ? stock : 0,
+        patternId: sanitizedPatternId,
+        price: sanitizedPrice,
+        stock: sanitizedStock,
+        stockLoja: initialLocation === 'LOJA' ? sanitizedStock : 0,
+        stockArmazem: initialLocation === 'ARMAZEM' ? sanitizedStock : 0,
         barcode,
         qrcodeUrl,
         description,
