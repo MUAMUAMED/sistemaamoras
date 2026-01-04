@@ -322,6 +322,15 @@ router.post('/', authenticateToken, uploadProductImage.array('images', 6), async
       });
     }
 
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      console.log('❌ [PRODUTO CREATE] Foto obrigatória faltando');
+      return res.status(400).json({
+        error: 'Dados obrigatórios',
+        message: 'Pelo menos uma foto é obrigatória',
+      });
+    }
+
     // Buscar categoria, subcategoria (se informada), tamanho e estampa para gerar código de barras
     const categoryPromise = categoryId ? prisma.category.findUnique({ where: { id: categoryId } }) : Promise.resolve(null);
     const subcategoryPromise = subcategoryId ? prisma.subcategory.findUnique({ where: { id: subcategoryId } }) : Promise.resolve(null);
