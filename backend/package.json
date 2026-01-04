@@ -10,7 +10,8 @@
     "start:prod": "NODE_ENV=production node dist/index.js",
     "migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "ts-node src/scripts/seed.ts"
