@@ -223,37 +223,51 @@ const Products: React.FC = () => {
     const selectedSize = sizes.find(s => s.id === data.sizeId);
     console.log('🔍 [FRONTEND CREATE] Tamanho selecionado:', selectedSize);
     
-    // Montar o payload com size e sizeCode (sem o arquivo de imagem)
-    const { imageFile, imageFilesRoupa, imageFilesIA, ...productData } = data;
-    const payload = {
-      ...productData,
-      size: selectedSize ? selectedSize.name : '',
-      sizeCode: selectedSize ? selectedSize.code : '',
-    };
+    // Create FormData
+    const formData = new FormData();
+    formData.append('name', data.name);
+    formData.append('description', data.description || '');
+    formData.append('price', data.price.toString());
+    if (data.cost) formData.append('cost', data.cost.toString());
+    formData.append('stock', data.stock.toString());
+    formData.append('minStock', data.minStock.toString());
     
-    console.log('📤 [FRONTEND CREATE] Payload que será enviado para API:', payload);
+    if (data.categoryId) formData.append('categoryId', data.categoryId);
+    if (data.subcategoryId) formData.append('subcategoryId', data.subcategoryId);
+    formData.append('sizeId', data.sizeId);
+    if (data.patternId) formData.append('patternId', data.patternId);
+    
+    formData.append('size', selectedSize ? selectedSize.name : '');
+    formData.append('sizeCode', selectedSize ? selectedSize.code : '');
+    
+    // Handle images
+    // Backend expects 'files' for all images
+    
+    // Add imageFilesRoupa (priority)
+    if (data.imageFilesRoupa && data.imageFilesRoupa.length > 0) {
+      data.imageFilesRoupa.forEach((file) => {
+        formData.append('files', file);
+      });
+    } 
+    // Add single imageFile if no multiple images
+    else if (data.imageFile) {
+      formData.append('files', data.imageFile);
+    }
+    
+    // Add imageFilesIA if any (append to same 'files' array)
+    if (data.imageFilesIA && data.imageFilesIA.length > 0) {
+       data.imageFilesIA.forEach((file) => {
+        formData.append('files', file);
+      });
+    }
+
+    console.log('📤 [FRONTEND CREATE] FormData preparado para envio');
     
     try {
-      // Criar o produto primeiro
+      // Criar o produto (agora envia tudo, incluindo imagens)
       console.log('🚀 [FRONTEND CREATE] Enviando requisição para criar produto...');
-      const createdProduct = await productsApi.create(payload);
+      const createdProduct = await productsApi.create(formData);
       console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
-      
-      // Se há uma imagem, fazer o upload (compatibilidade)
-      if (imageFile) {
-        console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
-        await productsApi.uploadImage(createdProduct.id, imageFile);
-        console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
-      }
-      // Upload de múltiplas imagens por tipo
-      if (imageFilesRoupa && imageFilesRoupa.length > 0) {
-        console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
-      }
-      if (imageFilesIA && imageFilesIA.length > 0) {
-        console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
-      }
       
       // Atualizar a lista de produtos
       queryClient.invalidateQueries({ queryKey: ['products'] });
