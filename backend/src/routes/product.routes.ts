@@ -286,7 +286,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
  *       201:
  *         description: Produto criado com sucesso
  */
-router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+router.post('/', authenticateToken, uploadProductImage.array('images', 6), async (req: AuthenticatedRequest, res, next) => {
   try {
     const {
       name,
