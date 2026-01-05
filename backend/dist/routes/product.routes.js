@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const fs_1 = __importDefault(require("fs"));
 const qrcode_1 = __importDefault(require("qrcode"));
 const database_1 = require("../config/database");
 const auth_1 = require("../middleware/auth");
@@ -119,6 +120,14 @@ router.get('/', auth_1.authenticateToken, async (req, res, next) => {
             images: imagesByProduct[p.id] || [],
         }));
         console.log(`🎯 [PRODUCT LIST] Retornando ${products.length} produtos com imagens`);
+        if (products.length > 0) {
+            const sample = products.slice(0, 3);
+            sample.forEach(p => {
+                if (p.images && p.images.length > 0) {
+                    console.log(`🖼️ [BACKEND IMAGE DEBUG] Produto ${p.id} (${p.name}):`, p.images.map((i) => i.url));
+                }
+            });
+        }
         res.json({
             data: products,
             pagination: {
@@ -168,6 +177,9 @@ router.get('/:id', auth_1.authenticateToken, async (req, res, next) => {
             console.warn('⚠️ ProductImage table not found in product details, returning empty images array:', error.message);
         }
         const product = { ...productBase, images };
+        if (images.length > 0) {
+            console.log(`🖼️ [BACKEND IMAGE DEBUG] Detalhes do produto ${id}:`, images.map((i) => i.url));
+        }
         return res.json(product);
     }
     catch (error) {
@@ -285,23 +297,17 @@ router.post('/', auth_1.authenticateToken, upload_1.uploadProductImage.array('fi
                 });
             }
         }
-        const categoryCode = category?.code || '00';
-        const patternCode = pattern?.code || '0000';
-        const barcode = generateBarcode(size.code, categoryCode, subcategory?.code || null, patternCode);
-        console.log('🏷️ [PRODUTO CREATE] Código de barras gerado:', {
-            sizeCode: size.code,
-            categoryCode,
-            subcategoryCode: subcategory?.code || null,
-            patternCode,
-            barcode
-        });
-        const existingProduct = await database_1.prisma.product.findUnique({
-            where: { barcode },
-            include: {
-                category: true,
-                pattern: true,
-            },
-        });
+        const generateRandomCode = () => {
+            let result = '';
+            for (let i = 0; i < 12; i++) {
+                result += Math.floor(Math.random() * 10);
+            }
+            return result;
+        };
+        const randomCode = generateRandomCode();
+        const finalName = sanitizedName || randomCode;
+        const barcode = randomCode;
+        const existingProduct = null;
         if (existingProduct) {
             console.log('⚠️ [PRODUTO CREATE] Produto já existe, adicionando estoque:', {
                 existingProductId: existingProduct.id,
@@ -351,7 +357,7 @@ router.post('/', auth_1.authenticateToken, upload_1.uploadProductImage.array('fi
         const qrcodeUrl = await generateQRCode(barcode);
         console.log('📱 [PRODUTO CREATE] QR Code gerado');
         const createData = {
-            name: sanitizedName,
+            name: finalName,
             categoryId: category ? category.id : null,
             subcategoryId: subcategory ? subcategory.id : null,
             sizeId,
@@ -364,6 +370,8 @@ router.post('/', auth_1.authenticateToken, upload_1.uploadProductImage.array('fi
             barcode,
             qrcodeUrl,
             description: sanitizedDescription,
+            inProduction: true,
+            status: 'PROCESSANDO',
         };
         console.log('💾 [PRODUTO CREATE] Dados que serão criados:', createData);
         try {
@@ -378,12 +386,15 @@ router.post('/', auth_1.authenticateToken, upload_1.uploadProductImage.array('fi
                 },
             });
             if (files && files.length > 0) {
+                console.log('📸 [PRODUTO CREATE] Salvando imagens:', files.length);
                 const imagesData = files.map((file, index) => ({
                     productId: product.id,
                     url: `/uploads/products/${file.filename}`,
+                    isMain: index === 0,
                     type: client_1.ProductImageType.ROUPA,
                     position: index
                 }));
+                console.log('📸 [PRODUTO CREATE] Dados das imagens:', imagesData);
                 await database_1.prisma.productImage.createMany({
                     data: imagesData
                 });
@@ -456,10 +467,47 @@ router.post('/', auth_1.authenticateToken, upload_1.uploadProductImage.array('fi
         });
     }
 });
-router.put('/:id', auth_1.authenticateToken, async (req, res, next) => {
+router.put('/:id', auth_1.authenticateToken, upload_1.uploadProductImage.array('files', 6), async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name, price, description, active, categoryId, subcategoryId, sizeId, patternId, stock, minStock, cost } = req.body;
+        let { name, price, description, active, categoryId, subcategoryId, sizeId, patternId, stock, minStock, cost } = req.body;
+        const sanitizeId = (val) => {
+            if (val === undefined)
+                return undefined;
+            if (val === null || val === 'null' || val === 'undefined' || val === '')
+                return null;
+            return val;
+        };
+        const parseNumber = (val) => {
+            if (val === undefined)
+                return undefined;
+            if (val === null || val === 'null' || val === 'undefined' || val === '')
+                return null;
+            const strVal = val.toString();
+            const parsed = parseFloat(strVal.replace(',', '.'));
+            return isNaN(parsed) ? undefined : parsed;
+        };
+        const parseIntVal = (val) => {
+            if (val === undefined)
+                return undefined;
+            if (val === null || val === 'null' || val === 'undefined' || val === '')
+                return null;
+            const strVal = val.toString();
+            const parsed = parseInt(strVal, 10);
+            return isNaN(parsed) ? undefined : parsed;
+        };
+        categoryId = sanitizeId(categoryId);
+        subcategoryId = sanitizeId(subcategoryId);
+        sizeId = sanitizeId(sizeId);
+        patternId = sanitizeId(patternId);
+        price = parseNumber(price);
+        cost = parseNumber(cost);
+        stock = parseIntVal(stock);
+        minStock = parseIntVal(minStock);
+        if (active === 'true')
+            active = true;
+        if (active === 'false')
+            active = false;
         console.log('🔍 [PRODUTO UPDATE] Dados recebidos:', {
             id,
             name,
@@ -508,10 +556,10 @@ router.put('/:id', auth_1.authenticateToken, async (req, res, next) => {
                 finalPatternId
             });
             const [category, subcategory, size, pattern] = await Promise.all([
-                database_1.prisma.category.findUnique({ where: { id: finalCategoryId } }),
+                finalCategoryId ? database_1.prisma.category.findUnique({ where: { id: finalCategoryId } }) : null,
                 finalSubcategoryId ? database_1.prisma.subcategory.findUnique({ where: { id: finalSubcategoryId } }) : null,
-                database_1.prisma.size.findUnique({ where: { id: finalSizeId } }),
-                database_1.prisma.pattern.findUnique({ where: { id: finalPatternId } }),
+                finalSizeId ? database_1.prisma.size.findUnique({ where: { id: finalSizeId } }) : null,
+                finalPatternId ? database_1.prisma.pattern.findUnique({ where: { id: finalPatternId } }) : null,
             ]);
             console.log('📋 [PRODUTO UPDATE] Dados encontrados:', {
                 category: category ? { id: category.id, name: category.name, code: category.code } : null,
@@ -519,11 +567,11 @@ router.put('/:id', auth_1.authenticateToken, async (req, res, next) => {
                 size: size ? { id: size.id, name: size.name, code: size.code } : null,
                 pattern: pattern ? { id: pattern.id, name: pattern.name, code: pattern.code } : null
             });
-            if (!category || !size || !pattern) {
-                console.log('❌ [PRODUTO UPDATE] Dados inválidos - categoria, tamanho ou estampa não encontrada');
+            if (!size) {
+                console.log('❌ [PRODUTO UPDATE] Tamanho não encontrado');
                 return res.status(400).json({
-                    error: 'Categoria, tamanho ou estampa inválida',
-                    message: 'Categoria, tamanho ou estampa não encontrada',
+                    error: 'Tamanho inválido',
+                    message: 'Tamanho não encontrado',
                 });
             }
             if (finalSubcategoryId) {
@@ -534,7 +582,7 @@ router.put('/:id', auth_1.authenticateToken, async (req, res, next) => {
                         message: 'Subcategoria não encontrada',
                     });
                 }
-                if (subcategory.categoryId !== finalCategoryId) {
+                if (finalCategoryId && subcategory.categoryId !== finalCategoryId) {
                     console.log('❌ [PRODUTO UPDATE] Subcategoria não pertence à categoria:', {
                         subcategoryId: subcategory.id,
                         subcategoryCategoryId: subcategory.categoryId,
@@ -546,12 +594,14 @@ router.put('/:id', auth_1.authenticateToken, async (req, res, next) => {
                     });
                 }
             }
-            newBarcode = generateBarcode(size.code, category.code, subcategory?.code || null, pattern.code);
+            const categoryCode = category?.code || '00';
+            const patternCode = pattern?.code || '0000';
+            newBarcode = generateBarcode(size.code, categoryCode, subcategory?.code || null, patternCode);
             console.log('🏷️ [PRODUTO UPDATE] Novo código de barras gerado:', {
                 sizeCode: size.code,
-                categoryCode: category.code,
+                categoryCode,
                 subcategoryCode: subcategory?.code || null,
-                patternCode: pattern.code,
+                patternCode,
                 newBarcode
             });
             const existingProduct = await database_1.prisma.product.findFirst({
@@ -564,47 +614,37 @@ router.put('/:id', auth_1.authenticateToken, async (req, res, next) => {
                 console.log('⚠️ [PRODUTO UPDATE] Código de barras já existe em outro produto. Iniciando MERGE...');
                 console.log('🔄 [MERGE] Produto Rascunho:', { id, name: product.name, barcode: product.barcode });
                 console.log('🔄 [MERGE] Produto Destino:', { id: existingProduct.id, name: existingProduct.name, barcode: existingProduct.barcode });
-
-                // 1. Mover imagens do rascunho para o produto existente
                 const draftImages = await database_1.prisma.productImage.findMany({ where: { productId: id } });
                 const existingImagesCount = await database_1.prisma.productImage.count({ where: { productId: existingProduct.id } });
-                
                 console.log(`📸 [MERGE] Movendo ${draftImages.length} imagens...`);
-                
                 for (let i = 0; i < draftImages.length; i++) {
                     await database_1.prisma.productImage.update({
                         where: { id: draftImages[i].id },
-                        data: { 
+                        data: {
                             productId: existingProduct.id,
                             position: existingImagesCount + i
                         }
                     });
                 }
-
-                // 2. Se o produto existente não tiver imagem principal e o rascunho tiver, atualizar
                 if (!existingProduct.imageUrl && product.imageUrl) {
-                     await database_1.prisma.product.update({
+                    await database_1.prisma.product.update({
                         where: { id: existingProduct.id },
                         data: { imageUrl: product.imageUrl }
-                     });
+                    });
                 }
-
-                // 3. Atualizar dados do produto existente com os novos dados do form
                 const mergeUpdateData = {
                     ...(name && { name }),
                     ...(price !== undefined && { price }),
                     ...(cost !== undefined && { cost }),
-                    ...(stock !== undefined && { stock: existingProduct.stock + stock }), // Somar estoque
+                    ...(stock !== undefined && { stock: existingProduct.stock + stock }),
                     ...(minStock !== undefined && { minStock }),
                     ...(description !== undefined && { description }),
                     ...(active !== undefined && { active }),
-                    // Manter IDs de categoria/tamanho/estampa do rascunho (que agora são os corretos)
                     categoryId: finalCategoryId,
                     subcategoryId: finalSubcategoryId,
                     sizeId: finalSizeId,
                     patternId: finalPatternId,
                 };
-
                 const mergedProduct = await database_1.prisma.product.update({
                     where: { id: existingProduct.id },
                     data: mergeUpdateData,
@@ -616,16 +656,34 @@ router.put('/:id', auth_1.authenticateToken, async (req, res, next) => {
                         images: true
                     }
                 });
-
-                // 4. Deletar o produto rascunho
                 console.log('🗑️ [MERGE] Deletando produto rascunho:', id);
                 await database_1.prisma.product.delete({ where: { id } });
-
                 console.log('✅ [MERGE] Merge concluído com sucesso!');
                 return res.json({
                     ...mergedProduct,
                     message: 'Produto mesclado com sucesso ao existente.',
                     merged: true
+                });
+            }
+        }
+        const files = req.files;
+        if (files && files.length > 0) {
+            console.log('📸 [PRODUTO UPDATE] Processando novas imagens:', files.length);
+            const existingImagesCount = await database_1.prisma.productImage.count({ where: { productId: id } });
+            const imagesData = files.map((file, index) => ({
+                productId: id,
+                url: `/uploads/products/${file.filename}`,
+                isMain: existingImagesCount === 0 && index === 0,
+                type: client_1.ProductImageType.ROUPA,
+                position: existingImagesCount + index
+            }));
+            await database_1.prisma.productImage.createMany({
+                data: imagesData
+            });
+            if (!product.imageUrl) {
+                await database_1.prisma.product.update({
+                    where: { id },
+                    data: { imageUrl: `/uploads/products/${files[0].filename}` }
                 });
             }
         }
@@ -732,118 +790,149 @@ router.delete('/:id', auth_1.authenticateToken, async (req, res, next) => {
     try {
         const { id } = req.params;
         const force = req.query.force === 'true';
+        console.log(`🗑️ [PRODUTO DELETE] Iniciando exclusão do produto ${id} (force=${force})`);
         const product = await database_1.prisma.product.findUnique({ where: { id } });
         if (!product) {
+            console.log('❌ [PRODUTO DELETE] Produto não encontrado');
             return res.status(404).json({
                 error: 'Produto não encontrado',
                 message: 'O produto solicitado não foi encontrado',
             });
         }
+        const [salesCount, movementsCount, imagesCount] = await Promise.all([
+            database_1.prisma.saleItem.count({ where: { productId: id } }),
+            database_1.prisma.stockMovement.count({ where: { productId: id } }),
+            database_1.prisma.productImage.count({ where: { productId: id } })
+        ]);
+        console.log('📊 [PRODUTO DELETE] Dependências encontradas:', {
+            sales: salesCount,
+            movements: movementsCount,
+            images: imagesCount
+        });
+        if ((salesCount > 0 || movementsCount > 0) && !force) {
+            console.log('⚠️ [PRODUTO DELETE] Produto tem vínculos, pedindo confirmação');
+            return res.status(409).json({
+                error: 'Produto vinculado',
+                message: 'Este produto está vinculado a vendas ou movimentações. Deseja apagar mesmo assim?',
+                canForce: true
+            });
+        }
         try {
-            await database_1.prisma.product.delete({ where: { id } });
+            await database_1.prisma.$transaction(async (tx) => {
+                if (imagesCount > 0) {
+                    console.log(`🗑️ [PRODUTO DELETE] Deletando ${imagesCount} imagens...`);
+                    await tx.productImage.deleteMany({ where: { productId: id } });
+                }
+                if (movementsCount > 0) {
+                    console.log(`🗑️ [PRODUTO DELETE] Deletando ${movementsCount} movimentações...`);
+                    await tx.stockMovement.deleteMany({ where: { productId: id } });
+                }
+                if (salesCount > 0) {
+                    console.log(`🗑️ [PRODUTO DELETE] Deletando ${salesCount} itens de venda...`);
+                    await tx.saleItem.deleteMany({ where: { productId: id } });
+                }
+                console.log('🗑️ [PRODUTO DELETE] Deletando produto...');
+                await tx.product.delete({ where: { id } });
+            });
+            console.log('✅ [PRODUTO DELETE] Produto excluído com sucesso');
             return res.json({ message: 'Produto excluído com sucesso' });
         }
-        catch (error) {
-            const err = error;
-            if ((err.code === 'P2003' || err.message?.includes('Foreign key constraint failed')) && !force) {
-                return res.status(409).json({
-                    error: 'Produto vinculado',
-                    message: 'Este produto está vinculado a vendas ou movimentações. Deseja apagar mesmo assim?',
-                    canForce: true
-                });
-            }
-            if (force) {
-                await database_1.prisma.stockMovement.deleteMany({ where: { productId: id } });
-                await database_1.prisma.saleItem.deleteMany({ where: { productId: id } });
-                try {
-                    await database_1.prisma.productImage.deleteMany({ where: { productId: id } });
-                } catch (e) { console.log('Erro ao deletar imagens (force):', e.message); }
-                await database_1.prisma.product.delete({ where: { id } });
-                return res.json({ message: 'Produto e vínculos excluídos com sucesso' });
-            }
-            throw error;
+        catch (txError) {
+            console.error('💥 [PRODUTO DELETE] Erro na transação:', txError.message);
+            throw txError;
         }
     }
     catch (error) {
-        const err = error;
-        if (err.code === 'P2003' || err.message?.includes('Foreign key constraint failed')) {
-            return res.status(400).json({
+        console.error('💥 [PRODUTO DELETE] Erro geral:', error.message);
+        if (error.code === 'P2003' || error.message?.includes('Foreign key constraint failed')) {
+            return res.status(409).json({
                 error: 'Produto vinculado',
-                message: 'Não é possível excluir este produto porque ele está vinculado a vendas ou movimentações de estoque.'
+                message: 'Não é possível excluir este produto porque ele está vinculado a outros registros.',
+                canForce: true
             });
         }
         return next(error);
     }
-    return;
 });
-router.post('/:id/image', auth_1.authenticateToken, upload_1.uploadProductImage.single('image'), async (req, res, next) => {
+router.post('/:id/image', auth_1.authenticateToken, upload_1.uploadProductImage.any(), async (req, res, next) => {
     try {
         const { id } = req.params;
-        if (!req.file) {
+        console.log('📸 [PRODUTO IMAGE UPLOAD] Iniciando upload para produto:', id);
+        const files = req.files;
+        if (!files || files.length === 0) {
+            console.log('❌ [PRODUTO IMAGE UPLOAD] Nenhuma imagem recebida');
             return res.status(400).json({
                 error: 'Nenhuma imagem enviada',
-                message: 'É necessário enviar uma imagem',
+                message: 'É necessário enviar pelo menos uma imagem',
             });
         }
+        console.log(`📸 [PRODUTO IMAGE UPLOAD] Recebidos ${files.length} arquivos`);
         const product = await database_1.prisma.product.findUnique({
             where: { id },
         });
         if (!product) {
+            console.log('❌ [PRODUTO IMAGE UPLOAD] Produto não encontrado');
+            files.forEach(f => {
+                try {
+                    fs_1.default.unlinkSync(f.path);
+                }
+                catch (e) { }
+            });
             return res.status(404).json({
                 error: 'Produto não encontrado',
                 message: 'O produto solicitado não foi encontrado',
             });
         }
-        const imageUrl = `/uploads/products/${req.file.filename}`;
         const setAsMain = req.query.main === 'true';
         const typeParam = req.query.type?.toUpperCase();
         const imageType = typeParam === 'IA' ? 'IA' : 'ROUPA';
-        let createdImage = null;
-        try {
-            createdImage = await database_1.prisma.productImage.create({
-                data: {
-                    productId: id,
-                    url: imageUrl,
-                    type: imageType,
-                    position: 0,
-                },
-            });
+        const existingCount = await database_1.prisma.productImage.count({ where: { productId: id } });
+        const createdImages = [];
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const imageUrl = `/uploads/products/${file.filename}`;
+            const isFirst = i === 0;
+            try {
+                const newImage = await database_1.prisma.productImage.create({
+                    data: {
+                        productId: id,
+                        url: imageUrl,
+                        type: imageType,
+                        position: existingCount + i,
+                        isMain: (existingCount === 0 && isFirst) || (setAsMain && isFirst)
+                    }
+                });
+                createdImages.push(newImage);
+                if ((existingCount === 0 && isFirst) || (setAsMain && isFirst)) {
+                    await database_1.prisma.product.update({
+                        where: { id },
+                        data: { imageUrl }
+                    });
+                }
+            }
+            catch (error) {
+                console.error('❌ [PRODUTO IMAGE UPLOAD] Erro ao salvar imagem no banco:', error.message);
+            }
         }
-        catch (error) {
-            console.warn('⚠️ ProductImage table not found, skipping image record creation:', error.message);
-        }
-        let updatedProduct = null;
-        if (setAsMain) {
-            updatedProduct = await database_1.prisma.product.update({
-                where: { id },
-                data: { imageUrl },
-                include: { category: true, pattern: true },
-            });
-        }
-        else {
-            updatedProduct = await database_1.prisma.product.findUnique({
-                where: { id },
-                include: { category: true, pattern: true },
-            });
-        }
-        let images = [];
-        try {
-            images = await database_1.prisma.productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
-        }
-        catch (error) {
-            console.warn('⚠️ ProductImage table not found, returning empty images array:', error.message);
-        }
+        const allImages = await database_1.prisma.productImage.findMany({
+            where: { productId: id },
+            orderBy: { position: 'asc' }
+        });
+        const updatedProduct = await database_1.prisma.product.findUnique({
+            where: { id },
+            include: { category: true, pattern: true },
+        });
         return res.json({
-            message: 'Imagem carregada com sucesso',
-            product: { ...updatedProduct, images },
-            image: createdImage,
-            imageUrl,
+            message: 'Imagens carregadas com sucesso',
+            product: { ...updatedProduct, images: allImages },
+            images: createdImages,
+            count: createdImages.length
         });
     }
     catch (error) {
+        console.error('💥 [PRODUTO IMAGE UPLOAD] Erro fatal:', error);
         return next(error);
     }
-    return;
 });
 router.get('/:id/images', auth_1.authenticateToken, async (req, res, next) => {
     try {

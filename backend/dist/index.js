@@ -9,7 +9,7 @@ const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const cors_1 = __importDefault(require("cors"));
 const fs_1 = __importDefault(require("fs"));
-const path = require("path");
+const path_1 = __importDefault(require("path"));
 const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const swagger_jsdoc_1 = __importDefault(require("swagger-jsdoc"));
 const logger_1 = require("./config/logger");
@@ -35,12 +35,10 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const notFoundHandler_1 = require("./middleware/notFoundHandler");
 dotenv_1.default.config();
 const env_1 = require("./config/env");
-const uploadBase = path.join(__dirname, '../uploads');
-console.log('📂 [SERVER] Base de uploads:', uploadBase);
 const uploadDirs = [
-    uploadBase,
-    path.join(uploadBase, 'products'),
-    path.join(uploadBase, 'avatars')
+    'uploads',
+    'uploads/products',
+    'uploads/avatars'
 ];
 uploadDirs.forEach(dir => {
     if (!fs_1.default.existsSync(dir)) {
@@ -55,6 +53,17 @@ uploadDirs.forEach(dir => {
 });
 const app = (0, express_1.default)();
 const PORT = env_1.env.PORT;
+const uploadsPath = path_1.default.resolve(__dirname, '../uploads');
+console.log('📂 [SERVER] Servindo uploads de:', uploadsPath);
+if (fs_1.default.existsSync(uploadsPath)) {
+    console.log('✅ [SERVER] Pasta uploads encontrada');
+    const files = fs_1.default.readdirSync(uploadsPath);
+    console.log('📂 [SERVER] Conteúdo raiz de uploads:', files);
+}
+else {
+    console.error('❌ [SERVER] Pasta uploads NÃO encontrada em:', uploadsPath);
+}
+app.use('/uploads', express_1.default.static(uploadsPath));
 const allowedOrigins = env_1.env.CORS_ORIGINS
     ? env_1.env.CORS_ORIGINS.split(",").map(origin => origin.trim())
     : env_1.env.NODE_ENV === 'development'
@@ -134,7 +143,7 @@ const limiter = (0, express_rate_limit_1.default)({
 app.use("/api", limiter);
 app.use(express_1.default.json({ limit: "10mb" }));
 app.use(express_1.default.urlencoded({ extended: true, limit: "10mb" }));
-app.use("/uploads", express_1.default.static(uploadBase));
+app.use("/uploads", express_1.default.static("uploads"));
 app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(specs));
 app.get("/health", (req, res) => {
     res.status(200).json({
