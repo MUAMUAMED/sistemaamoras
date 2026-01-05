@@ -173,6 +173,16 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
     console.log(`🎯 [PRODUCT LIST] Retornando ${products.length} produtos com imagens`);
     
+    // Debug de URLs de imagens
+    if (products.length > 0) {
+      const sample = products.slice(0, 3);
+      sample.forEach(p => {
+        if (p.images && p.images.length > 0) {
+          console.log(`🖼️ [BACKEND IMAGE DEBUG] Produto ${p.id} (${p.name}):`, p.images.map((i: any) => i.url));
+        }
+      });
+    }
+
     res.json({
       data: products,
       pagination: {
