@@ -66,6 +66,10 @@ uploadDirs.forEach(dir => {
 const app: Application = express();
 const PORT = env.PORT;
 
+// Servir arquivos estáticos da pasta uploads
+// A rota /uploads acessará a pasta física uploads na raiz do projeto
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+
 // === ORIGENS PERMITIDAS ===
 // Lê de variável de ambiente ou usa padrões
 const allowedOrigins: string[] = env.CORS_ORIGINS
