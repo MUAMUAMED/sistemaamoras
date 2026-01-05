@@ -741,6 +741,23 @@ const Products: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {productsData.data.map((product: Product) => {
                       const stockStatus = getStockStatus(product);
+                      
+                      // Debug de imagens do produto
+                      if (product.images && product.images.length > 0) {
+                        console.log(`🖼️ [PRODUCT IMAGE DEBUG] Produto ${product.id} (${product.name}):`, {
+                          images: product.images,
+                          firstImageUrl: product.images[0].url,
+                          processedUrl: getImageUrl(product.images[0].url)
+                        });
+                      } else if (product.imageUrl) {
+                        console.log(`🖼️ [PRODUCT IMAGE DEBUG] Produto ${product.id} (${product.name}):`, {
+                          imageUrl: product.imageUrl,
+                          processedUrl: getImageUrl(product.imageUrl)
+                        });
+                      } else {
+                        // console.log(`⚠️ [PRODUCT IMAGE DEBUG] Produto ${product.id} (${product.name}): SEM IMAGEM`);
+                      }
+
                       return (
                         <div key={product.id} className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden group card-hover animate-fade-in-up">
                           {/* Imagem do Produto */}
