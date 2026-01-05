@@ -68,7 +68,17 @@ const PORT = env.PORT;
 
 // Servir arquivos estáticos da pasta uploads
 // A rota /uploads acessará a pasta física uploads na raiz do projeto
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+const uploadsPath = path.resolve(__dirname, '../uploads');
+console.log('📂 [SERVER] Servindo uploads de:', uploadsPath);
+if (fs.existsSync(uploadsPath)) {
+  console.log('✅ [SERVER] Pasta uploads encontrada');
+  const files = fs.readdirSync(uploadsPath);
+  console.log('📂 [SERVER] Conteúdo raiz de uploads:', files);
+} else {
+  console.error('❌ [SERVER] Pasta uploads NÃO encontrada em:', uploadsPath);
+}
+
+app.use('/uploads', express.static(uploadsPath));
 
 // === ORIGENS PERMITIDAS ===
 // Lê de variável de ambiente ou usa padrões
