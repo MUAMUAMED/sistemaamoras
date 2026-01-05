@@ -245,6 +245,11 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
     }
     
     const product = { ...productBase, images } as any;
+    
+    if (images.length > 0) {
+        console.log(`🖼️ [BACKEND IMAGE DEBUG] Detalhes do produto ${id}:`, images.map((i: any) => i.url));
+    }
+
     return res.json(product);
   } catch (error) {
     return next(error);
