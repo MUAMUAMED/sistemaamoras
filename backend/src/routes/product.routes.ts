@@ -871,14 +871,71 @@ router.put('/:id', authenticateToken, uploadProductImage.array('files', 6), asyn
       });
 
       if (existingProduct) {
-        console.log('❌ [PRODUTO UPDATE] Código de barras já existe em outro produto:', {
-          newBarcode,
-          existingProductId: existingProduct.id,
-          existingProductName: existingProduct.name
+        console.log('⚠️ [PRODUTO UPDATE] Código de barras já existe em outro produto. Iniciando MERGE...');
+        console.log('🔄 [MERGE] Produto Rascunho:', { id, name: product.name, barcode: product.barcode });
+        console.log('🔄 [MERGE] Produto Destino:', { id: existingProduct.id, name: existingProduct.name, barcode: existingProduct.barcode });
+
+        // 1. Mover imagens do rascunho para o produto existente
+        const draftImages = await prisma.productImage.findMany({ where: { productId: id } });
+        const existingImagesCount = await prisma.productImage.count({ where: { productId: existingProduct.id } });
+        
+        console.log(`📸 [MERGE] Movendo ${draftImages.length} imagens...`);
+        
+        for (let i = 0; i < draftImages.length; i++) {
+            await prisma.productImage.update({
+                where: { id: draftImages[i].id },
+                data: { 
+                    productId: existingProduct.id,
+                    position: existingImagesCount + i
+                }
+            });
+        }
+
+        // 2. Se o produto existente não tiver imagem principal e o rascunho tiver, atualizar
+        if (!existingProduct.imageUrl && product.imageUrl) {
+             await prisma.product.update({
+                where: { id: existingProduct.id },
+                data: { imageUrl: product.imageUrl }
+             });
+        }
+
+        // 3. Atualizar dados do produto existente com os novos dados do form
+        const mergeUpdateData = {
+            ...(name && { name }),
+            ...(price !== undefined && { price }),
+            ...(cost !== undefined && { cost }),
+            ...(stock !== undefined && { stock: existingProduct.stock + stock }), // Somar estoque
+            ...(minStock !== undefined && { minStock }),
+            ...(description !== undefined && { description }),
+            ...(active !== undefined && { active }),
+            // Manter IDs de categoria/tamanho/estampa do rascunho (que agora são os corretos)
+            categoryId: finalCategoryId,
+            subcategoryId: finalSubcategoryId,
+            sizeId: finalSizeId,
+            patternId: finalPatternId,
+        };
+
+        const mergedProduct = await prisma.product.update({
+            where: { id: existingProduct.id },
+            data: mergeUpdateData,
+            include: {
+                category: true,
+                subcategory: true,
+                size: true,
+                pattern: true,
+                images: true
+            }
         });
-        return res.status(400).json({
-          error: 'Código de barras já existe',
-          message: 'Um produto com essas características já existe. Por favor, adicione estoque ao produto existente em vez de criar um novo.',
+
+        // 4. Deletar o produto rascunho
+        console.log('🗑️ [MERGE] Deletando produto rascunho:', id);
+        await prisma.product.delete({ where: { id } });
+
+        console.log('✅ [MERGE] Merge concluído com sucesso!');
+        return res.json({
+            ...mergedProduct,
+            message: 'Produto mesclado com sucesso ao existente.',
+            merged: true
         });
       }
     }
