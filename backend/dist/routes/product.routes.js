@@ -898,8 +898,7 @@ router.post('/:id/image', auth_1.authenticateToken, upload_1.uploadProductImage.
                         productId: id,
                         url: imageUrl,
                         type: imageType,
-                        position: existingCount + i,
-                        isMain: (existingCount === 0 && isFirst) || (setAsMain && isFirst)
+                        position: existingCount + i
                     }
                 });
                 createdImages.push(newImage);

@@ -1323,8 +1323,8 @@ router.post('/:id/image', authenticateToken, uploadProductImage.any(), async (re
                     productId: id,
                     url: imageUrl,
                     type: imageType as any,
-                    position: existingCount + i,
-                    isMain: (existingCount === 0 && isFirst) || (setAsMain && isFirst) // Define como main se for a primeira do produto ou se solicitado
+                    position: existingCount + i
+                    // isMain: (existingCount === 0 && isFirst) || (setAsMain && isFirst) // Define como main se for a primeira do produto ou se solicitado
                 }
             });
             createdImages.push(newImage);
