@@ -13,9 +13,13 @@ export const getImageUrl = (url: string | null | undefined): string => {
     // console.log('✅ [IMAGE DEBUG] URL absoluta mantida:', url);
     return url;
   }
+
+  const apiUrl = import.meta.env.REACT_APP_API_URL || import.meta.env.VITE_API_URL || process.env.REACT_APP_API_URL || '';
+  const isApiUrlAbsolute = apiUrl && (apiUrl.startsWith('http://') || apiUrl.startsWith('https://'));
   
-  // Se começa com /, usa URL relativa (mesmo domínio)
-  if (url.startsWith('/')) {
+  // Se começa com /, usa URL relativa (mesmo domínio) APENAS SE a API não for absoluta
+  // Se a API for absoluta (ex: http://backend:3000), queremos montar a URL completa
+  if (url.startsWith('/') && !isApiUrlAbsolute) {
     // console.log('✅ [IMAGE DEBUG] URL relativa mantida:', url);
     return url;
   }
