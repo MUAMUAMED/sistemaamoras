@@ -429,21 +429,30 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
       }
     }
 
-    // Gerar código de barras
-    // Usar '00' para categoria e '0000' para estampa se não informados
+    // Gerar código aleatório de 12 dígitos para nome e barcode
+    // Isso garante que sempre será criado um novo produto, evitando o fluxo de "produto já existe"
+    const generateRandomCode = () => {
+      let result = '';
+      for (let i = 0; i < 12; i++) {
+        result += Math.floor(Math.random() * 10);
+      }
+      return result;
+    };
+
+    const randomCode = generateRandomCode();
+    // Usar o código aleatório como nome e barcode
+    const finalName = sanitizedName || randomCode;
+    const barcode = randomCode; // Ignorar a geração baseada em atributos
+    
+    // Ignorar busca por produto existente já que o barcode é aleatório e único
+    const existingProduct = null;
+
+    /* 
+    // Lógica antiga de geração de barcode baseada em atributos (desativada temporariamente)
     const categoryCode = category?.code || '00';
     const patternCode = pattern?.code || '0000';
     const barcode = generateBarcode(size.code, categoryCode, subcategory?.code || null, patternCode);
     
-    console.log('🏷️ [PRODUTO CREATE] Código de barras gerado:', {
-      sizeCode: size.code,
-      categoryCode,
-      subcategoryCode: subcategory?.code || null,
-      patternCode,
-      barcode
-    });
-
-    // Verificar se código de barras já existe
     const existingProduct = await prisma.product.findUnique({
       where: { barcode },
       include: {
@@ -451,6 +460,7 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
         pattern: true,
       },
     });
+    */
 
     if (existingProduct) {
       console.log('⚠️ [PRODUTO CREATE] Produto já existe, adicionando estoque:', {
@@ -509,7 +519,7 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
     console.log('📱 [PRODUTO CREATE] QR Code gerado');
 
     const createData: any = {
-        name: sanitizedName,
+        name: finalName,
         // Usar IDs validados (null se não encontrado ou inválido) para evitar erro de Foreign Key
         categoryId: category ? category.id : null,
         subcategoryId: subcategory ? subcategory.id : null,
@@ -523,8 +533,8 @@ router.post('/', authenticateToken, uploadProductImage.array('files', 6), async 
         barcode,
         qrcodeUrl,
         description: sanitizedDescription,
-        // inProduction: true, // Temporariamente removido até migration ser aplicada
-        // status: 'PROCESSANDO', // Produtos começam sempre como PROCESSANDO (será adicionado após migration)
+        inProduction: true, // Produto recém criado está em produção
+        status: 'PROCESSANDO', // Status inicial de produto incompleto
     };
 
     console.log('💾 [PRODUTO CREATE] Dados que serão criados:', createData);
