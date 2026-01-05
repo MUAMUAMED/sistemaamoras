@@ -223,14 +223,20 @@ const Products: React.FC = () => {
     const selectedSize = sizes.find(s => s.id === data.sizeId);
     console.log('🔍 [FRONTEND CREATE] Tamanho selecionado:', selectedSize);
     
+    // Auto-fill optional fields for backend compatibility
+    const finalName = data.name.trim() || (selectedSize ? `Produto ${selectedSize.name}` : 'Novo Produto');
+    const finalPrice = data.price || 0;
+    const finalStock = data.stock || 0;
+    const finalMinStock = data.minStock || 0;
+    
     // Create FormData
     const formData = new FormData();
-    formData.append('name', data.name);
+    formData.append('name', finalName);
     formData.append('description', data.description || '');
-    formData.append('price', data.price.toString());
+    formData.append('price', finalPrice.toString());
     if (data.cost) formData.append('cost', data.cost.toString());
-    formData.append('stock', data.stock.toString());
-    formData.append('minStock', data.minStock.toString());
+    formData.append('stock', finalStock.toString());
+    formData.append('minStock', finalMinStock.toString());
     
     if (data.categoryId) formData.append('categoryId', data.categoryId);
     if (data.subcategoryId) formData.append('subcategoryId', data.subcategoryId);
@@ -294,20 +300,26 @@ const Products: React.FC = () => {
         const updatedProduct = await productsApi.update(selectedProduct.id, productData);
         console.log('✅ [FRONTEND UPDATE] Produto atualizado com sucesso:', updatedProduct);
         
-        // Se há uma nova imagem, fazer o upload (compatibilidade)
+        // Se o ID mudou (merge), avisar o usuário
+        if (updatedProduct.id !== selectedProduct.id) {
+            console.log(`🔄 [FRONTEND UPDATE] ID mudou de ${selectedProduct.id} para ${updatedProduct.id} (Merge detectado)`);
+            toast.success('Produto mesclado com existente!');
+        }
+
+        // Se há uma nova imagem, fazer o upload (usando o ID atualizado)
         if (imageFile) {
           console.log('📷 [FRONTEND UPDATE] Fazendo upload de nova imagem...');
-          await productsApi.uploadImage(selectedProduct.id, imageFile);
+          await productsApi.uploadImage(updatedProduct.id, imageFile);
           console.log('✅ [FRONTEND UPDATE] Imagem atualizada com sucesso');
         }
-        // Upload de múltiplas imagens por tipo
+        // Upload de múltiplas imagens por tipo (usando o ID atualizado)
         if (imageFilesRoupa && (imageFilesRoupa as File[]).length > 0) {
           console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', (imageFilesRoupa as File[]).length);
-          await productsApi.uploadImages(selectedProduct.id, imageFilesRoupa as File[], 'ROUPA');
+          await productsApi.uploadImages(updatedProduct.id, imageFilesRoupa as File[], 'ROUPA');
         }
         if (imageFilesIA && (imageFilesIA as File[]).length > 0) {
           console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', (imageFilesIA as File[]).length);
-          await productsApi.uploadImages(selectedProduct.id, imageFilesIA as File[], 'IA');
+          await productsApi.uploadImages(updatedProduct.id, imageFilesIA as File[], 'IA');
         }
         
         // Atualizar a lista de produtos
