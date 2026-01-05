@@ -1134,49 +1134,92 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
     const force = req.query.force === 'true';
+    
+    console.log(`🗑️ [PRODUTO DELETE] Iniciando exclusão do produto ${id} (force=${force})`);
+
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) {
+      console.log('❌ [PRODUTO DELETE] Produto não encontrado');
       return res.status(404).json({
         error: 'Produto não encontrado',
         message: 'O produto solicitado não foi encontrado',
       });
     }
-    try {
-      await prisma.product.delete({ where: { id } });
-      return res.json({ message: 'Produto excluído com sucesso' });
-    } catch (error) {
-      const err = error as any;
-      // Se for erro de integridade e não for forçado, retorna mensagem de confirmação
-      if ((err.code === 'P2003' || err.message?.includes('Foreign key constraint failed')) && !force) {
-        return res.status(409).json({
-          error: 'Produto vinculado',
-          message: 'Este produto está vinculado a vendas ou movimentações. Deseja apagar mesmo assim?',
-          canForce: true
-        });
-      }
-      // Se for forçado, apaga os vínculos e depois o produto
-      if (force) {
-        // Apaga movimentações de estoque
-        await prisma.stockMovement.deleteMany({ where: { productId: id } });
-        // Apaga itens de venda
-        await prisma.saleItem.deleteMany({ where: { productId: id } });
-        // Agora apaga o produto
-        await prisma.product.delete({ where: { id } });
-        return res.json({ message: 'Produto e vínculos excluídos com sucesso' });
-      }
-      throw error;
-    }
-  } catch (error) {
-    const err = error as any;
-    if (err.code === 'P2003' || err.message?.includes('Foreign key constraint failed')) {
-      return res.status(400).json({
+
+    // Verificar dependências antes de tentar deletar
+    const [salesCount, movementsCount, imagesCount] = await Promise.all([
+      prisma.saleItem.count({ where: { productId: id } }),
+      prisma.stockMovement.count({ where: { productId: id } }),
+      prisma.productImage.count({ where: { productId: id } })
+    ]);
+
+    console.log('📊 [PRODUTO DELETE] Dependências encontradas:', {
+      sales: salesCount,
+      movements: movementsCount,
+      images: imagesCount
+    });
+
+    // Se houver vínculos críticos (vendas/movimentações) e não for forçado, pedir confirmação
+    if ((salesCount > 0 || movementsCount > 0) && !force) {
+      console.log('⚠️ [PRODUTO DELETE] Produto tem vínculos, pedindo confirmação');
+      return res.status(409).json({
         error: 'Produto vinculado',
-        message: 'Não é possível excluir este produto porque ele está vinculado a vendas ou movimentações de estoque.'
+        message: 'Este produto está vinculado a vendas ou movimentações. Deseja apagar mesmo assim?',
+        canForce: true
       });
     }
+
+    // Executar exclusão em transação
+    try {
+      await prisma.$transaction(async (tx) => {
+        // 1. Deletar imagens (sempre seguro deletar pois são parte do produto)
+        if (imagesCount > 0) {
+          console.log(`🗑️ [PRODUTO DELETE] Deletando ${imagesCount} imagens...`);
+          await tx.productImage.deleteMany({ where: { productId: id } });
+        }
+
+        // 2. Deletar movimentações se forçado ou se não houver (mas o código acima já valida)
+        if (movementsCount > 0) {
+          console.log(`🗑️ [PRODUTO DELETE] Deletando ${movementsCount} movimentações...`);
+          await tx.stockMovement.deleteMany({ where: { productId: id } });
+        }
+
+        // 3. Deletar itens de venda se forçado
+        if (salesCount > 0) {
+          console.log(`🗑️ [PRODUTO DELETE] Deletando ${salesCount} itens de venda...`);
+          await tx.saleItem.deleteMany({ where: { productId: id } });
+        }
+
+        // 4. Deletar o produto
+        console.log('🗑️ [PRODUTO DELETE] Deletando produto...');
+        await tx.product.delete({ where: { id } });
+        
+        // Tentar remover arquivos de imagem do disco (opcional, não falha a transação se der erro)
+        // TODO: Implementar limpeza de arquivos físicos
+      });
+
+      console.log('✅ [PRODUTO DELETE] Produto excluído com sucesso');
+      return res.json({ message: 'Produto excluído com sucesso' });
+
+    } catch (txError: any) {
+      console.error('💥 [PRODUTO DELETE] Erro na transação:', txError.message);
+      throw txError;
+    }
+
+  } catch (error: any) {
+    console.error('💥 [PRODUTO DELETE] Erro geral:', error.message);
+    
+    // Tratamento específico para erro de FK (caso escape da validação anterior)
+    if (error.code === 'P2003' || error.message?.includes('Foreign key constraint failed')) {
+      return res.status(409).json({
+        error: 'Produto vinculado',
+        message: 'Não é possível excluir este produto porque ele está vinculado a outros registros.',
+        canForce: true
+      });
+    }
+    
     return next(error);
   }
-  return;
 });
 
 /**
