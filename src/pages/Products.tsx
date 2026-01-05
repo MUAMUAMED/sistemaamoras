@@ -300,20 +300,26 @@ const Products: React.FC = () => {
         const updatedProduct = await productsApi.update(selectedProduct.id, productData);
         console.log('✅ [FRONTEND UPDATE] Produto atualizado com sucesso:', updatedProduct);
         
-        // Se há uma nova imagem, fazer o upload (compatibilidade)
+        // Se o ID mudou (merge), avisar o usuário
+        if (updatedProduct.id !== selectedProduct.id) {
+            console.log(`🔄 [FRONTEND UPDATE] ID mudou de ${selectedProduct.id} para ${updatedProduct.id} (Merge detectado)`);
+            toast.success('Produto mesclado com existente!');
+        }
+
+        // Se há uma nova imagem, fazer o upload (usando o ID atualizado)
         if (imageFile) {
           console.log('📷 [FRONTEND UPDATE] Fazendo upload de nova imagem...');
-          await productsApi.uploadImage(selectedProduct.id, imageFile);
+          await productsApi.uploadImage(updatedProduct.id, imageFile);
           console.log('✅ [FRONTEND UPDATE] Imagem atualizada com sucesso');
         }
-        // Upload de múltiplas imagens por tipo
+        // Upload de múltiplas imagens por tipo (usando o ID atualizado)
         if (imageFilesRoupa && (imageFilesRoupa as File[]).length > 0) {
           console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', (imageFilesRoupa as File[]).length);
-          await productsApi.uploadImages(selectedProduct.id, imageFilesRoupa as File[], 'ROUPA');
+          await productsApi.uploadImages(updatedProduct.id, imageFilesRoupa as File[], 'ROUPA');
         }
         if (imageFilesIA && (imageFilesIA as File[]).length > 0) {
           console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', (imageFilesIA as File[]).length);
-          await productsApi.uploadImages(selectedProduct.id, imageFilesIA as File[], 'IA');
+          await productsApi.uploadImages(updatedProduct.id, imageFilesIA as File[], 'IA');
         }
         
         // Atualizar a lista de produtos
