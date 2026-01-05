@@ -878,7 +878,7 @@ router.put('/:id', authenticateToken, uploadProductImage.array('files', 6), asyn
         });
         return res.status(400).json({
           error: 'Código de barras já existe',
-          message: 'Já existe um produto com essa combinação de categoria, tamanho e estampa',
+          message: 'Um produto com essas características já existe. Por favor, adicione estoque ao produto existente em vez de criar um novo.',
         });
       }
     }
