@@ -1271,18 +1271,34 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
     }
 
     // Se desejar setar como principal, atualizar campo legacy imageUrl
+    // Para rascunhos, usar include opcional para evitar erros se relações não existirem
     let updatedProduct: any = null;
     if (setAsMain) {
-      updatedProduct = await prisma.product.update({
-        where: { id },
-        data: { imageUrl },
-        include: { category: true, pattern: true },
-      });
+      try {
+        updatedProduct = await prisma.product.update({
+          where: { id },
+          data: { imageUrl },
+          include: { category: true, pattern: true },
+        });
+      } catch (error: any) {
+        // Se falhar por causa de relações opcionais em rascunhos, buscar sem include
+        updatedProduct = await prisma.product.update({
+          where: { id },
+          data: { imageUrl },
+        });
+      }
     } else {
-      updatedProduct = await prisma.product.findUnique({
-        where: { id },
-        include: { category: true, pattern: true },
-      });
+      try {
+        updatedProduct = await prisma.product.findUnique({
+          where: { id },
+          include: { category: true, pattern: true },
+        });
+      } catch (error: any) {
+        // Se falhar por causa de relações opcionais em rascunhos, buscar sem include
+        updatedProduct = await prisma.product.findUnique({
+          where: { id },
+        });
+      }
     }
 
     let images: any[] = [];
