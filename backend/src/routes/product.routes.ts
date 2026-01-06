@@ -1464,7 +1464,7 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
     // Usar apenas arquivos válidos e respeitar o limite
     const filesToProcess: Express.Multer.File[] = validFiles.slice(0, remainingSlots);
 
-    if (filesToProcess.length < files.length) {
+    if (filesToProcess.length < validFiles.length) {
       return res.status(400).json({ 
         error: 'Limite de imagens excedido', 
         message: `Máximo de 6 imagens por produto. Espaços disponíveis: ${remainingSlots}` 
