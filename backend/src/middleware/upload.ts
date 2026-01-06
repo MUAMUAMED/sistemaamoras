@@ -8,7 +8,7 @@ const storage = multer.diskStorage({
     console.log('📁 [MULTER] Salvando arquivo em:', 'uploads/products/');
     cb(null, 'uploads/products/');
   }),
-  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => {
+  filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     // Gerar nome único para o arquivo
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
