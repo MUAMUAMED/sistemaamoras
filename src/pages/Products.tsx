@@ -1163,7 +1163,7 @@ interface ProductFormModalProps {
   subcategories: Subcategory[];
   patterns: Pattern[];
   sizes: Size[];
-  onSubmit: (data: ProductFormData) => void;
+  onSubmit: (data: ProductFormData, saveAsDraft?: boolean) => void;
   onClose: () => void;
   isLoading: boolean;
   setShowCategoryModal: (show: boolean) => void;
@@ -1291,13 +1291,13 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
-    if (validateForm()) {
+    if (saveAsDraft || validateForm()) {
       const submitData: ProductFormData = {
         ...formData,
         subcategoryId: formData.subcategoryId || undefined,
-        price: normalizePrice(formData.price),
+        price: formData.price ? normalizePrice(formData.price) : undefined,
         cost: formData.cost ? normalizePrice(formData.cost) : undefined,
         stock: parseInt(formData.stock) || 0,
         minStock: parseInt(formData.minStock) || 0,
@@ -1305,8 +1305,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         imageFilesRoupa: formData.imageFilesRoupa || [],
         imageFilesIA: formData.imageFilesIA || [],
         initialLocation: formData.initialLocation || 'LOJA', // Padrão para Loja
+        saveAsDraft: saveAsDraft,
       };
-      onSubmit(submitData);
+      onSubmit(submitData, saveAsDraft);
     }
   };
 
@@ -1771,6 +1772,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             )}
             <button
               type="submit"
+              onClick={(e) => handleSubmit(e, false)}
               disabled={isLoading}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
