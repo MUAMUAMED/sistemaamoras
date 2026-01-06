@@ -222,8 +222,9 @@ const Products: React.FC = () => {
     setFilters(prev => ({ ...prev, page }));
   };
 
-  const handleCreateProduct = async (data: ProductFormData) => {
+  const handleCreateProduct = async (data: ProductFormData, saveAsDraft: boolean = false) => {
     console.log('🆕 [FRONTEND CREATE] Dados do formulário recebidos:', data);
+    console.log('📝 [FRONTEND CREATE] saveAsDraft:', saveAsDraft);
     
     // Buscar o objeto do tamanho selecionado
     const selectedSize = sizes.find(s => s.id === data.sizeId);
@@ -235,6 +236,7 @@ const Products: React.FC = () => {
       ...productData,
       size: selectedSize ? selectedSize.name : '',
       sizeCode: selectedSize ? selectedSize.code : '',
+      saveAsDraft: saveAsDraft,
     };
     
     console.log('📤 [FRONTEND CREATE] Payload que será enviado para API:', payload);
@@ -245,30 +247,50 @@ const Products: React.FC = () => {
       const createdProduct = await productsApi.create(payload);
       console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
       
-      // Se há uma imagem, fazer o upload (compatibilidade)
-      if (imageFile) {
-        console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
-        await productsApi.uploadImage(createdProduct.id, imageFile);
-        console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
-      }
-      // Upload de múltiplas imagens por tipo
-      if (imageFilesRoupa && imageFilesRoupa.length > 0) {
-        console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
-      }
-      if (imageFilesIA && imageFilesIA.length > 0) {
-        console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
+      // Upload de imagens apenas se não for rascunho (rascunhos podem não ter produto completo)
+      if (!saveAsDraft) {
+        // Se há uma imagem, fazer o upload (compatibilidade)
+        if (imageFile) {
+          console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
+          await productsApi.uploadImage(createdProduct.id, imageFile);
+          console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
+        }
+        // Upload de múltiplas imagens por tipo
+        if (imageFilesRoupa && imageFilesRoupa.length > 0) {
+          console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
+          await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
+        }
+        if (imageFilesIA && imageFilesIA.length > 0) {
+          console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
+          await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
+        }
+      } else {
+        // Para rascunhos, tentar fazer upload de imagens se houver
+        // Mas não falhar se der erro (rascunhos são parciais)
+        try {
+          if (imageFile) {
+            await productsApi.uploadImage(createdProduct.id, imageFile);
+          }
+          if (imageFilesRoupa && imageFilesRoupa.length > 0) {
+            await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
+          }
+          if (imageFilesIA && imageFilesIA.length > 0) {
+            await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
+          }
+        } catch (imageError: any) {
+          console.warn('⚠️ [FRONTEND CREATE] Erro ao fazer upload de imagens do rascunho (ignorado):', imageError);
+          // Não falhar o processo por causa de imagens em rascunhos
+        }
       }
       
       // Atualizar a lista de produtos
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setShowCreateModal(false);
-      toast.success('Produto criado com sucesso!');
+      toast.success(saveAsDraft ? 'Rascunho salvo com sucesso!' : 'Produto criado com sucesso!');
     } catch (error: any) {
       console.error('💥 [FRONTEND CREATE] Erro ao criar produto:', error);
       console.error('💥 [FRONTEND CREATE] Resposta do servidor:', error.response?.data);
-      toast.error(error.response?.data?.error || 'Erro ao criar produto');
+      toast.error(error.response?.data?.error || (saveAsDraft ? 'Erro ao salvar rascunho' : 'Erro ao criar produto'));
     }
   };
 
