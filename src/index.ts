@@ -196,6 +196,31 @@ app.get('/uploads/test', (req, res) => {
   });
 });
 
+// Rota específica para verificar se um arquivo de imagem existe
+app.get('/uploads/products/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(uploadsPath, 'products', filename);
+  
+  console.log(`🔍 [IMAGE CHECK] Verificando arquivo: ${filePath}`);
+  console.log(`🔍 [IMAGE CHECK] Arquivo existe: ${fs.existsSync(filePath)}`);
+  
+  if (fs.existsSync(filePath)) {
+    const stats = fs.statSync(filePath);
+    console.log(`✅ [IMAGE CHECK] Arquivo encontrado: ${filename}, tamanho: ${stats.size} bytes`);
+    res.sendFile(filePath);
+  } else {
+    console.error(`❌ [IMAGE CHECK] Arquivo não encontrado: ${filePath}`);
+    res.status(404).json({
+      error: 'Arquivo não encontrado',
+      filename,
+      filePath,
+      uploadsPath,
+      productsPath: path.join(uploadsPath, 'products'),
+      exists: fs.existsSync(path.join(uploadsPath, 'products'))
+    });
+  }
+});
+
 // === Swagger ===
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
