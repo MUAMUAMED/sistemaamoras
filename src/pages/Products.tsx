@@ -3519,7 +3519,7 @@ const EntryStockModal: React.FC<EntryStockModalProps> = ({ onClose, onSuccess })
             {/* Lista de produtos encontrados */}
             {searchTerm.length > 2 && productsData?.data && (
               <div className="mt-2 border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
-                {productsData.data.map((product: Product) => (
+                {productsData.data?.map((product: Product) => (
                   <button
                     key={product.id}
                     type="button"
@@ -3775,7 +3775,7 @@ const ExitStockModal: React.FC<ExitStockModalProps> = ({ onClose, onSuccess }) =
             {/* Lista de produtos encontrados */}
             {searchTerm.length > 2 && productsData?.data && (
               <div className="mt-2 border border-gray-200 rounded-lg max-h-40 overflow-y-auto">
-                {productsData.data.map((product: Product) => (
+                {productsData.data?.map((product: Product) => (
                   <button
                     key={product.id}
                     type="button"
