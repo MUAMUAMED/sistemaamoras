@@ -326,20 +326,16 @@ export const productsApi = {
     const formData = new FormData();
     formData.append('image', imageFile);
     
-    const response = await api.post(`/products/${id}/image`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    // NÃO setar Content-Type manualmente - o browser define o boundary automaticamente
+    const response = await api.post(`/products/${id}/image`, formData);
     return response.data;
   },
 
   uploadImages: async (id: string, images: File[], type: 'ROUPA' | 'IA'): Promise<{ message: string }> => {
     const formData = new FormData();
     images.forEach((file) => formData.append('images', file));
-    const response = await api.post(`/products/${id}/images?type=${type}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // NÃO setar Content-Type manualmente - o browser define o boundary automaticamente
+    const response = await api.post(`/products/${id}/images?type=${type}`, formData);
     return response.data;
   },
   
