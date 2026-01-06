@@ -1907,22 +1907,71 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
             <h3 className="text-lg font-semibold text-gray-900 mb-4">{product.name}</h3>
             
             <div className="mb-4 space-y-3">
+              {(() => {
+                console.log(`🖼️ [PRODUCT DETAILS] Produto ${product.id} - Imagens:`, {
+                  imagesCount: product.images?.length || 0,
+                  images: product.images?.map(img => ({ id: img.id, url: img.url, type: img.type, finalUrl: getImageUrl(img.url) })) || []
+                });
+                return null;
+              })()}
               {(product.images && product.images.length > 0) ? (
                 <div>
-                  <p className="text-sm text-gray-700 mb-1">Imagens da Roupa</p>
+                  <p className="text-sm text-gray-700 mb-1">Imagens da Roupa ({product.images.filter(img => img.type === 'ROUPA').length})</p>
                   <div className="grid grid-cols-3 gap-2">
                     {product.images.filter(img => img.type === 'ROUPA').map(img => (
-                      <img key={img.id} src={getImageUrl(img.url)} alt="Imagem Roupa" className="w-full h-24 object-cover rounded" />
+                      <img 
+                        key={img.id} 
+                        src={getImageUrl(img.url)} 
+                        alt="Imagem Roupa" 
+                        className="w-full h-24 object-cover rounded"
+                        onError={(e) => {
+                          console.error(`❌ [PRODUCT DETAILS] Erro ao carregar imagem ROUPA:`, {
+                            productId: product.id,
+                            imageId: img.id,
+                            imageUrl: img.url,
+                            finalUrl: getImageUrl(img.url)
+                          });
+                        }}
+                        onLoad={() => {
+                          console.log(`✅ [PRODUCT DETAILS] Imagem ROUPA carregada:`, {
+                            productId: product.id,
+                            imageId: img.id,
+                            imageUrl: img.url,
+                            finalUrl: getImageUrl(img.url)
+                          });
+                        }}
+                      />
                     ))}
                   </div>
                 </div>
               ) : null}
               {(product.images && product.images.some(img => img.type === 'IA')) ? (
                 <div>
-                  <p className="text-sm text-gray-700 mb-1">Imagens IA</p>
+                  <p className="text-sm text-gray-700 mb-1">Imagens IA ({product.images.filter(img => img.type === 'IA').length})</p>
                   <div className="grid grid-cols-3 gap-2">
                     {product.images.filter(img => img.type === 'IA').map(img => (
-                      <img key={img.id} src={getImageUrl(img.url)} alt="Imagem IA" className="w-full h-24 object-cover rounded" />
+                      <img 
+                        key={img.id} 
+                        src={getImageUrl(img.url)} 
+                        alt="Imagem IA" 
+                        className="w-full h-24 object-cover rounded"
+                        onError={(e) => {
+                          console.error(`❌ [PRODUCT DETAILS] Erro ao carregar imagem IA:`, {
+                            productId: product.id,
+                            imageId: img.id,
+                            imageUrl: img.url,
+                            finalUrl: getImageUrl(img.url)
+                          });
+                        }}
+                        onLoad={() => {
+                          console.log(`✅ [PRODUCT DETAILS] Imagem IA carregada:`, {
+                            productId: product.id,
+                            imageId: img.id,
+                            imageUrl: img.url,
+                            finalUrl: getImageUrl(img.url)
+                          });
+                        }}
+                      />
                     ))}
                   </div>
                 </div>
