@@ -301,6 +301,11 @@ export const productsApi = {
     const response = await api.post('/products', data);
     return response.data;
   },
+
+  createFromDraft: async (id: string, data?: { initialLocation?: 'LOJA' | 'ARMAZEM' }): Promise<Product> => {
+    const response = await api.post(`/products/${id}/create`, data || {});
+    return response.data;
+  },
   
   update: async (id: string, data: Partial<ProductFormData>): Promise<Product> => {
     const response = await api.put(`/products/${id}`, data);

@@ -81,25 +81,26 @@ export interface Size {
 // Tipos de produto
 export interface Product {
   id: string;
-  name: string;
+  name?: string; // Opcional para rascunhos
   description?: string;
-  price: number;
+  price?: number; // Opcional para rascunhos
   cost?: number;
   stock: number; // Estoque total (para compatibilidade)
   stockLoja: number; // Estoque na Loja
   stockArmazem: number; // Estoque no Armazém
   minStock: number;
-  barcode: string;
+  barcode?: string; // Opcional para rascunhos
   qrcodeUrl?: string;
   imageUrl?: string;
   images?: ProductImage[]; // Galeria de imagens
-  categoryId: string;
+  categoryId?: string; // Opcional para rascunhos
   subcategoryId?: string; // Opcional
-  sizeId: string; // ID do tamanho
-  patternId: string;
+  sizeId?: string; // Opcional para rascunhos
+  patternId?: string; // Opcional para rascunhos
   active: boolean;
   inProduction: boolean; // Status de produção (mantido para compatibilidade)
   status: ProductStatus; // Status do produto
+  isDraft?: boolean; // Indica se é um rascunho
   createdAt: string;
   updatedAt: string;
   
@@ -332,21 +333,22 @@ export interface PaginatedResponse<T> {
 
 // Tipos para formulários
 export interface ProductFormData {
-  name: string;
+  name?: string; // Opcional para rascunhos
   description?: string;
-  price: number;
+  price?: number; // Opcional para rascunhos
   cost?: number;
-  stock: number;
-  minStock: number;
-  categoryId: string;
+  stock?: number; // Opcional para rascunhos
+  minStock?: number;
+  categoryId?: string; // Opcional para rascunhos
   subcategoryId?: string; // Opcional
-  patternId: string;
-  sizeId: string; // ID do tamanho para buscar dados
+  patternId?: string; // Opcional para rascunhos
+  sizeId?: string; // Opcional para rascunhos
   active?: boolean;
   imageFile?: File;
   imageFilesRoupa?: File[]; // novas imagens tipo roupa
   imageFilesIA?: File[];    // novas imagens tipo IA
   initialLocation?: 'LOJA' | 'ARMAZEM'; // Localização inicial do estoque
+  saveAsDraft?: boolean; // Flag para salvar como rascunho
 }
 
 export interface SubcategoryFormData {
@@ -412,6 +414,7 @@ export interface ProductFilters {
   minStock?: number;
   maxStock?: number;
   active?: boolean;
+  isDraft?: boolean; // Filtrar por rascunhos
   page?: number;
   limit?: number;
 }

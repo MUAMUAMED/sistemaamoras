@@ -216,53 +216,104 @@ const Products: React.FC = () => {
     setFilters(prev => ({ ...prev, page }));
   };
 
-  const handleCreateProduct = async (data: ProductFormData) => {
+  const handleCreateProduct = async (data: ProductFormData, saveAsDraft: boolean = false) => {
     console.log('🆕 [FRONTEND CREATE] Dados do formulário recebidos:', data);
+    console.log('📝 [FRONTEND CREATE] Salvar como rascunho:', saveAsDraft);
     
-    // Buscar o objeto do tamanho selecionado
-    const selectedSize = sizes.find(s => s.id === data.sizeId);
-    console.log('🔍 [FRONTEND CREATE] Tamanho selecionado:', selectedSize);
-    
-    // Montar o payload com size e sizeCode (sem o arquivo de imagem)
-    const { imageFile, imageFilesRoupa, imageFilesIA, ...productData } = data;
-    const payload = {
-      ...productData,
-      size: selectedSize ? selectedSize.name : '',
-      sizeCode: selectedSize ? selectedSize.code : '',
-    };
-    
-    console.log('📤 [FRONTEND CREATE] Payload que será enviado para API:', payload);
-    
+    // Se for rascunho, não precisa validar campos obrigatórios
+    if (!saveAsDraft) {
+      // Buscar o objeto do tamanho selecionado
+      const selectedSize = sizes.find(s => s.id === data.sizeId);
+      console.log('🔍 [FRONTEND CREATE] Tamanho selecionado:', selectedSize);
+      
+      // Montar o payload com size e sizeCode (sem o arquivo de imagem)
+      const { imageFile, imageFilesRoupa, imageFilesIA, ...productData } = data;
+      const payload = {
+        ...productData,
+        size: selectedSize ? selectedSize.name : '',
+        sizeCode: selectedSize ? selectedSize.code : '',
+      };
+      
+      console.log('📤 [FRONTEND CREATE] Payload que será enviado para API:', payload);
+      
+      try {
+        // Criar o produto primeiro
+        console.log('🚀 [FRONTEND CREATE] Enviando requisição para criar produto...');
+        const createdProduct = await productsApi.create(payload);
+        console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
+        
+        // Se há uma imagem, fazer o upload (compatibilidade)
+        if (imageFile) {
+          console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
+          await productsApi.uploadImage(createdProduct.id, imageFile);
+          console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
+        }
+        // Upload de múltiplas imagens por tipo
+        if (imageFilesRoupa && imageFilesRoupa.length > 0) {
+          console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
+          await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
+        }
+        if (imageFilesIA && imageFilesIA.length > 0) {
+          console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
+          await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
+        }
+        
+        // Atualizar a lista de produtos
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        setShowCreateModal(false);
+        toast.success('Produto criado com sucesso!');
+      } catch (error: any) {
+        console.error('💥 [FRONTEND CREATE] Erro ao criar produto:', error);
+        console.error('💥 [FRONTEND CREATE] Resposta do servidor:', error.response?.data);
+        toast.error(error.response?.data?.error || 'Erro ao criar produto');
+      }
+    } else {
+      // Salvar como rascunho
+      const { imageFile, imageFilesRoupa, imageFilesIA, ...productData } = data;
+      const payload = {
+        ...productData,
+        saveAsDraft: true,
+      };
+      
+      try {
+        console.log('📝 [FRONTEND CREATE] Salvando como rascunho...');
+        const createdDraft = await productsApi.create(payload);
+        console.log('✅ [FRONTEND CREATE] Rascunho salvo com sucesso:', createdDraft);
+        
+        // Upload de imagens também funciona para rascunhos
+        if (imageFile) {
+          await productsApi.uploadImage(createdDraft.id, imageFile);
+        }
+        if (imageFilesRoupa && imageFilesRoupa.length > 0) {
+          await productsApi.uploadImages(createdDraft.id, imageFilesRoupa, 'ROUPA');
+        }
+        if (imageFilesIA && imageFilesIA.length > 0) {
+          await productsApi.uploadImages(createdDraft.id, imageFilesIA, 'IA');
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        setShowCreateModal(false);
+        toast.success('Rascunho salvo com sucesso!');
+      } catch (error: any) {
+        console.error('💥 [FRONTEND CREATE] Erro ao salvar rascunho:', error);
+        toast.error(error.response?.data?.error || 'Erro ao salvar rascunho');
+      }
+    }
+  };
+
+  const handleCreateFromDraft = async (productId: string, initialLocation?: 'LOJA' | 'ARMAZEM') => {
     try {
-      // Criar o produto primeiro
-      console.log('🚀 [FRONTEND CREATE] Enviando requisição para criar produto...');
-      const createdProduct = await productsApi.create(payload);
-      console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
+      console.log('🔄 [FRONTEND CREATE FROM DRAFT] Convertendo rascunho em produto...');
+      const createdProduct = await productsApi.createFromDraft(productId, { initialLocation });
+      console.log('✅ [FRONTEND CREATE FROM DRAFT] Produto criado com sucesso:', createdProduct);
       
-      // Se há uma imagem, fazer o upload (compatibilidade)
-      if (imageFile) {
-        console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
-        await productsApi.uploadImage(createdProduct.id, imageFile);
-        console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
-      }
-      // Upload de múltiplas imagens por tipo
-      if (imageFilesRoupa && imageFilesRoupa.length > 0) {
-        console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
-      }
-      if (imageFilesIA && imageFilesIA.length > 0) {
-        console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
-      }
-      
-      // Atualizar a lista de produtos
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      setShowCreateModal(false);
-      toast.success('Produto criado com sucesso!');
+      setShowEditModal(false);
+      setSelectedProduct(null);
+      toast.success('Produto criado a partir do rascunho com sucesso!');
     } catch (error: any) {
-      console.error('💥 [FRONTEND CREATE] Erro ao criar produto:', error);
-      console.error('💥 [FRONTEND CREATE] Resposta do servidor:', error.response?.data);
-      toast.error(error.response?.data?.error || 'Erro ao criar produto');
+      console.error('💥 [FRONTEND CREATE FROM DRAFT] Erro:', error);
+      toast.error(error.response?.data?.message || 'Erro ao criar produto. Verifique se todos os campos obrigatórios estão preenchidos.');
     }
   };
 
@@ -663,6 +714,25 @@ const Products: React.FC = () => {
                 <option value="false">Inativo</option>
               </select>
             </div>
+
+            {/* Filtro de Rascunhos */}
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-700">
+                Tipo
+              </label>
+              <select
+                value={filters.isDraft === undefined ? '' : filters.isDraft.toString()}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? undefined : e.target.value === 'true';
+                  handleFilterChange('isDraft', value);
+                }}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 input-focus"
+              >
+                <option value="">Todos</option>
+                <option value="false">Produtos Completos</option>
+                <option value="true">Rascunhos</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -742,6 +812,11 @@ const Products: React.FC = () => {
                             
                             {/* Status Badge */}
                             <div className="absolute top-3 right-3 flex flex-col gap-1">
+                              {product.isDraft && (
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  📝 Rascunho
+                                </span>
+                              )}
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {product.active ? 'Ativo' : 'Inativo'}
                               </span>
@@ -764,14 +839,14 @@ const Products: React.FC = () => {
                           {/* Informações do Produto */}
                           <div className="p-4">
                             <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                              {product.name}
+                              {product.name || '(Sem nome)'}
                             </h3>
                             
                             <div className="space-y-2 mb-4">
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-600">Preço:</span>
                                 <span className="font-semibold text-green-600">
-                                  R$ {product.price.toFixed(2)}
+                                  {product.price ? `R$ ${product.price.toFixed(2)}` : '-'}
                                 </span>
                               </div>
                               
@@ -966,13 +1041,14 @@ const Products: React.FC = () => {
 
       {showEditModal && selectedProduct && (
         <ProductFormModal
-          title="Editar Produto"
+          title={selectedProduct.isDraft ? "Editar Rascunho" : "Editar Produto"}
           product={selectedProduct}
           categories={categories}
           subcategories={subcategories}
           patterns={patterns}
           sizes={sizes}
           onSubmit={handleUpdateProduct}
+          onCreateFromDraft={handleCreateFromDraft}
           onClose={() => {
             setShowEditModal(false);
             setSelectedProduct(null);
@@ -1156,7 +1232,8 @@ interface ProductFormModalProps {
   subcategories: Subcategory[];
   patterns: Pattern[];
   sizes: Size[];
-  onSubmit: (data: ProductFormData) => void;
+  onSubmit: (data: ProductFormData, saveAsDraft?: boolean) => void;
+  onCreateFromDraft?: (productId: string, initialLocation?: 'LOJA' | 'ARMAZEM') => void;
   onClose: () => void;
   isLoading: boolean;
   setShowCategoryModal: (show: boolean) => void;
@@ -1173,6 +1250,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   patterns,
   sizes,
   onSubmit,
+  onCreateFromDraft,
   onClose,
   isLoading,
   setShowCategoryModal,
@@ -1356,7 +1434,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1739,6 +1817,21 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             />
           </div>
 
+          {/* Alerta para rascunhos */}
+          {product?.isDraft && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-medium text-yellow-800 mb-1">⚠️ Este é um rascunho</h3>
+                  <p className="text-sm text-yellow-700">
+                    Complete todos os campos obrigatórios e clique em "Criar Produto" para finalizar.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-end gap-3">
             <button
               type="button"
@@ -1747,12 +1840,35 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             >
               Cancelar
             </button>
+            {/* Botão para salvar como rascunho (apenas na criação) */}
+            {!product && (
+              <button
+                type="button"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
+              </button>
+            )}
+            {/* Botão para criar produto a partir do rascunho (apenas na edição de rascunho) */}
+            {product?.isDraft && onCreateFromDraft && (
+              <button
+                type="button"
+                onClick={handleCreateFromDraft}
+                disabled={isLoading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Criando...' : 'Criar Produto'}
+              </button>
+            )}
             <button
               type="submit"
+              onClick={(e) => handleSubmit(e, false)}
               disabled={isLoading}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Salvando...' : 'Salvar'}
+              {isLoading ? 'Salvando...' : product?.isDraft ? 'Salvar Rascunho' : 'Salvar'}
             </button>
           </div>
         </form>
