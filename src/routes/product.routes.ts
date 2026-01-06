@@ -1393,7 +1393,19 @@ router.get('/:id/images', authenticateToken, async (req, res, next) => {
  *                   type: string
  *                   format: binary
  */
-router.post('/:id/images', authenticateToken, uploadProductImage.array('images', 6), async (req, res, next) => {
+router.post('/:id/images', authenticateToken, (req, res, next) => {
+  // Middleware para capturar erros do Multer
+  uploadProductImage.array('images', 6)(req, res, (err: any) => {
+    if (err) {
+      console.error('❌ [MULTER ERROR] Erro no upload:', err);
+      return res.status(400).json({
+        error: 'Erro no upload de arquivo',
+        message: err.message || 'Erro ao processar arquivo enviado'
+      });
+    }
+    next();
+  });
+}, async (req, res, next) => {
   try {
     console.log('🖼️ [UPLOAD IMAGES] Após multer:', {
       productId: req.params.id,
