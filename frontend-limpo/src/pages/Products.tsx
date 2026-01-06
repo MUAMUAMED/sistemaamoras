@@ -1873,20 +1873,28 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               Cancelar
             </button>
             {/* Botão para salvar como rascunho (apenas na criação) */}
-            {!product ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
+            {/* TESTE: Sempre mostrar para debug */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
+                if (!product) {
                   handleSubmit(e, true);
-                }}
-                disabled={isLoading}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
-              </button>
-            ) : null}
+                } else {
+                  console.warn('⚠️ Tentou salvar como rascunho mas product existe:', product);
+                }
+              }}
+              disabled={isLoading}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ 
+                display: !product ? 'block' : 'none',
+                backgroundColor: '#4B5563',
+                color: 'white'
+              }}
+            >
+              {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
+            </button>
             {/* Botão para criar produto a partir do rascunho (apenas na edição de rascunho) */}
             {product?.isDraft && onCreateFromDraft && (
               <button
