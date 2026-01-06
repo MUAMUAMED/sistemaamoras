@@ -77,14 +77,23 @@ router.get('/', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const { search, barcode, category, page = 1, limit = 20 } = req.query;
+    const { search, barcode, category, page = 1, limit = 20, isDraft } = req.query;
     
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
     const take = parseInt(limit as string);
 
-    const where: any = {
-      active: true,
-    };
+    const where: any = {};
+
+    // Se isDraft não for especificado, filtrar apenas produtos ativos (não rascunhos)
+    // Se isDraft for true, mostrar apenas rascunhos
+    // Se isDraft for false, mostrar apenas produtos completos e ativos
+    if (isDraft === undefined || isDraft === 'false') {
+      where.active = true;
+      where.isDraft = false;
+    } else if (isDraft === 'true') {
+      where.isDraft = true;
+      // Para rascunhos, não filtrar por active
+    }
 
     if (search) {
       where.OR = [
@@ -305,6 +314,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       stock,
       description,
       initialLocation,
+      saveAsDraft, // Novo parâmetro para salvar como rascunho
     } = req.body;
 
     console.log('🆕 [PRODUTO CREATE] Dados recebidos:', {
@@ -316,10 +326,50 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       price,
       stock,
       description,
+      saveAsDraft,
       bodyCompleto: req.body
     });
 
-    // Validar dados obrigatórios
+    // Se for rascunho, não validar campos obrigatórios
+    if (saveAsDraft) {
+      console.log('📝 [PRODUTO CREATE] Salvando como rascunho - sem validações obrigatórias');
+      
+      const draftData: any = {
+        name: name || null,
+        categoryId: categoryId || null,
+        subcategoryId: subcategoryId || null,
+        sizeId: sizeId || null,
+        patternId: patternId || null,
+        price: price || null,
+        stock: stock || 0,
+        stockLoja: initialLocation === 'LOJA' ? (stock || 0) : 0,
+        stockArmazem: initialLocation === 'ARMAZEM' ? (stock || 0) : 0,
+        description: description || null,
+        isDraft: true,
+        // Não gerar barcode nem qrcode para rascunhos
+        barcode: null,
+        qrcodeUrl: null,
+      };
+
+      const draftProduct = await prisma.product.create({
+        data: draftData,
+        include: {
+          category: true,
+          subcategory: true,
+          size: true,
+          pattern: true,
+        },
+      });
+
+      console.log('✅ [PRODUTO CREATE] Rascunho criado com sucesso:', draftProduct.id);
+
+      return res.status(201).json({
+        ...draftProduct,
+        message: 'Rascunho salvo com sucesso',
+      });
+    }
+
+    // Validar dados obrigatórios (apenas se não for rascunho)
     if (!name || !categoryId || !sizeId || !patternId || !price || stock === undefined) {
       console.log('❌ [PRODUTO CREATE] Dados obrigatórios faltando:', {
         name: !!name,
@@ -468,6 +518,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         barcode,
         qrcodeUrl,
         description,
+        isDraft: false, // Produto normal, não é rascunho
         // inProduction: true, // Temporariamente removido até migration ser aplicada
         // status: 'PROCESSANDO', // Produtos começam sempre como PROCESSANDO (será adicionado após migration)
     };
@@ -797,6 +848,187 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
     return res.json(updatedProduct);
   } catch (error) {
     console.error('💥 [PRODUTO UPDATE] Erro:', error);
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/products/{id}/create:
+ *   post:
+ *     summary: Converter rascunho em produto
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               initialLocation:
+ *                 type: string
+ *                 enum: [LOJA, ARMAZEM]
+ *     responses:
+ *       200:
+ *         description: Produto criado a partir do rascunho com sucesso
+ *       400:
+ *         description: Dados obrigatórios faltando ou inválidos
+ *       404:
+ *         description: Rascunho não encontrado
+ */
+router.post('/:id/create', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const { id } = req.params;
+    const { initialLocation } = req.body;
+
+    console.log('🔄 [PRODUTO CREATE FROM DRAFT] Convertendo rascunho em produto:', id);
+
+    // Buscar o rascunho
+    const draft = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        subcategory: true,
+        size: true,
+        pattern: true,
+      },
+    });
+
+    if (!draft) {
+      console.log('❌ [PRODUTO CREATE FROM DRAFT] Rascunho não encontrado:', id);
+      return res.status(404).json({
+        error: 'Rascunho não encontrado',
+        message: 'O rascunho solicitado não foi encontrado',
+      });
+    }
+
+    if (!draft.isDraft) {
+      console.log('❌ [PRODUTO CREATE FROM DRAFT] Produto já não é mais rascunho:', id);
+      return res.status(400).json({
+        error: 'Não é um rascunho',
+        message: 'Este produto já foi criado e não é mais um rascunho',
+      });
+    }
+
+    // Validar dados obrigatórios
+    if (!draft.name || !draft.categoryId || !draft.sizeId || !draft.patternId || !draft.price || draft.stock === undefined) {
+      console.log('❌ [PRODUTO CREATE FROM DRAFT] Dados obrigatórios faltando:', {
+        name: !!draft.name,
+        categoryId: !!draft.categoryId,
+        sizeId: !!draft.sizeId,
+        patternId: !!draft.patternId,
+        price: !!draft.price,
+        stock: draft.stock !== undefined
+      });
+      return res.status(400).json({
+        error: 'Dados obrigatórios',
+        message: 'Nome, categoria, tamanho, estampa, preço e estoque são obrigatórios para criar o produto',
+      });
+    }
+
+    // Buscar dados para gerar código de barras
+    const [category, subcategory, size, pattern] = await Promise.all([
+      prisma.category.findUnique({ where: { id: draft.categoryId! } }),
+      draft.subcategoryId ? prisma.subcategory.findUnique({ where: { id: draft.subcategoryId } }) : null,
+      prisma.size.findUnique({ where: { id: draft.sizeId! } }),
+      prisma.pattern.findUnique({ where: { id: draft.patternId! } }),
+    ]);
+
+    if (!category || !size || !pattern) {
+      console.log('❌ [PRODUTO CREATE FROM DRAFT] Dados inválidos - categoria, tamanho ou estampa não encontrada');
+      return res.status(400).json({
+        error: 'Categoria, tamanho ou estampa inválida',
+        message: 'Categoria, tamanho ou estampa não encontrada',
+      });
+    }
+
+    // Gerar código de barras
+    const barcode = generateBarcode(size.code, category.code, subcategory?.code || null, pattern.code);
+    console.log('🏷️ [PRODUTO CREATE FROM DRAFT] Código de barras gerado:', {
+      sizeCode: size.code,
+      categoryCode: category.code,
+      subcategoryCode: subcategory?.code || null,
+      patternCode: pattern.code,
+      barcode
+    });
+
+    // Verificar se código de barras já existe
+    const existingProduct = await prisma.product.findFirst({
+      where: { 
+        barcode,
+        id: { not: id } // Excluir o próprio rascunho
+      },
+    });
+
+    if (existingProduct) {
+      console.log('❌ [PRODUTO CREATE FROM DRAFT] Código de barras já existe:', {
+        barcode,
+        existingProductId: existingProduct.id,
+        existingProductName: existingProduct.name
+      });
+      return res.status(400).json({
+        error: 'Código de barras já existe',
+        message: 'Já existe um produto com essa combinação de categoria, tamanho e estampa',
+      });
+    }
+
+    // Gerar QR Code
+    const qrcodeUrl = await generateQRCode(barcode);
+    console.log('📱 [PRODUTO CREATE FROM DRAFT] QR Code gerado');
+
+    // Atualizar rascunho para produto
+    const product = await prisma.product.update({
+      where: { id },
+      data: {
+        barcode,
+        qrcodeUrl,
+        isDraft: false,
+        stockLoja: initialLocation === 'LOJA' ? (draft.stock || 0) : 0,
+        stockArmazem: initialLocation === 'ARMAZEM' ? (draft.stock || 0) : 0,
+      },
+      include: {
+        category: true,
+        subcategory: true,
+        size: true,
+        pattern: true,
+      },
+    });
+
+    console.log('✅ [PRODUTO CREATE FROM DRAFT] Produto criado com sucesso:', {
+      id: product.id,
+      name: product.name,
+      barcode: product.barcode
+    });
+
+    // Registrar movimentação de estoque inicial
+    if (draft.stock && draft.stock > 0) {
+      await prisma.stockMovement.create({
+        data: {
+          productId: product.id,
+          type: 'ENTRY',
+          quantity: draft.stock,
+          reason: 'Estoque inicial - produto criado a partir de rascunho',
+          location: initialLocation || 'LOJA',
+          userId: req.user!.id,
+        },
+      });
+      console.log(`📦 [PRODUTO CREATE FROM DRAFT] Movimentação de estoque inicial registrada na ${initialLocation || 'LOJA'}`);
+    }
+
+    return res.status(200).json({
+      ...product,
+      message: 'Produto criado a partir do rascunho com sucesso',
+    });
+  } catch (error) {
+    console.error('💥 [PRODUTO CREATE FROM DRAFT] Erro:', error);
     return next(error);
   }
 });

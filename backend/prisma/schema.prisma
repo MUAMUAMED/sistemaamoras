@@ -100,17 +100,17 @@ model Size {
 // Produtos (roupas)
 model Product {
   id            String   @id @default(cuid())
-  name          String
-  categoryId    String
+  name          String?
+  categoryId    String?
   subcategoryId String?  // Opcional - subcategoria do produto
-  sizeId        String   // Relação com o modelo Size
-  patternId     String
-  price         Float
+  sizeId        String?  // Relação com o modelo Size
+  patternId     String?
+  price         Float?
   stock         Int      @default(0) // Estoque total (para compatibilidade)
   stockLoja     Int      @default(0) // Estoque na Loja
   stockArmazem  Int      @default(0) // Estoque no Armazém
   minStock      Int      @default(5)
-  barcode       String   @unique
+  barcode       String?  @unique // Opcional para rascunhos
   qrcodeUrl     String?
   imageUrl      String?  // URL da imagem principal do produto (compatibilidade)
   images        ProductImage[] // Galeria de imagens do produto
@@ -118,14 +118,15 @@ model Product {
   active          Boolean  @default(true)
   inProduction    Boolean  @default(true) // Status de produção - true quando recém criado (manter para compatibilidade)
   status          ProductStatus @default(PROCESSANDO) // Status do produto
+  isDraft        Boolean  @default(false) // Indica se é um rascunho
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   // Relacionamentos
-  category       Category        @relation(fields: [categoryId], references: [id])
+  category       Category?        @relation(fields: [categoryId], references: [id])
   subcategory    Subcategory?    @relation(fields: [subcategoryId], references: [id])
-  size           Size            @relation(fields: [sizeId], references: [id])
-  pattern        Pattern         @relation(fields: [patternId], references: [id])
+  size           Size?            @relation(fields: [sizeId], references: [id])
+  pattern        Pattern?         @relation(fields: [patternId], references: [id])
   saleItems      SaleItem[]
   stockMovements StockMovement[]
 
