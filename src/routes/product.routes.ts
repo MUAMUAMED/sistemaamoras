@@ -84,15 +84,26 @@ router.get('/', authenticateToken, async (req, res, next) => {
 
     const where: any = {};
 
-    // Se isDraft não for especificado, filtrar apenas produtos ativos (não rascunhos)
-    // Se isDraft for true, mostrar apenas rascunhos
-    // Se isDraft for false, mostrar apenas produtos completos e ativos
-    if (isDraft === undefined || isDraft === 'false') {
+    // Lógica de filtro por isDraft:
+    // - Se isDraft não for especificado: mostrar TODOS os produtos (rascunhos e não rascunhos)
+    // - Se isDraft for 'true': mostrar apenas rascunhos
+    // - Se isDraft for 'false': mostrar apenas produtos completos (não rascunhos) e ativos
+    if (isDraft === 'false') {
+      // Apenas produtos completos e ativos
       where.active = true;
       where.isDraft = false;
     } else if (isDraft === 'true') {
+      // Apenas rascunhos
       where.isDraft = true;
-      // Para rascunhos, não filtrar por active
+      // Para rascunhos, não filtrar por active (podem estar ativos ou não)
+    } else {
+      // Se não especificado, mostrar TODOS (rascunhos e não rascunhos)
+      // Não adicionar filtro de isDraft, mas manter filtro de active apenas para produtos não rascunhos
+      // Isso mostra: todos os rascunhos + produtos ativos não rascunhos
+      where.OR = [
+        { isDraft: true }, // Todos os rascunhos
+        { isDraft: false, active: true } // Produtos completos e ativos
+      ];
     }
 
     if (search) {
