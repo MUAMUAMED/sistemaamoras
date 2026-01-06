@@ -65,6 +65,19 @@ const Products: React.FC = () => {
   const { data: productsData, isLoading: loadingProducts } = useQuery({
     queryKey: ['products', filters],
     queryFn: () => productsApi.list(filters),
+    onSuccess: (data) => {
+      console.log('📦 [PRODUCTS QUERY] Produtos recebidos:', data?.data?.length || 0);
+      if (data?.data) {
+        data.data.forEach((product: Product) => {
+          console.log(`  Produto ${product.id}:`, {
+            name: product.name,
+            imagesCount: product.images?.length || 0,
+            images: product.images?.map(img => ({ id: img.id, url: img.url, type: img.type })) || [],
+            imageUrl: product.imageUrl
+          });
+        });
+      }
+    }
   });
 
   const { data: categories = [] } = useQuery({
@@ -739,15 +752,30 @@ const Products: React.FC = () => {
                           {/* Imagem do Produto */}
                           <div className="relative h-48 bg-gray-100 overflow-hidden">
                             {product.images && product.images.length > 0 ? (
-                              <img
-                                src={getImageUrl(product.images[0].url)}
-                                alt={product.name || 'Produto sem nome'}
-                                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                }}
-                              />
+                              <>
+                                {console.log(`🖼️ [PRODUCT CARD] Produto ${product.id} tem ${product.images.length} imagem(ns):`, product.images.map(img => ({ id: img.id, url: img.url, type: img.type })))}
+                                <img
+                                  src={getImageUrl(product.images[0].url)}
+                                  alt={product.name || 'Produto sem nome'}
+                                  className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                                  onError={(e) => {
+                                    console.error(`❌ [PRODUCT CARD] Erro ao carregar imagem:`, {
+                                      productId: product.id,
+                                      imageUrl: product.images[0].url,
+                                      finalUrl: getImageUrl(product.images[0].url)
+                                    });
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                  onLoad={() => {
+                                    console.log(`✅ [PRODUCT CARD] Imagem carregada com sucesso:`, {
+                                      productId: product.id,
+                                      imageUrl: product.images[0].url,
+                                      finalUrl: getImageUrl(product.images[0].url)
+                                    });
+                                  }}
+                                />
+                              </>
                             ) : product.imageUrl ? (
                               <img
                                 src={getImageUrl(product.imageUrl)}
