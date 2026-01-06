@@ -27,7 +27,7 @@ services:
   # Backend API - TESTE
   backend-test:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: amoras-backend-test
     environment:
