@@ -80,6 +80,15 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Se for FormData, garantir que o Content-Type não seja setado manualmente
+    // O browser precisa definir o boundary automaticamente
+    if (config.data instanceof FormData) {
+      // Remover Content-Type se estiver definido - o browser define automaticamente
+      delete config.headers['Content-Type'];
+      console.log('📦 [AXIOS] FormData detectado, Content-Type será definido pelo browser');
+    }
+    
     return config;
   },
   (error) => {
