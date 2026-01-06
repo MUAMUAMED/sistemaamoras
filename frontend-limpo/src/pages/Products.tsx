@@ -1333,42 +1333,44 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     return numbers ? parseInt(numbers) / 100 : 0;
   };
 
-  const validateForm = () => {
+  const validateForm = (skipRequired: boolean = false): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Nome é obrigatório';
-    }
+    if (!skipRequired) {
+      if (!formData.name?.trim()) {
+        newErrors.name = 'Nome é obrigatório';
+      }
 
-    if (!formData.price || parseCurrency(formData.price) <= 0) {
-      newErrors.price = 'Preço deve ser maior que zero';
-    }
+      if (!formData.price || parseCurrency(formData.price) <= 0) {
+        newErrors.price = 'Preço deve ser maior que zero';
+      }
 
-    if (!formData.categoryId) {
-      newErrors.categoryId = 'Categoria é obrigatória';
-    }
+      if (!formData.categoryId) {
+        newErrors.categoryId = 'Categoria é obrigatória';
+      }
 
-    // Subcategoria é opcional - removida validação obrigatória
+      // Subcategoria é opcional - removida validação obrigatória
 
-    if (!formData.patternId) {
-      newErrors.patternId = 'Estampa é obrigatória';
-    }
+      if (!formData.patternId) {
+        newErrors.patternId = 'Estampa é obrigatória';
+      }
 
-    if (!formData.sizeId) {
-      newErrors.sizeId = 'Tamanho é obrigatório';
+      if (!formData.sizeId) {
+        newErrors.sizeId = 'Tamanho é obrigatório';
+      }
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
-    if (validateForm()) {
+    if (validateForm(saveAsDraft)) {
       const submitData: ProductFormData = {
         ...formData,
         subcategoryId: formData.subcategoryId || undefined,
-        price: normalizePrice(formData.price),
+        price: formData.price ? normalizePrice(formData.price) : undefined,
         cost: formData.cost ? normalizePrice(formData.cost) : undefined,
         stock: parseInt(formData.stock) || 0,
         minStock: parseInt(formData.minStock) || 0,
@@ -1377,8 +1379,20 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         imageFilesIA: formData.imageFilesIA || [],
         initialLocation: formData.initialLocation || 'LOJA', // Padrão para Loja
       };
-      onSubmit(submitData);
+      onSubmit(submitData, saveAsDraft);
     }
+  };
+
+  const handleCreateFromDraft = async () => {
+    if (!product?.id || !onCreateFromDraft) return;
+    
+    // Validar campos obrigatórios antes de criar produto
+    if (!validateForm(false)) {
+      toast.error('Preencha todos os campos obrigatórios antes de criar o produto');
+      return;
+    }
+    
+    onCreateFromDraft(product.id, formData.initialLocation || 'LOJA');
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1844,7 +1858,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             {!product && (
               <button
                 type="button"
-                onClick={(e) => handleSubmit(e, true)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSubmit(e, true);
+                }}
                 disabled={isLoading}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
