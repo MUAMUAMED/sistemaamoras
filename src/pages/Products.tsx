@@ -247,28 +247,20 @@ const Products: React.FC = () => {
       const createdProduct = await productsApi.create(payload);
       console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
       
-      // Upload de imagens apenas se não for rascunho
-      // Rascunhos não devem ter upload de imagens para evitar erros no backend
-      if (!saveAsDraft) {
-        // Se há uma imagem, fazer o upload (compatibilidade)
-        if (imageFile) {
-          console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
-          await productsApi.uploadImage(createdProduct.id, imageFile);
-          console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
-        }
-        // Upload de múltiplas imagens por tipo
-        if (imageFilesRoupa && imageFilesRoupa.length > 0) {
-          console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
-          await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
-        }
-        if (imageFilesIA && imageFilesIA.length > 0) {
-          console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
-          await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
-        }
-      } else {
-        // Para rascunhos, não fazer upload de imagens
-        // As imagens serão salvas quando o rascunho for convertido em produto completo
-        console.log('📝 [FRONTEND CREATE] Rascunho criado. Imagens serão salvas quando o produto for finalizado.');
+      // Upload de imagens (agora funciona para rascunhos também, após correção no backend)
+      if (imageFile) {
+        console.log('📷 [FRONTEND CREATE] Fazendo upload de imagem...');
+        await productsApi.uploadImage(createdProduct.id, imageFile);
+        console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
+      }
+      // Upload de múltiplas imagens por tipo
+      if (imageFilesRoupa && imageFilesRoupa.length > 0) {
+        console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
+        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
+      }
+      if (imageFilesIA && imageFilesIA.length > 0) {
+        console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
+        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
       }
       
       // Atualizar a lista de produtos
