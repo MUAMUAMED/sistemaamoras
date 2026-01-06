@@ -1467,9 +1467,25 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
       console.warn('⚠️ ProductImage table not found, returning empty images array:', error.message);
     }
 
-    return res.json({ message: 'Imagens enviadas com sucesso', created, images });
-  } catch (error) {
-    return next(error);
+    // Retornar sucesso mesmo se algumas imagens falharam (arquivos já foram salvos)
+    return res.json({ 
+      message: created.length > 0 
+        ? `Imagens enviadas com sucesso (${created.length} de ${filesToProcess.length})`
+        : 'Arquivos salvos, mas houve problema ao registrar no banco',
+      created, 
+      images,
+      warnings: created.length < filesToProcess.length 
+        ? [`Apenas ${created.length} de ${filesToProcess.length} imagens foram registradas no banco`]
+        : []
+    });
+  } catch (error: any) {
+    console.error('❌ Erro geral no upload de imagens:', error);
+    console.error('❌ Stack:', error.stack);
+    // Retornar erro 500 apenas se for um erro crítico
+    return res.status(500).json({ 
+      error: 'Erro ao processar imagens',
+      message: error.message || 'Erro interno do servidor'
+    });
   }
 });
 
