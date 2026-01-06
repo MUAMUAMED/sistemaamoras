@@ -1161,18 +1161,39 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
     const force = req.query.force === 'true';
+    
+    console.log(`🗑️ [DELETE PRODUCT] Iniciando exclusão do produto: ${id}, force: ${force}`);
+    
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) {
+      console.log(`❌ [DELETE PRODUCT] Produto não encontrado: ${id}`);
       return res.status(404).json({
         error: 'Produto não encontrado',
         message: 'O produto solicitado não foi encontrado',
       });
     }
+    
+    console.log(`✅ [DELETE PRODUCT] Produto encontrado: ${product.name || 'Sem nome'} (isDraft: ${product.isDraft})`);
+    
     try {
+      // Deletar imagens do produto primeiro (se existirem)
+      try {
+        const imageCount = await (prisma as any).productImage.deleteMany({ where: { productId: id } });
+        console.log(`🗑️ [DELETE PRODUCT] ${imageCount.count} imagem(ns) deletada(s)`);
+      } catch (imageError: any) {
+        console.warn('⚠️ [DELETE PRODUCT] Erro ao deletar imagens (pode não existir tabela):', imageError.message);
+        // Continuar mesmo se falhar (tabela pode não existir)
+      }
+      
+      // Deletar o produto
       await prisma.product.delete({ where: { id } });
+      console.log(`✅ [DELETE PRODUCT] Produto deletado com sucesso: ${id}`);
       return res.json({ message: 'Produto excluído com sucesso' });
     } catch (error) {
       const err = error as any;
+      console.error(`❌ [DELETE PRODUCT] Erro ao deletar produto:`, err.message);
+      console.error(`❌ [DELETE PRODUCT] Código do erro:`, err.code);
+      
       // Se for erro de integridade e não for forçado, retorna mensagem de confirmação
       if ((err.code === 'P2003' || err.message?.includes('Foreign key constraint failed')) && !force) {
         return res.status(409).json({
@@ -1183,18 +1204,30 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
       }
       // Se for forçado, apaga os vínculos e depois o produto
       if (force) {
-        // Apaga movimentações de estoque
-        await prisma.stockMovement.deleteMany({ where: { productId: id } });
-        // Apaga itens de venda
-        await prisma.saleItem.deleteMany({ where: { productId: id } });
-        // Agora apaga o produto
-        await prisma.product.delete({ where: { id } });
-        return res.json({ message: 'Produto e vínculos excluídos com sucesso' });
+        console.log(`🔄 [DELETE PRODUCT] Modo forçado ativado, deletando vínculos...`);
+        try {
+          // Deletar imagens
+          await (prisma as any).productImage.deleteMany({ where: { productId: id } });
+          // Apaga movimentações de estoque
+          await prisma.stockMovement.deleteMany({ where: { productId: id } });
+          // Apaga itens de venda
+          await prisma.saleItem.deleteMany({ where: { productId: id } });
+          // Agora apaga o produto
+          await prisma.product.delete({ where: { id } });
+          console.log(`✅ [DELETE PRODUCT] Produto e vínculos deletados com sucesso`);
+          return res.json({ message: 'Produto e vínculos excluídos com sucesso' });
+        } catch (forceError: any) {
+          console.error(`❌ [DELETE PRODUCT] Erro no modo forçado:`, forceError.message);
+          throw forceError;
+        }
       }
       throw error;
     }
   } catch (error) {
     const err = error as any;
+    console.error(`💥 [DELETE PRODUCT] Erro geral:`, err.message);
+    console.error(`💥 [DELETE PRODUCT] Stack:`, err.stack);
+    
     if (err.code === 'P2003' || err.message?.includes('Foreign key constraint failed')) {
       return res.status(400).json({
         error: 'Produto vinculado',
