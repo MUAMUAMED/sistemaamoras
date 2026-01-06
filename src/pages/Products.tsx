@@ -959,7 +959,7 @@ const Products: React.FC = () => {
               </div>
 
               {/* Paginação */}
-              {productsData && productsData.pagination && productsData.pagination.total > (filters.limit || 20) && (
+              {productsData?.pagination && productsData.pagination.total > (filters.limit || 20) && (
                 <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-600">
@@ -978,7 +978,7 @@ const Products: React.FC = () => {
                       </span>
                       <button
                         onClick={() => handlePageChange((filters.page || 1) + 1)}
-                        disabled={(filters.page || 1) >= Math.ceil(productsData.pagination.total / (filters.limit || 20))}
+                        disabled={(filters.page || 1) >= Math.ceil((productsData.pagination?.total || 0) / (filters.limit || 20))}
                         className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Próximo
