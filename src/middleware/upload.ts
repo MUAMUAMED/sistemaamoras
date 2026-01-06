@@ -13,12 +13,18 @@ if (!fs.existsSync(uploadDir)) {
 // Configuração do armazenamento
 const storage = multer.diskStorage({
   destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
-    // Garantir que o diretório existe antes de salvar
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
+    try {
+      // Garantir que o diretório existe antes de salvar
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+        console.log('📁 [MULTER] Diretório criado:', uploadDir);
+      }
+      console.log('📁 [MULTER] Salvando arquivo em:', uploadDir);
+      cb(null, uploadDir);
+    } catch (error: any) {
+      console.error('❌ [MULTER] Erro ao criar diretório:', error);
+      cb(error, uploadDir);
     }
-    console.log('📁 [MULTER] Salvando arquivo em:', uploadDir);
-    cb(null, uploadDir);
   },
   filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     // Gerar nome único para o arquivo

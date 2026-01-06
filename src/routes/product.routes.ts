@@ -1466,10 +1466,17 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
     }
 
     let created: any[] = [];
+    let errors: string[] = [];
     try {
       // Criar imagens uma por uma para rascunhos (evita problemas com transações)
       for (let index = 0; index < filesToProcess.length; index++) {
         const file = filesToProcess[index];
+        if (!file || !file.filename) {
+          console.error(`❌ Arquivo ${index + 1} inválido:`, file);
+          errors.push(`Arquivo ${index + 1} inválido`);
+          continue;
+        }
+        
         try {
           const image = await (prisma as any).productImage.create({
             data: {
@@ -1480,20 +1487,32 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
             },
           });
           created.push(image);
+          console.log(`✅ Imagem ${index + 1} criada no banco:`, image.id);
         } catch (imageError: any) {
           console.error(`❌ Erro ao criar imagem ${index + 1}:`, imageError);
           console.error(`❌ Stack:`, imageError.stack);
+          errors.push(`Erro ao criar imagem ${index + 1}: ${imageError.message}`);
           // Continuar com as outras imagens mesmo se uma falhar
         }
       }
       
-      if (created.length === 0) {
+      if (created.length === 0 && filesToProcess.length > 0) {
         console.warn('⚠️ Nenhuma imagem foi criada no banco, mas arquivos foram salvos');
+        // Se nenhuma imagem foi criada, retornar erro 500 com detalhes
+        return res.status(500).json({
+          error: 'Erro ao registrar imagens no banco',
+          message: 'Os arquivos foram salvos, mas houve erro ao registrar no banco de dados',
+          details: errors.length > 0 ? errors : ['Erro desconhecido ao criar registros de imagens']
+        });
       }
     } catch (error: any) {
       console.error('❌ Erro ao processar imagens:', error);
       console.error('❌ Stack:', error.stack);
-      // Não retornar erro aqui, apenas logar - os arquivos já foram salvos
+      return res.status(500).json({
+        error: 'Erro ao processar imagens',
+        message: error.message || 'Erro interno do servidor',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
 
     let images: any[] = [];
