@@ -741,7 +741,7 @@ const Products: React.FC = () => {
                             {product.images && product.images.length > 0 ? (
                               <img
                                 src={getImageUrl(product.images[0].url)}
-                                alt={product.name}
+                                alt={product.name || 'Produto sem nome'}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
@@ -751,7 +751,7 @@ const Products: React.FC = () => {
                             ) : product.imageUrl ? (
                               <img
                                 src={getImageUrl(product.imageUrl)}
-                                alt={product.name}
+                                alt={product.name || 'Produto sem nome'}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                               />
                             ) : null}
