@@ -1863,20 +1863,33 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               Cancelar
             </button>
             {/* Botão para salvar como rascunho (apenas na criação) */}
-            {!product && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
-                  handleSubmit(e, true);
-                }}
-                disabled={isLoading}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
-              </button>
-            )}
+            {(() => {
+              const shouldShow = !product;
+              console.log('🔍 [BUTTON DEBUG] Verificando botão rascunho:', {
+                product,
+                shouldShow,
+                productType: typeof product,
+                productValue: product,
+                isUndefined: product === undefined,
+                isNull: product === null,
+                isFalsy: !product
+              });
+              return shouldShow ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
+                    handleSubmit(e, true);
+                  }}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ display: 'block' }}
+                >
+                  {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
+                </button>
+              ) : null;
+            })()}
             {/* Botão para criar produto a partir do rascunho (apenas na edição de rascunho) */}
             {product?.isDraft && onCreateFromDraft && (
               <button
