@@ -254,13 +254,24 @@ const Products: React.FC = () => {
         console.log('✅ [FRONTEND CREATE] Imagem enviada com sucesso');
       }
       // Upload de múltiplas imagens por tipo
+      // Validar novamente antes de enviar (garantia extra)
       if (imageFilesRoupa && imageFilesRoupa.length > 0) {
-        console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', imageFilesRoupa.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
+        const validRoupaFiles = imageFilesRoupa.filter(f => f instanceof File && f.size > 0);
+        if (validRoupaFiles.length > 0) {
+          console.log('🖼️ [FRONTEND CREATE] Enviando imagens ROUPA...', validRoupaFiles.length);
+          await productsApi.uploadImages(createdProduct.id, validRoupaFiles, 'ROUPA');
+        } else {
+          console.warn('⚠️ [FRONTEND CREATE] Nenhuma imagem ROUPA válida para enviar');
+        }
       }
       if (imageFilesIA && imageFilesIA.length > 0) {
-        console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', imageFilesIA.length);
-        await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
+        const validIAFiles = imageFilesIA.filter(f => f instanceof File && f.size > 0);
+        if (validIAFiles.length > 0) {
+          console.log('🤖 [FRONTEND CREATE] Enviando imagens IA...', validIAFiles.length);
+          await productsApi.uploadImages(createdProduct.id, validIAFiles, 'IA');
+        } else {
+          console.warn('⚠️ [FRONTEND CREATE] Nenhuma imagem IA válida para enviar');
+        }
       }
       
       // Atualizar a lista de produtos
