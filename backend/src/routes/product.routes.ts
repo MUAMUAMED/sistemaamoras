@@ -1393,13 +1393,34 @@ router.get('/:id/images', authenticateToken, async (req, res, next) => {
  *                   type: string
  *                   format: binary
  */
-router.post('/:id/images', authenticateToken, uploadProductImage.array('images', 6), async (req, res, next) => {
+router.post('/:id/images', authenticateToken, (req, res, next) => {
+  console.log('🖼️ [UPLOAD IMAGES] Requisição recebida:', {
+    productId: req.params.id,
+    type: req.query.type,
+    contentType: req.headers['content-type'],
+    hasFiles: !!req.files,
+    filesCount: req.files ? (req.files as any[]).length : 0
+  });
+  next();
+}, uploadProductImage.array('images', 6), async (req, res, next) => {
   try {
+    console.log('🖼️ [UPLOAD IMAGES] Após multer:', {
+      productId: req.params.id,
+      filesCount: req.files ? (req.files as any[]).length : 0,
+      files: req.files ? (req.files as any[]).map((f: any) => ({ 
+        filename: f.filename, 
+        originalname: f.originalname,
+        mimetype: f.mimetype,
+        size: f.size 
+      })) : []
+    });
+
     const { id } = req.params;
     const typeParam = (req.query.type as string)?.toUpperCase();
     const imageType = typeParam === 'IA' ? 'IA' : 'ROUPA';
 
     if (!req.files || !(req.files as any[]).length) {
+      console.warn('⚠️ [UPLOAD IMAGES] Nenhuma imagem enviada');
       return res.status(400).json({ error: 'Nenhuma imagem enviada' });
     }
 
