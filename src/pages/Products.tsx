@@ -759,13 +759,25 @@ const Products: React.FC = () => {
                                 alt={product.name || 'Produto sem nome'}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
+                                  const imageUrl = product.images?.[0]?.url;
+                                  const finalUrl = imageUrl ? getImageUrl(imageUrl) : '';
                                   console.error(`❌ [PRODUCT CARD] Erro ao carregar imagem:`, {
                                     productId: product.id,
-                                    imageUrl: product.images?.[0]?.url,
-                                    finalUrl: product.images?.[0]?.url ? getImageUrl(product.images[0].url) : ''
+                                    productName: product.name,
+                                    imageUrl,
+                                    finalUrl,
+                                    apiUrl: import.meta.env.REACT_APP_API_URL || import.meta.env.VITE_API_URL || 'não configurada',
+                                    error: e.currentTarget.src,
+                                    status: (e.target as HTMLImageElement).complete ? 'complete' : 'loading'
                                   });
-                                  e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  // Tentar carregar a imagem novamente com URL alternativa
+                                  if (finalUrl && finalUrl !== e.currentTarget.src) {
+                                    console.log('🔄 [PRODUCT CARD] Tentando recarregar com URL:', finalUrl);
+                                    e.currentTarget.src = finalUrl;
+                                  } else {
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                  }
                                 }}
                                 onLoad={() => {
                                   console.log(`✅ [PRODUCT CARD] Imagem carregada com sucesso:`, {
