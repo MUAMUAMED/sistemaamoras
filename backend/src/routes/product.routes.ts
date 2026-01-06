@@ -1390,6 +1390,9 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
 
+    // Permitir upload de imagens para rascunhos também
+    // Rascunhos podem ter imagens mesmo sem todos os campos preenchidos
+
     const files = (req.files as Express.Multer.File[]) || [];
     
     // Verificar limite atual de imagens do produto
