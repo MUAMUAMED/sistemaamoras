@@ -151,9 +151,43 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 // Servir arquivos estáticos de uploads
 // Usar path absoluto para garantir que funciona em qualquer ambiente
 import path from 'path';
+import fs from 'fs';
+
 const uploadsPath = path.join(process.cwd(), 'uploads');
-app.use("/uploads", express.static(uploadsPath));
+
+// Garantir que o diretório existe
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+  console.log(`📁 [STATIC] Diretório de uploads criado: ${uploadsPath}`);
+}
+
+// Servir arquivos estáticos com headers CORS apropriados
+app.use("/uploads", (req, res, next) => {
+  // Adicionar headers CORS para imagens
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+}, express.static(uploadsPath, {
+  // Configurações adicionais para servir arquivos
+  setHeaders: (res, filePath) => {
+    // Adicionar cache headers para imagens
+    if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.png') || filePath.endsWith('.gif') || filePath.endsWith('.webp')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+    }
+  }
+}));
+
 console.log(`📁 [STATIC] Servindo arquivos estáticos de: ${uploadsPath}`);
+
+// Rota de teste para verificar se os arquivos estão sendo servidos
+app.get('/uploads/test', (req, res) => {
+  res.json({
+    uploadsPath,
+    exists: fs.existsSync(uploadsPath),
+    files: fs.existsSync(uploadsPath) ? fs.readdirSync(uploadsPath).slice(0, 10) : []
+  });
+});
 
 // === Swagger ===
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
