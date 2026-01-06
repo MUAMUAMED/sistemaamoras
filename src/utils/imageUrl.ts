@@ -23,16 +23,25 @@ export const getImageUrl = (url: string | null | undefined): string => {
   // Se temos uma URL de API configurada, construir URL completa
   if (apiUrl) {
     // Remover /api do final se existir (imagens são servidas na raiz do backend)
-    const baseUrl = apiUrl.replace(/\/api\/?$/, '');
-    const finalUrl = `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
-    console.log('🔗 [getImageUrl] URL construída:', { original: url, baseUrl, finalUrl });
+    // Também remover barra final se existir
+    let baseUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+    // Garantir que a URL da imagem começa com /
+    const imagePath = url.startsWith('/') ? url : `/${url}`;
+    const finalUrl = `${baseUrl}${imagePath}`;
+    console.log('🔗 [getImageUrl] URL construída:', { 
+      original: url, 
+      apiUrl, 
+      baseUrl, 
+      imagePath,
+      finalUrl 
+    });
     return finalUrl;
   }
   
   // Se não temos URL de API configurada, usar URL relativa
   // Isso funciona se frontend e backend estão no mesmo domínio
   const relativeUrl = url.startsWith('/') ? url : `/${url}`;
-  console.log('📁 [getImageUrl] Usando URL relativa:', relativeUrl);
+  console.log('📁 [getImageUrl] Usando URL relativa (sem API_URL configurada):', relativeUrl);
   return relativeUrl;
 };
 
