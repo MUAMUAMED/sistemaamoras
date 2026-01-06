@@ -42,21 +42,14 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilt
     fieldname: file.fieldname,
     originalname: file.originalname,
     mimetype: file.mimetype,
-    size: file.size,
+    // Nota: file.size pode estar undefined no fileFilter (arquivo ainda não foi completamente recebido)
+    size: file.size || 'undefined (será validado após upload)',
     buffer: file.buffer ? `Buffer(${file.buffer.length} bytes)` : 'undefined'
   });
   
-  // Validar que o arquivo tem tamanho válido
-  if (!file.size || file.size === 0) {
-    console.error('❌ [MULTER] Arquivo sem tamanho válido:', {
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size
-    });
-    return cb(new Error('Arquivo inválido: tamanho não pode ser zero ou indefinido'));
-  }
-  
-  if (file.mimetype.startsWith('image/')) {
+  // Validar apenas o tipo MIME (não validar tamanho aqui, pois pode estar undefined)
+  // O tamanho será validado após o arquivo ser salvo
+  if (file.mimetype && file.mimetype.startsWith('image/')) {
     cb(null, true);
   } else {
     console.error('❌ [MULTER] Tipo de arquivo não permitido:', file.mimetype);

@@ -1436,17 +1436,46 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
 
     // Validar que os arquivos têm propriedades válidas
     const files = (req.files as Express.Multer.File[]) || [];
-    const validFiles = files.filter(file => file && file.size > 0 && file.filename);
+    
+    // Verificar se os arquivos foram salvos corretamente
+    const validFiles = files.filter(file => {
+      if (!file || !file.filename) {
+        return false;
+      }
+      
+      // Verificar se o arquivo existe no sistema de arquivos
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(process.cwd(), 'uploads', 'products', file.filename);
+      
+      if (!fs.existsSync(filePath)) {
+        console.error('❌ [UPLOAD IMAGES] Arquivo não encontrado no sistema de arquivos:', filePath);
+        return false;
+      }
+      
+      // Verificar tamanho do arquivo no sistema de arquivos
+      const stats = fs.statSync(filePath);
+      if (stats.size === 0) {
+        console.error('❌ [UPLOAD IMAGES] Arquivo tem tamanho zero:', filePath);
+        return false;
+      }
+      
+      // Atualizar file.size com o tamanho real do arquivo
+      file.size = stats.size;
+      
+      return true;
+    });
     
     if (validFiles.length === 0) {
       console.error('❌ [UPLOAD IMAGES] Arquivos recebidos são inválidos:', files.map(f => ({
         filename: f?.filename,
         size: f?.size,
-        originalname: f?.originalname
+        originalname: f?.originalname,
+        path: f?.path
       })));
       return res.status(400).json({ 
         error: 'Arquivos inválidos',
-        message: 'Os arquivos enviados não são válidos. Verifique se são imagens reais.'
+        message: 'Os arquivos enviados não são válidos ou não foram salvos corretamente. Verifique se são imagens reais.'
       });
     }
 
