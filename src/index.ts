@@ -148,7 +148,12 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // === Estáticos ===
-app.use("/uploads", express.static("uploads"));
+// Servir arquivos estáticos de uploads
+// Usar path absoluto para garantir que funciona em qualquer ambiente
+import path from 'path';
+const uploadsPath = path.join(process.cwd(), 'uploads');
+app.use("/uploads", express.static(uploadsPath));
+console.log(`📁 [STATIC] Servindo arquivos estáticos de: ${uploadsPath}`);
 
 // === Swagger ===
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));

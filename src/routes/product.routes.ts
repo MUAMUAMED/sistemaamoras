@@ -1563,14 +1563,22 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
         }
         
         try {
+          // Construir URL completa da imagem
+          // Em produção, usar APP_URL se disponível, senão usar URL relativa
+          const imageUrl = process.env.APP_URL 
+            ? `${process.env.APP_URL}/uploads/products/${file.filename}`
+            : `/uploads/products/${file.filename}`;
+          
           const image = await (prisma as any).productImage.create({
             data: {
               productId: id,
-              url: `/uploads/products/${file.filename}`,
+              url: imageUrl,
               type: imageType as any,
               position: currentImageCount + index,
             },
           });
+          
+          console.log(`📸 [UPLOAD IMAGES] Imagem criada com URL:`, imageUrl);
           created.push(image);
           console.log(`✅ Imagem ${index + 1} criada no banco:`, image.id);
         } catch (imageError: any) {
