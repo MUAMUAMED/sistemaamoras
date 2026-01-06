@@ -1863,7 +1863,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               Cancelar
             </button>
             {/* Botão para salvar como rascunho (apenas na criação) */}
-            {isCreating && (
+            {!product && (
               <button
                 type="button"
                 onClick={(e) => {
