@@ -790,7 +790,7 @@ const Products: React.FC = () => {
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-600">Preço:</span>
                                 <span className="font-semibold text-green-600">
-                                  R$ {product.price.toFixed(2)}
+                                  R$ {product.price ? product.price.toFixed(2) : '0.00'}
                                 </span>
                               </div>
                               
@@ -1942,7 +1942,7 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-sm text-gray-600">Preço de Venda:</span>
-                  <span className="text-sm font-medium text-gray-900">R$ {product.price.toFixed(2)}</span>
+                  <span className="text-sm font-medium text-gray-900">R$ {product.price ? product.price.toFixed(2) : '0.00'}</span>
                 </div>
                 {product.cost && (
                   <div className="flex justify-between">
@@ -1950,7 +1950,7 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
                     <span className="text-sm font-medium text-gray-900">R$ {product.cost.toFixed(2)}</span>
                   </div>
                 )}
-                {product.cost && (
+                {product.cost && product.price && (
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Margem:</span>
                     <span className="text-sm font-medium text-green-600">
@@ -2200,7 +2200,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                     ${productDetails.subcategory ? `<div class="detail-line subcategory">SUB: ${productDetails.subcategory.name}</div>` : ''}
                     <div class="detail-line pattern">EST: ${productDetails.pattern?.name || 'N/A'}</div>
                   </div>
-                  <div class="price">R$ ${productDetails.price.toFixed(2).replace('.', ',')}</div>
+                  <div class="price">R$ ${productDetails.price ? productDetails.price.toFixed(2).replace('.', ',') : '0,00'}</div>
                 </div>
               </div>
               <script>

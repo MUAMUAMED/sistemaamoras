@@ -176,7 +176,7 @@ export default function ProductSelector({
                     </div>
                   </div>
                   <div className={`text-right ml-2 ${index === selectedIndex ? 'text-indigo-200' : 'text-gray-500'}`}>
-                    <div className="font-medium">R$ {product.price.toFixed(2)}</div>
+                    <div className="font-medium">R$ {product.price ? product.price.toFixed(2) : '0.00'}</div>
                     <div className="text-xs">
                       Estoque: {product.stock}
                     </div>
