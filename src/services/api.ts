@@ -332,8 +332,36 @@ export const productsApi = {
   },
 
   uploadImages: async (id: string, images: File[], type: 'ROUPA' | 'IA'): Promise<{ message: string }> => {
+    // Validar que todos os arquivos são Files válidos
+    const validFiles: File[] = [];
+    images.forEach((file, index) => {
+      if (file instanceof File && file.size > 0) {
+        validFiles.push(file);
+        console.log(`✅ [UPLOAD] Arquivo ${index + 1} válido:`, {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
+      } else {
+        console.error(`❌ [UPLOAD] Arquivo ${index + 1} inválido:`, {
+          isFile: file instanceof File,
+          size: file?.size,
+          type: typeof file
+        });
+      }
+    });
+
+    if (validFiles.length === 0) {
+      throw new Error('Nenhum arquivo válido para upload');
+    }
+
     const formData = new FormData();
-    images.forEach((file) => formData.append('images', file));
+    validFiles.forEach((file) => {
+      formData.append('images', file);
+    });
+    
+    console.log(`📤 [UPLOAD] Enviando ${validFiles.length} arquivo(s) válido(s) de ${images.length} total`);
+    
     // NÃO setar Content-Type manualmente - o browser define o boundary automaticamente
     const response = await api.post(`/products/${id}/images?type=${type}`, formData);
     return response.data;
