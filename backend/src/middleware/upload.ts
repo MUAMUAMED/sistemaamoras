@@ -1,12 +1,24 @@
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { Request } from 'express';
+
+// Garantir que o diretório de upload existe
+const uploadDir = path.join(process.cwd(), 'uploads', 'products');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log('📁 [MULTER] Diretório de upload criado:', uploadDir);
+}
 
 // Configuração do armazenamento
 const storage = multer.diskStorage({
   destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
-    console.log('📁 [MULTER] Salvando arquivo em:', 'uploads/products/');
-    cb(null, 'uploads/products/');
+    // Garantir que o diretório existe antes de salvar
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    console.log('📁 [MULTER] Salvando arquivo em:', uploadDir);
+    cb(null, uploadDir);
   },
   filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     // Gerar nome único para o arquivo
