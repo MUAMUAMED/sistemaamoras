@@ -247,7 +247,8 @@ const Products: React.FC = () => {
       const createdProduct = await productsApi.create(payload);
       console.log('✅ [FRONTEND CREATE] Produto criado com sucesso:', createdProduct);
       
-      // Upload de imagens apenas se não for rascunho (rascunhos podem não ter produto completo)
+      // Upload de imagens apenas se não for rascunho
+      // Rascunhos não devem ter upload de imagens para evitar erros no backend
       if (!saveAsDraft) {
         // Se há uma imagem, fazer o upload (compatibilidade)
         if (imageFile) {
@@ -265,22 +266,9 @@ const Products: React.FC = () => {
           await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
         }
       } else {
-        // Para rascunhos, tentar fazer upload de imagens se houver
-        // Mas não falhar se der erro (rascunhos são parciais)
-        try {
-          if (imageFile) {
-            await productsApi.uploadImage(createdProduct.id, imageFile);
-          }
-          if (imageFilesRoupa && imageFilesRoupa.length > 0) {
-            await productsApi.uploadImages(createdProduct.id, imageFilesRoupa, 'ROUPA');
-          }
-          if (imageFilesIA && imageFilesIA.length > 0) {
-            await productsApi.uploadImages(createdProduct.id, imageFilesIA, 'IA');
-          }
-        } catch (imageError: any) {
-          console.warn('⚠️ [FRONTEND CREATE] Erro ao fazer upload de imagens do rascunho (ignorado):', imageError);
-          // Não falhar o processo por causa de imagens em rascunhos
-        }
+        // Para rascunhos, não fazer upload de imagens
+        // As imagens serão salvas quando o rascunho for convertido em produto completo
+        console.log('📝 [FRONTEND CREATE] Rascunho criado. Imagens serão salvas quando o produto for finalizado.');
       }
       
       // Atualizar a lista de produtos
