@@ -33,7 +33,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "⚠️  Script não encontrado no container. Copiando..." -ForegroundColor Yellow
     
     # Copiar script para o container
-    docker cp backend/scripts/create-test-user.js amoras-backend:/app/scripts/create-test-user.js
+    docker cp scripts/create-test-user.js amoras-backend:/app/scripts/create-test-user.js
     
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Erro ao copiar script para o container!" -ForegroundColor Red

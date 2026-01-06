@@ -46,8 +46,8 @@ services:
       - amoras-network
     restart: unless-stopped
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
 
   # Frontend React
   frontend:

@@ -47,8 +47,8 @@ services:
       - amoras-test-network
     restart: "no"  # Não reiniciar automaticamente para ver erros
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
     command: sh -c "echo 'Waiting for DB...' && sleep 10 && npx prisma migrate deploy || echo 'Migration check done' && node dist/index.js"
 
 volumes:
