@@ -4,10 +4,10 @@ import { Request } from 'express';
 
 // Configuração do armazenamento
 const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => {
+  destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
     console.log('📁 [MULTER] Salvando arquivo em:', 'uploads/products/');
     cb(null, 'uploads/products/');
-  }),
+  },
   filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
     // Gerar nome único para o arquivo
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
