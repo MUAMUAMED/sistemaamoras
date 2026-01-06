@@ -1025,6 +1025,7 @@ const Products: React.FC = () => {
       {showCreateModal && (
         <ProductFormModal
           title="Novo Produto"
+          product={undefined}
           categories={categories}
           subcategories={subcategories}
           patterns={patterns}
@@ -1258,6 +1259,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   setShowPatternModal,
   setSelectedCategoryId,
 }) => {
+  const isCreating = !product;
+  
   console.log('🔧 [FORM MODAL] Inicializando formulário:', {
     title,
     product: product ? {
@@ -1271,7 +1274,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       stock: product.stock,
       isDraft: product.isDraft
     } : null,
-    isCreating: !product,
+    isCreating,
+    productIsUndefined: product === undefined,
+    productIsNull: product === null,
+    productIsFalsy: !product,
     sizesCount: sizes.length,
     categoriesCount: categories.length,
     patternsCount: patterns.length,
@@ -1857,11 +1863,12 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               Cancelar
             </button>
             {/* Botão para salvar como rascunho (apenas na criação) */}
-            {!product && (
+            {isCreating && (
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
+                  console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
                   handleSubmit(e, true);
                 }}
                 disabled={isLoading}
