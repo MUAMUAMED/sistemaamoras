@@ -182,10 +182,17 @@ console.log(`📁 [STATIC] Servindo arquivos estáticos de: ${uploadsPath}`);
 
 // Rota de teste para verificar se os arquivos estão sendo servidos
 app.get('/uploads/test', (req, res) => {
+  const productsPath = path.join(uploadsPath, 'products');
+  const productsFiles = fs.existsSync(productsPath) ? fs.readdirSync(productsPath).slice(0, 20) : [];
+  
   res.json({
     uploadsPath,
     exists: fs.existsSync(uploadsPath),
-    files: fs.existsSync(uploadsPath) ? fs.readdirSync(uploadsPath).slice(0, 10) : []
+    files: fs.existsSync(uploadsPath) ? fs.readdirSync(uploadsPath).slice(0, 10) : [],
+    productsPath,
+    productsExists: fs.existsSync(productsPath),
+    productsFiles,
+    productsFilesCount: productsFiles.length
   });
 });
 
