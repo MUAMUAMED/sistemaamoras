@@ -1268,8 +1268,10 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       sizeId: product.sizeId,
       patternId: product.patternId,
       price: product.price,
-      stock: product.stock
+      stock: product.stock,
+      isDraft: product.isDraft
     } : null,
+    isCreating: !product,
     sizesCount: sizes.length,
     categoriesCount: categories.length,
     patternsCount: patterns.length,
