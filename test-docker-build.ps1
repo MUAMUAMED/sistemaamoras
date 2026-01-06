@@ -41,15 +41,14 @@ try {
     Write-Host "  AVISO: docker-compose nao encontrado" -ForegroundColor Yellow
 }
 
-# Mudar para diretório backend
+# Preparar ambiente (agora na raiz)
 Write-Host "[3/8] Preparando ambiente..." -ForegroundColor Yellow
-$backendPath = Join-Path $PSScriptRoot "backend"
-if (-not (Test-Path $backendPath)) {
-    Write-Host "  ERRO: Diretorio backend nao encontrado!" -ForegroundColor Red
-    exit 1
+$projectRoot = $PSScriptRoot
+if (-not $projectRoot) {
+    $projectRoot = Get-Location
 }
-Set-Location $backendPath
-Write-Host "  OK: Diretorio: $backendPath" -ForegroundColor Green
+Set-Location $projectRoot
+Write-Host "  OK: Diretorio: $projectRoot" -ForegroundColor Green
 
 # Verificar arquivos essenciais
 Write-Host "[4/8] Verificando arquivos essenciais..." -ForegroundColor Yellow

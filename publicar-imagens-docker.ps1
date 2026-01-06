@@ -88,11 +88,11 @@ Set-Location $projectRoot
 # BACKEND
 # ============================================
 Write-Host "[4/7] 📦 Build Backend..." -ForegroundColor Yellow
-Write-Host "   Diretório: $projectRoot\backend" -ForegroundColor Gray
-Set-Location "$projectRoot\backend"
+Write-Host "   Diretório: $projectRoot" -ForegroundColor Gray
+Set-Location "$projectRoot"
 
-Write-Host "   Executando: docker build -t $DockerUser/amoras-backend:latest ." -ForegroundColor Gray
-$backendBuild = docker build -t "$DockerUser/amoras-backend:latest" . 2>&1
+Write-Host "   Executando: docker build -t $DockerUser/amoras-backend:latest -f Dockerfile ." -ForegroundColor Gray
+$backendBuild = docker build -t "$DockerUser/amoras-backend:latest" -f Dockerfile . 2>&1
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "   ✅ Backend build concluído com sucesso!" -ForegroundColor Green

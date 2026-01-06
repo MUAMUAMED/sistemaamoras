@@ -19,8 +19,8 @@ if (-not $projectRoot) {
 
 # BACKEND
 Write-Host "[1/4] Build Backend..." -ForegroundColor Yellow
-Set-Location "$projectRoot\backend"
-docker build -t "$DockerUser/amoras-backend:latest" .
+Set-Location "$projectRoot"
+docker build -t "$DockerUser/amoras-backend:latest" -f Dockerfile .
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERRO: Build do Backend falhou" -ForegroundColor Red
     exit 1

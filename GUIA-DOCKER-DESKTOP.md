@@ -115,7 +115,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: amoras-backend
     environment:
@@ -130,8 +130,8 @@ services:
     networks:
       - amoras-network
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
 
 volumes:
   postgres_data:

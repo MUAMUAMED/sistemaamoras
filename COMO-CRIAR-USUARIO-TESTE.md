@@ -55,7 +55,7 @@ Se preferir executar manualmente:
 ### Passo 1: Copiar script para o container
 
 ```powershell
-docker cp backend/scripts/create-test-user.js amoras-backend:/app/scripts/create-test-user.js
+docker cp scripts/create-test-user.js amoras-backend:/app/scripts/create-test-user.js
 ```
 
 ### Passo 2: Executar o script
@@ -146,8 +146,8 @@ docker-compose up -d
 ```
 
 **Solução:**
-- Verifique se o arquivo existe: `backend/scripts/create-test-user.js`
-- Execute manualmente: `docker cp backend/scripts/create-test-user.js amoras-backend:/app/scripts/create-test-user.js`
+- Verifique se o arquivo existe: `scripts/create-test-user.js`
+- Execute manualmente: `docker cp scripts/create-test-user.js amoras-backend:/app/scripts/create-test-user.js`
 
 ### 3. Erro de conexão com banco
 ```
@@ -184,7 +184,7 @@ Se quiser criar um usuário com email e senha específicos, você pode:
 
 ### Opção 1: Editar o script temporariamente
 
-Edite `backend/scripts/create-test-user.js` e substitua:
+Edite `scripts/create-test-user.js` e substitua:
 
 ```javascript
 const email = generateRandomEmail();

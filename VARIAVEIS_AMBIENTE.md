@@ -5,7 +5,7 @@ Este documento lista todas as variáveis de ambiente necessárias para o sistema
 ## 📋 Como Usar
 
 1. **Docker Compose**: Crie um arquivo `.env` na raiz do projeto com as variáveis abaixo
-2. **Backend**: Crie um arquivo `.env` na pasta `backend/` (veja `backend/env.local.example`)
+2. **Backend**: Crie um arquivo `.env` na raiz do projeto (veja `env.local.example`)
 3. **Frontend**: Configure as variáveis no build (veja `frontend/env.production.example`)
 
 ## 🔧 Variáveis Principais
