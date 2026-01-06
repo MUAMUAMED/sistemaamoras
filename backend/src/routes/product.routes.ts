@@ -1431,19 +1431,33 @@ router.post('/:id/images', authenticateToken, uploadProductImage.array('images',
 
     let created: any[] = [];
     try {
-      created = await prisma.$transaction(filesToProcess.map((file: Express.Multer.File, index) =>
-        (prisma as any).productImage.create({
-          data: {
-            productId: id,
-            url: `/uploads/products/${file.filename}`,
-            type: imageType as any,
-            position: currentImageCount + index,
-          },
-        })
-      ));
+      // Criar imagens uma por uma para rascunhos (evita problemas com transações)
+      for (let index = 0; index < filesToProcess.length; index++) {
+        const file = filesToProcess[index];
+        try {
+          const image = await (prisma as any).productImage.create({
+            data: {
+              productId: id,
+              url: `/uploads/products/${file.filename}`,
+              type: imageType as any,
+              position: currentImageCount + index,
+            },
+          });
+          created.push(image);
+        } catch (imageError: any) {
+          console.error(`❌ Erro ao criar imagem ${index + 1}:`, imageError);
+          console.error(`❌ Stack:`, imageError.stack);
+          // Continuar com as outras imagens mesmo se uma falhar
+        }
+      }
+      
+      if (created.length === 0) {
+        console.warn('⚠️ Nenhuma imagem foi criada no banco, mas arquivos foram salvos');
+      }
     } catch (error: any) {
-      console.warn('⚠️ ProductImage table not found, skipping image record creation:', error.message);
-      return res.json({ message: 'Imagens enviadas com sucesso (modo compatibilidade)', created: [], images: [] });
+      console.error('❌ Erro ao processar imagens:', error);
+      console.error('❌ Stack:', error.stack);
+      // Não retornar erro aqui, apenas logar - os arquivos já foram salvos
     }
 
     let images: any[] = [];
