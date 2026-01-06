@@ -1419,10 +1419,32 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
     const typeParam = (req.query.type as string)?.toUpperCase();
     const imageType = typeParam === 'IA' ? 'IA' : 'ROUPA';
 
+    // Validação melhorada - verificar se há arquivos válidos
     if (!req.files || !(req.files as any[]).length) {
-      console.warn('⚠️ [UPLOAD IMAGES] Nenhuma imagem enviada');
-      return res.status(400).json({ error: 'Nenhuma imagem enviada' });
+      console.warn('⚠️ [UPLOAD IMAGES] Nenhuma imagem recebida');
+      return res.status(400).json({ 
+        error: 'Nenhuma imagem enviada',
+        message: 'É necessário enviar pelo menos uma imagem válida'
+      });
     }
+
+    // Validar que os arquivos têm propriedades válidas
+    const files = (req.files as Express.Multer.File[]) || [];
+    const validFiles = files.filter(file => file && file.size > 0 && file.filename);
+    
+    if (validFiles.length === 0) {
+      console.error('❌ [UPLOAD IMAGES] Arquivos recebidos são inválidos:', files.map(f => ({
+        filename: f?.filename,
+        size: f?.size,
+        originalname: f?.originalname
+      })));
+      return res.status(400).json({ 
+        error: 'Arquivos inválidos',
+        message: 'Os arquivos enviados não são válidos. Verifique se são imagens reais.'
+      });
+    }
+
+    console.log(`✅ [UPLOAD IMAGES] ${validFiles.length} arquivo(s) válido(s) de ${files.length} recebido(s)`);
 
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
@@ -1430,8 +1452,6 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
     // Permitir upload de imagens para rascunhos também
     // Rascunhos podem ter imagens mesmo sem todos os campos preenchidos
 
-    const files = (req.files as Express.Multer.File[]) || [];
-    
     // Verificar limite atual de imagens do produto
     let currentImageCount = 0;
     try {
@@ -1441,7 +1461,8 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
     }
 
     const remainingSlots = Math.max(0, 6 - currentImageCount);
-    const filesToProcess: Express.Multer.File[] = files.slice(0, remainingSlots);
+    // Usar apenas arquivos válidos e respeitar o limite
+    const filesToProcess: Express.Multer.File[] = validFiles.slice(0, remainingSlots);
 
     if (filesToProcess.length < files.length) {
       return res.status(400).json({ 
