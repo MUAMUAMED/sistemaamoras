@@ -55,6 +55,12 @@ const Products: React.FC = () => {
   // Lista de produtos que foram finalizados (para controle local)
   const [finishedProducts, setFinishedProducts] = useState<Set<string>>(new Set());
 
+  // TESTE: Popup para verificar se mudanças estão sendo aplicadas
+  useEffect(() => {
+    alert('🧪 TESTE: Se você está vendo isso, as mudanças estão sendo aplicadas!');
+    toast.success('🧪 TESTE: Sistema está funcionando!', { duration: 5000 });
+  }, []);
+
   // Queries
   const { data: productsData, isLoading: loadingProducts } = useQuery({
     queryKey: ['products', filters],
