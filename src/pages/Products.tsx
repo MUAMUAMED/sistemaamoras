@@ -1322,16 +1322,42 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleImagesRoupaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
+    
+    // Validar que todos são Files válidos ANTES de adicionar ao state
+    const validFiles: File[] = [];
+    files.forEach((file, index) => {
+      if (file instanceof File && file.size > 0) {
+        validFiles.push(file);
+        console.log(`✅ [IMAGES ROUPA] Arquivo ${index + 1} válido:`, {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
+      } else {
+        console.error(`❌ [IMAGES ROUPA] Arquivo ${index + 1} inválido:`, {
+          isFile: file instanceof File,
+          size: file?.size,
+          type: typeof file
+        });
+      }
+    });
+    
+    if (validFiles.length === 0 && files.length > 0) {
+      toast.error('Nenhum arquivo válido foi selecionado');
+      e.target.value = '';
+      return;
+    }
+    
     const currentFiles = formData.imageFilesRoupa || [];
-    const totalFiles = [...currentFiles, ...files];
+    const totalFiles = [...currentFiles, ...validFiles];
     const limitedFiles = totalFiles.slice(0, 6);
     
     setFormData(prev => ({ ...prev, imageFilesRoupa: limitedFiles }));
     
     if (totalFiles.length > 6) {
       toast.error(`Máximo de 6 imagens permitidas. ${totalFiles.length - 6} imagem(ns) não foram adicionadas.`);
-    } else if (files.length > 0) {
-      toast.success(`${files.length} imagem(ns) adicionada(s) à categoria Roupa.`);
+    } else if (validFiles.length > 0) {
+      toast.success(`${validFiles.length} imagem(ns) adicionada(s) à categoria Roupa.`);
     }
     
     // Limpar o input para permitir selecionar os mesmos arquivos novamente
@@ -1340,16 +1366,42 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleImagesIAChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
+    
+    // Validar que todos são Files válidos ANTES de adicionar ao state
+    const validFiles: File[] = [];
+    files.forEach((file, index) => {
+      if (file instanceof File && file.size > 0) {
+        validFiles.push(file);
+        console.log(`✅ [IMAGES IA] Arquivo ${index + 1} válido:`, {
+          name: file.name,
+          size: file.size,
+          type: file.type
+        });
+      } else {
+        console.error(`❌ [IMAGES IA] Arquivo ${index + 1} inválido:`, {
+          isFile: file instanceof File,
+          size: file?.size,
+          type: typeof file
+        });
+      }
+    });
+    
+    if (validFiles.length === 0 && files.length > 0) {
+      toast.error('Nenhum arquivo válido foi selecionado');
+      e.target.value = '';
+      return;
+    }
+    
     const currentFiles = formData.imageFilesIA || [];
-    const totalFiles = [...currentFiles, ...files];
+    const totalFiles = [...currentFiles, ...validFiles];
     const limitedFiles = totalFiles.slice(0, 6);
     
     setFormData(prev => ({ ...prev, imageFilesIA: limitedFiles }));
     
     if (totalFiles.length > 6) {
       toast.error(`Máximo de 6 imagens permitidas. ${totalFiles.length - 6} imagem(ns) não foram adicionadas.`);
-    } else if (files.length > 0) {
-      toast.success(`${files.length} imagem(ns) adicionada(s) à categoria IA.`);
+    } else if (validFiles.length > 0) {
+      toast.success(`${validFiles.length} imagem(ns) adicionada(s) à categoria IA.`);
     }
     
     // Limpar o input para permitir selecionar os mesmos arquivos novamente
