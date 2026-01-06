@@ -332,21 +332,22 @@ export interface PaginatedResponse<T> {
 
 // Tipos para formulários
 export interface ProductFormData {
-  name: string;
+  name?: string; // Opcional para rascunhos
   description?: string;
-  price: number;
+  price?: number; // Opcional para rascunhos
   cost?: number;
-  stock: number;
-  minStock: number;
-  categoryId: string;
+  stock?: number; // Opcional para rascunhos
+  minStock?: number; // Opcional para rascunhos
+  categoryId?: string; // Opcional para rascunhos
   subcategoryId?: string; // Opcional
-  patternId: string;
-  sizeId: string; // ID do tamanho para buscar dados
+  patternId?: string; // Opcional para rascunhos
+  sizeId?: string; // Opcional para rascunhos - ID do tamanho para buscar dados
   active?: boolean;
   imageFile?: File;
   imageFilesRoupa?: File[]; // novas imagens tipo roupa
   imageFilesIA?: File[];    // novas imagens tipo IA
   initialLocation?: 'LOJA' | 'ARMAZEM'; // Localização inicial do estoque
+  saveAsDraft?: boolean; // Flag para salvar como rascunho
 }
 
 export interface SubcategoryFormData {
