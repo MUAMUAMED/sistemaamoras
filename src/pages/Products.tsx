@@ -2034,32 +2034,48 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </p>
                 
                 {/* Mostrar imagem principal atual */}
-                {product?.imageUrl ? (
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-600 mb-2">Imagem principal atual:</p>
-                    <div className="relative inline-block">
-                      <img
-                        src={getImageUrl(product.imageUrl)}
-                        alt="Imagem principal"
-                        className="w-24 h-24 object-cover rounded border-2 border-yellow-400"
-                        key={`main-${product.imageUrl}`}
-                        onError={(e) => {
-                          console.error('❌ [MAIN IMAGE] Erro ao carregar imagem principal:', product.imageUrl);
-                        }}
-                        onLoad={() => {
-                          console.log('✅ [MAIN IMAGE] Imagem principal carregada:', product.imageUrl);
-                        }}
-                      />
-                      <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
-                        Principal
-                      </span>
+                {(() => {
+                  console.log('🖼️ [RENDER MAIN IMAGE] Renderizando seção de imagem principal:', {
+                    hasProduct: !!product,
+                    imageUrl: product?.imageUrl,
+                    normalizedImageUrl: normalizeUrl(product?.imageUrl),
+                    productId: product?.id
+                  });
+                  return product?.imageUrl ? (
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-600 mb-2">Imagem principal atual:</p>
+                      <div className="relative inline-block">
+                        <img
+                          src={getImageUrl(product.imageUrl)}
+                          alt="Imagem principal"
+                          className="w-24 h-24 object-cover rounded border-2 border-yellow-400"
+                          key={`main-${product.imageUrl}`}
+                          onError={(e) => {
+                            console.error('❌ [MAIN IMAGE] Erro ao carregar imagem principal:', {
+                              imageUrl: product.imageUrl,
+                              finalUrl: getImageUrl(product.imageUrl),
+                              error: e
+                            });
+                          }}
+                          onLoad={() => {
+                            console.log('✅ [MAIN IMAGE] Imagem principal carregada:', {
+                              imageUrl: product.imageUrl,
+                              finalUrl: getImageUrl(product.imageUrl),
+                              key: `main-${product.imageUrl}`
+                            });
+                          }}
+                        />
+                        <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
+                          Principal
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-500 italic">Nenhuma imagem principal definida. Clique em uma imagem abaixo para defini-la.</p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-500 italic">Nenhuma imagem principal definida. Clique em uma imagem abaixo para defini-la.</p>
+                    </div>
+                  );
+                })()}
                 
                 {/* Mostrar todas as imagens existentes (ROUPA e IA) para escolher como principal */}
                 {(existingImagesRoupa.length > 0 || existingImagesIA.length > 0) && (
