@@ -1434,11 +1434,23 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   onProductUpdate,
 }) => {
   const queryClient = useQueryClient();
+  
+  // Log quando produto ou imageUrl mudar
+  useEffect(() => {
+    console.log('🔄 [FORM MODAL] Produto atualizado:', {
+      productId: product?.id,
+      imageUrl: product?.imageUrl,
+      hasImages: !!product?.images,
+      imagesCount: product?.images?.length || 0
+    });
+  }, [product?.id, product?.imageUrl]);
+  
   console.log('🔧 [FORM MODAL] Inicializando formulário:', {
     title,
     product: product ? {
       id: product.id,
       name: product.name,
+      imageUrl: product.imageUrl,
       categoryId: product.categoryId,
       subcategoryId: product.subcategoryId,
       sizeId: product.sizeId,
@@ -2009,7 +2021,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </p>
                 
                 {/* Mostrar imagem principal atual */}
-                {product?.imageUrl && (
+                {product?.imageUrl ? (
                   <div className="mb-3">
                     <p className="text-xs text-gray-600 mb-2">Imagem principal atual:</p>
                     <div className="relative inline-block">
@@ -2017,11 +2029,22 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         src={getImageUrl(product.imageUrl)}
                         alt="Imagem principal"
                         className="w-24 h-24 object-cover rounded border-2 border-yellow-400"
+                        key={`main-${product.imageUrl}`}
+                        onError={(e) => {
+                          console.error('❌ [MAIN IMAGE] Erro ao carregar imagem principal:', product.imageUrl);
+                        }}
+                        onLoad={() => {
+                          console.log('✅ [MAIN IMAGE] Imagem principal carregada:', product.imageUrl);
+                        }}
                       />
                       <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
                         Principal
                       </span>
                     </div>
+                  </div>
+                ) : (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-500 italic">Nenhuma imagem principal definida. Clique em uma imagem abaixo para defini-la.</p>
                   </div>
                 )}
                 
@@ -2037,17 +2060,34 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         <div 
                           key={img.id} 
                           className="relative group cursor-pointer"
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             if (product?.id) {
                               try {
+                                console.log('🖼️ [SET MAIN IMAGE] Iniciando:', {
+                                  productId: product.id,
+                                  imageId: img.id,
+                                  currentImageUrl: product.imageUrl,
+                                  newImageUrl: img.url
+                                });
                                 const response = await productsApi.setMainImage(product.id, img.id);
+                                console.log('✅ [SET MAIN IMAGE] Resposta:', {
+                                  message: response.message,
+                                  productImageUrl: response.product?.imageUrl,
+                                  productId: response.product?.id
+                                });
                                 toast.success('Imagem definida como principal!');
                                 queryClient.invalidateQueries({ queryKey: ['products'] });
                                 // Atualizar o produto no componente pai se callback disponível
                                 if (response.product && onProductUpdate) {
+                                  console.log('🔄 [SET MAIN IMAGE] Chamando onProductUpdate com:', response.product);
                                   onProductUpdate(response.product);
+                                } else {
+                                  console.warn('⚠️ [SET MAIN IMAGE] onProductUpdate não disponível ou produto não retornado');
                                 }
                               } catch (error: any) {
+                                console.error('❌ [SET MAIN IMAGE] Erro:', error);
                                 toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
                               }
                             }
@@ -2057,7 +2097,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             src={getImageUrl(img.url)}
                             alt="Imagem Roupa"
                             className={`w-full h-20 object-cover rounded border-2 transition-all ${
-                              product?.imageUrl === img.url 
+                              ((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || '')))
                                 ? 'border-yellow-400 ring-2 ring-yellow-300' 
                                 : 'border-blue-300 group-hover:border-yellow-400'
                             }`}
@@ -2067,7 +2107,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               Tornar Principal
                             </div>
                           </div>
-                          {product?.imageUrl === img.url && (
+                          {((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || ''))) && (
                             <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
                               ⭐
                             </span>
@@ -2080,17 +2120,34 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         <div 
                           key={img.id} 
                           className="relative group cursor-pointer"
-                          onClick={async () => {
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
                             if (product?.id) {
                               try {
+                                console.log('🖼️ [SET MAIN IMAGE] Iniciando:', {
+                                  productId: product.id,
+                                  imageId: img.id,
+                                  currentImageUrl: product.imageUrl,
+                                  newImageUrl: img.url
+                                });
                                 const response = await productsApi.setMainImage(product.id, img.id);
+                                console.log('✅ [SET MAIN IMAGE] Resposta:', {
+                                  message: response.message,
+                                  productImageUrl: response.product?.imageUrl,
+                                  productId: response.product?.id
+                                });
                                 toast.success('Imagem definida como principal!');
                                 queryClient.invalidateQueries({ queryKey: ['products'] });
                                 // Atualizar o produto no componente pai se callback disponível
                                 if (response.product && onProductUpdate) {
+                                  console.log('🔄 [SET MAIN IMAGE] Chamando onProductUpdate com:', response.product);
                                   onProductUpdate(response.product);
+                                } else {
+                                  console.warn('⚠️ [SET MAIN IMAGE] onProductUpdate não disponível ou produto não retornado');
                                 }
                               } catch (error: any) {
+                                console.error('❌ [SET MAIN IMAGE] Erro:', error);
                                 toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
                               }
                             }
@@ -2100,7 +2157,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             src={getImageUrl(img.url)}
                             alt="Imagem IA"
                             className={`w-full h-20 object-cover rounded border-2 transition-all ${
-                              product?.imageUrl === img.url 
+                              ((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || '')))
                                 ? 'border-yellow-400 ring-2 ring-yellow-300' 
                                 : 'border-purple-300 group-hover:border-yellow-400'
                             }`}
@@ -2110,7 +2167,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               Tornar Principal
                             </div>
                           </div>
-                          {product?.imageUrl === img.url && (
+                          {((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || ''))) && (
                             <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
                               ⭐
                             </span>
