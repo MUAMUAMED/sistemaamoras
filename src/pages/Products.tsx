@@ -1423,14 +1423,25 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
     
     const currentFiles = formData.imageFilesRoupa || [];
+    const totalExisting = existingImagesRoupa.length;
+    const totalNew = currentFiles.length + validFiles.length;
+    const totalAllowed = 6 - totalExisting; // Espaços disponíveis considerando imagens existentes
+    
+    if (totalNew > totalAllowed) {
+      toast.error(`Máximo de 6 imagens permitidas. Você já tem ${totalExisting} imagem(ns) existente(s). Pode adicionar apenas ${totalAllowed} nova(s).`);
+      const limitedNewFiles = validFiles.slice(0, Math.max(0, totalAllowed - currentFiles.length));
+      if (limitedNewFiles.length > 0) {
+        setFormData(prev => ({ ...prev, imageFilesRoupa: [...currentFiles, ...limitedNewFiles] }));
+        toast.success(`${limitedNewFiles.length} imagem(ns) adicionada(s) à categoria ROUPA.`);
+      }
+      e.target.value = '';
+      return;
+    }
+    
     const totalFiles = [...currentFiles, ...validFiles];
-    const limitedFiles = totalFiles.slice(0, 6);
+    setFormData(prev => ({ ...prev, imageFilesRoupa: totalFiles }));
     
-    setFormData(prev => ({ ...prev, imageFilesRoupa: limitedFiles }));
-    
-    if (totalFiles.length > 6) {
-      toast.error(`Máximo de 6 imagens permitidas. ${totalFiles.length - 6} imagem(ns) não foram adicionadas.`);
-    } else if (validFiles.length > 0) {
+    if (validFiles.length > 0) {
       toast.success(`${validFiles.length} imagem(ns) adicionada(s) à categoria Roupa.`);
     }
     
@@ -1747,7 +1758,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         />
                       </label>
                       <span className="text-sm text-gray-600">
-                        {formData.imageFilesRoupa?.length || 0}/6 imagens
+                        {(existingImagesRoupa.length + (formData.imageFilesRoupa?.length || 0))}/6 imagens
                       </span>
                     </div>
                     {formData.imageFilesRoupa && formData.imageFilesRoupa.length > 0 && (
@@ -1764,14 +1775,50 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     )}
                   </div>
                   
+                  {/* Mostrar imagens existentes */}
+                  {existingImagesRoupa.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-600 mb-2">
+                        📸 {existingImagesRoupa.length} imagem(ns) existente(s) na categoria ROUPA
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        {existingImagesRoupa.map((img, index) => (
+                          <div key={img.id} className="relative group">
+                            <img
+                              src={getImageUrl(img.url)}
+                              alt={`Imagem Roupa ${index + 1}`}
+                              className="w-full h-20 object-cover rounded border-2 border-blue-300"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded transition-all duration-200 flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExistingImagesRoupa(prev => prev.filter(i => i.id !== img.id));
+                                  toast.success('Imagem será removida ao salvar');
+                                }}
+                                className="opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-all duration-200"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <span className="absolute bottom-0 left-0 bg-blue-600 text-white text-xs px-1 rounded-tr">
+                              {index + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Mostrar novas imagens selecionadas */}
                   {formData.imageFilesRoupa && formData.imageFilesRoupa.length > 0 && (
                     <div>
                       <p className="text-xs text-gray-600 mb-2">
-                        ✅ {formData.imageFilesRoupa.length} imagem(ns) selecionada(s) para categoria ROUPA
+                        ✅ {formData.imageFilesRoupa.length} nova(s) imagem(ns) selecionada(s) para categoria ROUPA
                       </p>
                       <div className="grid grid-cols-3 gap-2">
                         {formData.imageFilesRoupa.map((file, index) => (
-                          <div key={index} className="relative group">
+                          <div key={`new-${index}`} className="relative group">
                             <img
                               src={URL.createObjectURL(file)}
                               alt={`Preview Roupa ${index + 1}`}
@@ -1790,8 +1837,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                 ×
                               </button>
                             </div>
-                            <span className="absolute bottom-0 left-0 bg-blue-600 text-white text-xs px-1 rounded-tr">
-                              {index + 1}
+                            <span className="absolute bottom-0 left-0 bg-green-600 text-white text-xs px-1 rounded-tr">
+                              Nova {index + 1}
                             </span>
                           </div>
                         ))}
