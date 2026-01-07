@@ -300,18 +300,25 @@ const Products: React.FC = () => {
     }
   };
 
-  const handleUpdateProduct = async (data: Partial<ProductFormData>) => {
+  const handleUpdateProduct = async (data: Partial<ProductFormData>, saveAsDraft?: boolean) => {
     if (selectedProduct) {
       console.log('🔄 [FRONTEND UPDATE] Produto selecionado:', selectedProduct);
       console.log('🔄 [FRONTEND UPDATE] Dados do formulário recebidos:', data);
+      console.log('🔄 [FRONTEND UPDATE] saveAsDraft:', saveAsDraft);
       
       try {
-        const { imageFile, imageFilesRoupa, imageFilesIA, ...productData } = data as any;
-        console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', productData);
+        const { imageFile, imageFilesRoupa, imageFilesIA, saveAsDraft: dataSaveAsDraft, ...productData } = data as any;
+        const isDraft = saveAsDraft ?? dataSaveAsDraft ?? false;
+        
+        // Se for rascunho, permitir campos vazios
+        const updateData = isDraft ? productData : productData;
+        
+        console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', updateData);
+        console.log('📤 [FRONTEND UPDATE] É rascunho?', isDraft);
         
         // Atualizar dados do produto (sem a imagem)
         console.log('🚀 [FRONTEND UPDATE] Enviando requisição para atualizar produto...');
-        const updatedProduct = await productsApi.update(selectedProduct.id, productData);
+        const updatedProduct = await productsApi.update(selectedProduct.id, { ...updateData, isDraft: isDraft });
         console.log('✅ [FRONTEND UPDATE] Produto atualizado com sucesso:', updatedProduct);
         
         // Se há uma nova imagem, fazer o upload (compatibilidade)
@@ -334,12 +341,14 @@ const Products: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['products'] });
         setShowEditModal(false);
         setSelectedProduct(null);
-        toast.success('Produto atualizado com sucesso!');
+        toast.success(isDraft ? 'Rascunho atualizado com sucesso!' : 'Produto atualizado com sucesso!');
       } catch (error: any) {
         console.error('💥 [FRONTEND UPDATE] Erro ao atualizar produto:', error);
         console.error('💥 [FRONTEND UPDATE] Resposta do servidor:', error.response?.data);
         toast.error(error.response?.data?.error || 'Erro ao atualizar produto');
       }
+    } else {
+      console.error('❌ [FRONTEND UPDATE] Nenhum produto selecionado!');
     }
   };
 
@@ -1411,10 +1420,13 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
-    console.log('💾 [FORM MODAL] Botão Salvar clicado', { saveAsDraft });
+    console.log('📝 [FORM SUBMIT] Iniciando submit:', { saveAsDraft, formData: { ...formData, imageFile: formData.imageFile ? 'File exists' : null, imageFilesRoupa: formData.imageFilesRoupa?.length || 0, imageFilesIA: formData.imageFilesIA?.length || 0 } });
     
-    if (saveAsDraft || validateForm()) {
-      console.log('🚀 [FORM MODAL] Iniciando submissão...');
+    // Se é rascunho OU se a validação passar, prosseguir
+    const isValid = saveAsDraft || validateForm();
+    console.log('✅ [FORM SUBMIT] Validação:', { saveAsDraft, isValid, errors });
+    
+    if (isValid) {
       const submitData: ProductFormData = {
         ...formData,
         subcategoryId: formData.subcategoryId || undefined,
@@ -1428,7 +1440,17 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         initialLocation: formData.initialLocation || 'LOJA', // Padrão para Loja
         saveAsDraft: saveAsDraft,
       };
+      console.log('🚀 [FORM SUBMIT] Chamando onSubmit com dados:', { ...submitData, imageFile: submitData.imageFile ? 'File exists' : null, imageFilesRoupa: submitData.imageFilesRoupa?.length || 0, imageFilesIA: submitData.imageFilesIA?.length || 0 });
       onSubmit(submitData, saveAsDraft);
+    } else {
+      console.error('❌ [FORM SUBMIT] Validação falhou, não enviando:', errors);
+      // Mostrar mensagem de erro para o usuário
+      const errorMessages = Object.values(errors);
+      if (errorMessages.length > 0) {
+        toast.error(`Por favor, preencha os campos obrigatórios: ${errorMessages.join(', ')}`);
+      } else {
+        toast.error('Por favor, preencha todos os campos obrigatórios');
+      }
     }
   };
 
