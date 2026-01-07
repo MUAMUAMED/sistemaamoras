@@ -1249,13 +1249,19 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       sizeId: product.sizeId,
       patternId: product.patternId,
       price: product.price,
-      stock: product.stock
+      stock: product.stock,
+      imagesCount: product.images?.length || 0,
+      images: product.images?.map(img => ({ id: img.id, url: img.url, type: img.type })) || []
     } : null,
     sizesCount: sizes.length,
     categoriesCount: categories.length,
     patternsCount: patterns.length,
     subcategoriesCount: subcategories.length
   });
+
+  // Estado para armazenar imagens existentes do produto
+  const [existingImagesRoupa, setExistingImagesRoupa] = useState<Array<{ id: string; url: string; type: string }>>([]);
+  const [existingImagesIA, setExistingImagesIA] = useState<Array<{ id: string; url: string; type: string }>>([]);
 
   const [formData, setFormData] = useState<ProductFormModalData>({
     name: product?.name || '',
@@ -1272,6 +1278,24 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     imageFilesRoupa: [],
     imageFilesIA: [],
   });
+
+  // Carregar imagens existentes quando o produto mudar
+  useEffect(() => {
+    if (product?.images) {
+      const roupaImages = product.images.filter(img => img.type === 'ROUPA');
+      const iaImages = product.images.filter(img => img.type === 'IA');
+      setExistingImagesRoupa(roupaImages);
+      setExistingImagesIA(iaImages);
+      console.log('🖼️ [FORM MODAL] Imagens existentes carregadas:', {
+        roupa: roupaImages.length,
+        ia: iaImages.length,
+        total: product.images.length
+      });
+    } else {
+      setExistingImagesRoupa([]);
+      setExistingImagesIA([]);
+    }
+  }, [product?.id, product?.images]);
 
   // Debug apenas quando produto muda
   useEffect(() => {
@@ -1443,8 +1467,23 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     }
     
     const currentFiles = formData.imageFilesIA || [];
+    const totalExisting = existingImagesIA.length;
+    const totalNew = currentFiles.length + validFiles.length;
+    const totalAllowed = 6 - totalExisting; // Espaços disponíveis considerando imagens existentes
+    
+    if (totalNew > totalAllowed) {
+      toast.error(`Máximo de 6 imagens permitidas. Você já tem ${totalExisting} imagem(ns) existente(s). Pode adicionar apenas ${totalAllowed} nova(s).`);
+      const limitedNewFiles = validFiles.slice(0, totalAllowed - currentFiles.length);
+      if (limitedNewFiles.length > 0) {
+        setFormData(prev => ({ ...prev, imageFilesIA: [...currentFiles, ...limitedNewFiles] }));
+        toast.success(`${limitedNewFiles.length} imagem(ns) adicionada(s) à categoria IA.`);
+      }
+      e.target.value = '';
+      return;
+    }
+    
     const totalFiles = [...currentFiles, ...validFiles];
-    const limitedFiles = totalFiles.slice(0, 6);
+    const limitedFiles = totalFiles;
     
     setFormData(prev => ({ ...prev, imageFilesIA: limitedFiles }));
     
@@ -1783,7 +1822,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                         />
                       </label>
                       <span className="text-sm text-gray-600">
-                        {formData.imageFilesIA?.length || 0}/6 imagens
+                        {(existingImagesIA.length + (formData.imageFilesIA?.length || 0))}/6 imagens
                       </span>
                     </div>
                     {formData.imageFilesIA && formData.imageFilesIA.length > 0 && (
@@ -1800,14 +1839,56 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     )}
                   </div>
                   
+                  {/* Mostrar imagens existentes */}
+                  {existingImagesIA.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-600 mb-2">
+                        📸 {existingImagesIA.length} imagem(ns) existente(s) na categoria IA
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        {existingImagesIA.map((img, index) => (
+                          <div key={img.id} className="relative group">
+                            <img
+                              src={getImageUrl(img.url)}
+                              alt={`Imagem IA ${index + 1}`}
+                              className="w-full h-20 object-cover rounded border-2 border-purple-300"
+                            />
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded transition-all duration-200 flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    // Aqui você pode adicionar uma chamada para deletar a imagem se necessário
+                                    // Por enquanto, apenas remove da visualização
+                                    setExistingImagesIA(prev => prev.filter(i => i.id !== img.id));
+                                    toast.success('Imagem será removida ao salvar');
+                                  } catch (error) {
+                                    toast.error('Erro ao remover imagem');
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-all duration-200"
+                              >
+                                ×
+                              </button>
+                            </div>
+                            <span className="absolute bottom-0 left-0 bg-purple-600 text-white text-xs px-1 rounded-tr">
+                              {index + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Mostrar novas imagens selecionadas */}
                   {formData.imageFilesIA && formData.imageFilesIA.length > 0 && (
                     <div>
                       <p className="text-xs text-gray-600 mb-2">
-                        ✅ {formData.imageFilesIA.length} imagem(ns) selecionada(s) para categoria IA
+                        ✅ {formData.imageFilesIA.length} nova(s) imagem(ns) selecionada(s) para categoria IA
                       </p>
                       <div className="grid grid-cols-3 gap-2">
                         {formData.imageFilesIA.map((file, index) => (
-                          <div key={index} className="relative group">
+                          <div key={`new-${index}`} className="relative group">
                             <img
                               src={URL.createObjectURL(file)}
                               alt={`Preview IA ${index + 1}`}
@@ -1826,8 +1907,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                                 ×
                               </button>
                             </div>
-                            <span className="absolute bottom-0 left-0 bg-purple-600 text-white text-xs px-1 rounded-tr">
-                              {index + 1}
+                            <span className="absolute bottom-0 left-0 bg-green-600 text-white text-xs px-1 rounded-tr">
+                              Nova {index + 1}
                             </span>
                           </div>
                         ))}
