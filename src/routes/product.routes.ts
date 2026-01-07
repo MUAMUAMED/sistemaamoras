@@ -881,6 +881,15 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       updateData.barcode = newBarcode;
     }
     if (isDraft !== undefined) {
+      // Validar: produtos não-rascunho não podem voltar a ser rascunho
+      if (isDraft && !product.isDraft) {
+        console.log('❌ [PRODUTO UPDATE] Tentativa de converter produto final em rascunho bloqueada');
+        return res.status(400).json({
+          error: 'Operação não permitida',
+          message: 'Produtos finais não podem ser convertidos em rascunhos. Apenas rascunhos podem ser mantidos como rascunhos.',
+        });
+      }
+      
       updateData.isDraft = isDraft;
       // Se está marcando como rascunho, atualizar status também
       if (isDraft) {
