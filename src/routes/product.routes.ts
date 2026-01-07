@@ -1565,7 +1565,9 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
         }
         
         // Verificar onde o arquivo foi salvo
-        const expectedPath = path.join(process.cwd(), 'uploads', 'products', file.filename);
+        // Usar mesmo caminho base que o Multer usa
+        const baseDir = process.env.UPLOADS_BASE_DIR || process.cwd();
+        const expectedPath = path.join(baseDir, 'uploads', 'products', file.filename);
         const fileExists = fs.existsSync(expectedPath);
         const fileStats = fileExists ? fs.statSync(expectedPath) : null;
         
