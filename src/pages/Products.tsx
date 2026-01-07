@@ -1522,7 +1522,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setExistingImagesRoupa([]);
       setExistingImagesIA([]);
     }
-  }, [product?.id, product?.images?.length]); // Mudar dependência para usar length ao invés do array inteiro
+  }, [product?.id, product?.images?.length, product?.imageUrl]); // Incluir imageUrl para reagir quando imagem principal mudar
 
   // Debug apenas quando produto muda
   useEffect(() => {
