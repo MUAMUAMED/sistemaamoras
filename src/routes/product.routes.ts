@@ -689,7 +689,8 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       patternId,
       stock,
       minStock,
-      cost
+      cost,
+      isDraft // Novo campo para rascunhos
     } = req.body;
 
     console.log('🔍 [PRODUTO UPDATE] Dados recebidos:', {
@@ -705,6 +706,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       stock,
       minStock,
       cost,
+      isDraft,
       bodyCompleto: req.body
     });
 
@@ -730,9 +732,14 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       barcode: product.barcode
     });
 
+    // Se for rascunho, não validar campos obrigatórios e não gerar código de barras
+    const isUpdatingDraft = isDraft !== undefined ? isDraft : product.isDraft;
+    console.log('📝 [PRODUTO UPDATE] É rascunho?', { isDraft, productIsDraft: product.isDraft, isUpdatingDraft });
+
     // Se estiver alterando categoria, tamanho ou estampa, validar e gerar novo código de barras
+    // MAS apenas se NÃO for rascunho (rascunhos podem ter campos null)
     let newBarcode = product.barcode;
-    if (categoryId || sizeId || patternId || subcategoryId !== undefined) {
+    if (!isUpdatingDraft && (categoryId || sizeId || patternId || subcategoryId !== undefined)) {
       console.log('🔄 [PRODUTO UPDATE] Alterando categoria/tamanho/estampa, validando...');
       
       const finalCategoryId = categoryId || product.categoryId;
@@ -749,10 +756,10 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 
       // Buscar dados para validação e geração do código de barras
       const [category, subcategory, size, pattern] = await Promise.all([
-        prisma.category.findUnique({ where: { id: finalCategoryId } }),
+        finalCategoryId ? prisma.category.findUnique({ where: { id: finalCategoryId } }) : null,
         finalSubcategoryId ? prisma.subcategory.findUnique({ where: { id: finalSubcategoryId } }) : null,
-        prisma.size.findUnique({ where: { id: finalSizeId } }),
-        prisma.pattern.findUnique({ where: { id: finalPatternId } }),
+        finalSizeId ? prisma.size.findUnique({ where: { id: finalSizeId } }) : null,
+        finalPatternId ? prisma.pattern.findUnique({ where: { id: finalPatternId } }) : null,
       ]);
 
       console.log('📋 [PRODUTO UPDATE] Dados encontrados:', {
@@ -762,6 +769,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
         pattern: pattern ? { id: pattern.id, name: pattern.name, code: pattern.code } : null
       });
 
+      // Para produtos finais, validar que categoria, tamanho e estampa existem
       if (!category || !size || !pattern) {
         console.log('❌ [PRODUTO UPDATE] Dados inválidos - categoria, tamanho ou estampa não encontrada');
         return res.status(400).json({
@@ -824,20 +832,52 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       }
     }
 
-    const updateData = {
-        ...(name && { name }),
-      ...(price !== undefined && { price }),
-      ...(cost !== undefined && { cost }),
-      ...(stock !== undefined && { stock }),
-      ...(minStock !== undefined && { minStock }),
-      ...(description !== undefined && { description }),
-        ...(active !== undefined && { active }),
-      ...(categoryId && { categoryId }),
-      ...(subcategoryId !== undefined && { subcategoryId }),
-      ...(sizeId && { sizeId }),
-      ...(patternId && { patternId }),
-      ...(newBarcode !== product.barcode && { barcode: newBarcode }),
-    };
+    // Construir updateData: para rascunhos, permitir null; para produtos finais, apenas valores válidos
+    const updateData: any = {};
+    
+    if (name !== undefined) {
+      updateData.name = isUpdatingDraft ? (name || null) : name;
+    }
+    if (price !== undefined) {
+      updateData.price = isUpdatingDraft ? (price !== null && price !== undefined ? price : null) : price;
+    }
+    if (cost !== undefined) {
+      updateData.cost = cost;
+    }
+    if (stock !== undefined) {
+      updateData.stock = stock;
+    }
+    if (minStock !== undefined) {
+      updateData.minStock = minStock;
+    }
+    if (description !== undefined) {
+      updateData.description = isUpdatingDraft ? (description || null) : description;
+    }
+    if (active !== undefined) {
+      updateData.active = active;
+    }
+    if (categoryId !== undefined) {
+      updateData.categoryId = isUpdatingDraft ? (categoryId || null) : categoryId;
+    }
+    if (subcategoryId !== undefined) {
+      updateData.subcategoryId = isUpdatingDraft ? (subcategoryId || null) : subcategoryId;
+    }
+    if (sizeId !== undefined) {
+      updateData.sizeId = isUpdatingDraft ? (sizeId || null) : sizeId;
+    }
+    if (patternId !== undefined) {
+      updateData.patternId = isUpdatingDraft ? (patternId || null) : patternId;
+    }
+    if (newBarcode !== product.barcode) {
+      updateData.barcode = newBarcode;
+    }
+    if (isDraft !== undefined) {
+      updateData.isDraft = isDraft;
+      // Se está marcando como rascunho, atualizar status também
+      if (isDraft) {
+        updateData.status = 'PROCESSANDO';
+      }
+    }
 
     console.log('💾 [PRODUTO UPDATE] Dados que serão atualizados:', updateData);
 
