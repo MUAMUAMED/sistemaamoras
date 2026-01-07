@@ -659,8 +659,6 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
  *                 type: integer
  *               minStock:
  *                 type: integer
- *               cost:
- *                 type: number
  *     responses:
  *       200:
  *         description: Produto atualizado com sucesso
