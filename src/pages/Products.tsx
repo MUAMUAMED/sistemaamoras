@@ -344,9 +344,13 @@ const Products: React.FC = () => {
             isZero: value === 0
           });
           
-          // Pular campos de imagem (já tratados separadamente)
-          if (key === 'imageFile' || key === 'imageFilesRoupa' || key === 'imageFilesIA' || key === 'saveAsDraft') {
-            console.log(`⏭️ [FRONTEND UPDATE] Pulando campo "${key}" (campo de imagem ou saveAsDraft)`);
+          // Pular campos de imagem e campos que não devem ser enviados na atualização
+          if (key === 'imageFile' || 
+              key === 'imageFilesRoupa' || 
+              key === 'imageFilesIA' || 
+              key === 'saveAsDraft' ||
+              key === 'initialLocation') { // initialLocation só é usado na criação, não na atualização
+            console.log(`⏭️ [FRONTEND UPDATE] Pulando campo "${key}" (campo de imagem, saveAsDraft ou initialLocation)`);
             return;
           }
           
