@@ -879,34 +879,50 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       }
     }
 
-    console.log('💾 [PRODUTO UPDATE] Dados que serão atualizados:', updateData);
+    console.log('💾 [PRODUTO UPDATE] Dados que serão atualizados:', JSON.stringify(updateData, null, 2));
+    console.log('💾 [PRODUTO UPDATE] É rascunho?', isUpdatingDraft);
+    console.log('💾 [PRODUTO UPDATE] Produto ID:', id);
 
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: updateData,
-      include: {
-        category: true,
-        subcategory: true,
-        size: true,
-        pattern: true,
-      },
-    });
+    try {
+      const updatedProduct = await prisma.product.update({
+        where: { id },
+        data: updateData,
+        include: {
+          category: true,
+          subcategory: true,
+          size: true,
+          pattern: true,
+        },
+      });
+      
+      console.log('✅ [PRODUTO UPDATE] Produto atualizado com sucesso no Prisma');
 
-    console.log('✅ [PRODUTO UPDATE] Produto atualizado com sucesso:', {
-      id: updatedProduct.id,
-      name: updatedProduct.name,
-      categoryId: updatedProduct.categoryId,
-      categoryName: updatedProduct.category?.name,
-      subcategoryId: updatedProduct.subcategoryId,
-      subcategoryName: updatedProduct.subcategory?.name,
-      sizeId: updatedProduct.sizeId,
-      sizeName: updatedProduct.size?.name,
-      patternId: updatedProduct.patternId,
-      patternName: updatedProduct.pattern?.name,
-      barcode: updatedProduct.barcode
-    });
+      console.log('✅ [PRODUTO UPDATE] Produto atualizado com sucesso:', {
+        id: updatedProduct.id,
+        name: updatedProduct.name,
+        categoryId: updatedProduct.categoryId,
+        categoryName: updatedProduct.category?.name,
+        subcategoryId: updatedProduct.subcategoryId,
+        subcategoryName: updatedProduct.subcategory?.name,
+        sizeId: updatedProduct.sizeId,
+        sizeName: updatedProduct.size?.name,
+        patternId: updatedProduct.patternId,
+        patternName: updatedProduct.pattern?.name,
+        barcode: updatedProduct.barcode,
+        isDraft: updatedProduct.isDraft,
+        status: updatedProduct.status
+      });
 
-    return res.json(updatedProduct);
+      return res.json(updatedProduct);
+    } catch (prismaError: any) {
+      console.error('💥 [PRODUTO UPDATE] Erro no Prisma:', {
+        message: prismaError?.message,
+        code: prismaError?.code,
+        meta: prismaError?.meta,
+        stack: prismaError?.stack
+      });
+      throw prismaError;
+    }
   } catch (error) {
     console.error('💥 [PRODUTO UPDATE] Erro:', error);
     return next(error);
