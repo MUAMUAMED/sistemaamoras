@@ -2873,11 +2873,12 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                 }
                 .product-details {
                   display: flex;
-                  flex-direction: column;
-                  gap: 0.3mm;
+                  flex-direction: row;
+                  gap: 1mm;
                   min-height: 0;
                   justify-content: center;
                   align-items: center;
+                  margin-bottom: 0.5mm;
                 }
                 .detail-line {
                   font-size: 7px;
@@ -2887,19 +2888,14 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   overflow-wrap: break-word;
                   hyphens: auto;
                   text-align: center;
-                  width: 100%;
-                }
-                .detail-line.subcategory,
-                .detail-line.pattern {
-                  font-size: 6px;
-                  line-height: 0.9;
+                  white-space: nowrap;
                 }
                 .price {
                   font-weight: bold;
-                  font-size: 9px;
+                  font-size: 14px;
                   text-align: center;
                   background: #f5f5f5;
-                  padding: 0.3mm 0.5mm;
+                  padding: 0.5mm 1mm;
                   border-radius: 0.3mm;
                   margin-top: 0.5mm;
                   border: 1px solid #ddd;
@@ -2923,9 +2919,6 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   <div class="product-name">${productDetails.name}</div>
                   <div class="product-details">
                     <div class="detail-line">TAM: ${productDetails.size?.name || 'N/A'}</div>
-                    <div class="detail-line">CAT: ${productDetails.category?.name || 'N/A'}</div>
-                    ${productDetails.subcategory ? `<div class="detail-line subcategory">SUB: ${productDetails.subcategory.name}</div>` : ''}
-                    <div class="detail-line pattern">EST: ${productDetails.pattern?.name || 'N/A'}</div>
                   </div>
                   <div class="price">R$ ${productDetails.price ? productDetails.price.toFixed(2).replace('.', ',') : '0,00'}</div>
                 </div>
