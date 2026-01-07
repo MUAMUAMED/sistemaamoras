@@ -929,45 +929,32 @@ const Products: React.FC = () => {
                         <div key={product.id} className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden group card-hover animate-fade-in-up">
                           {/* Imagem do Produto */}
                           <div className="relative h-48 bg-gray-100 overflow-hidden">
-                            {product.images && product.images.length > 0 ? (
+                            {product.imageUrl ? (
                               <img
-                                src={getImageUrl(product.images[0]?.url)}
+                                src={getImageUrl(product.imageUrl)}
                                 alt={product.name || 'Produto sem nome'}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
-                                  const imageUrl = product.images?.[0]?.url;
+                                  const imageUrl = product.imageUrl;
                                   const finalUrl = imageUrl ? getImageUrl(imageUrl) : '';
-                                  console.error(`❌ [PRODUCT CARD] Erro ao carregar imagem:`, {
-                                    productId: product.id,
-                                    productName: product.name,
-                                    imageUrl,
-                                    finalUrl,
-                                    apiUrl: import.meta.env.REACT_APP_API_URL || import.meta.env.VITE_API_URL || 'não configurada',
-                                    error: e.currentTarget.src,
-                                    status: (e.target as HTMLImageElement).complete ? 'complete' : 'loading'
-                                  });
-                                  // Tentar carregar a imagem novamente com URL alternativa
-                                  if (finalUrl && finalUrl !== e.currentTarget.src) {
-                                    console.log('🔄 [PRODUCT CARD] Tentando recarregar com URL:', finalUrl);
-                                    e.currentTarget.src = finalUrl;
+                                  const fallbackUrl = product.images?.[0]?.url ? getImageUrl(product.images[0].url) : '';
+                                  if (fallbackUrl && fallbackUrl !== e.currentTarget.src) {
+                                    e.currentTarget.src = fallbackUrl;
                                   } else {
                                     e.currentTarget.style.display = 'none';
                                     e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                   }
                                 }}
-                                onLoad={() => {
-                                  console.log(`✅ [PRODUCT CARD] Imagem carregada com sucesso:`, {
-                                    productId: product.id,
-                                    imageUrl: product.images?.[0]?.url,
-                                    finalUrl: product.images?.[0]?.url ? getImageUrl(product.images[0].url) : ''
-                                  });
-                                }}
                               />
-                            ) : product.imageUrl ? (
+                            ) : product.images && product.images.length > 0 ? (
                               <img
-                                src={getImageUrl(product.imageUrl)}
+                                src={getImageUrl(product.images[0]?.url)}
                                 alt={product.name || 'Produto sem nome'}
                                 className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
                               />
                             ) : null}
                             <div className={`absolute inset-0 flex items-center justify-center ${(product.images && product.images.length > 0) || product.imageUrl ? 'hidden' : ''}`}>
