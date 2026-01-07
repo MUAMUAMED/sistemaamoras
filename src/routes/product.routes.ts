@@ -734,14 +734,27 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 
     // Se for rascunho, não validar campos obrigatórios e não gerar código de barras
     const isUpdatingDraft = isDraft !== undefined ? isDraft : product.isDraft;
-    console.log('📝 [PRODUTO UPDATE] É rascunho?', { isDraft, productIsDraft: product.isDraft, isUpdatingDraft });
+    const isConvertingToFinal = !isUpdatingDraft && product.isDraft; // Convertendo rascunho para produto final
+    console.log('📝 [PRODUTO UPDATE] É rascunho?', { isDraft, productIsDraft: product.isDraft, isUpdatingDraft, isConvertingToFinal });
 
     // Se estiver alterando categoria, tamanho ou estampa, validar e gerar novo código de barras
+    // OU se estiver convertendo rascunho para produto final (sempre precisa gerar código de barras)
     // MAS apenas se NÃO for rascunho (rascunhos podem ter campos null)
     let newBarcode = product.barcode;
-    if (!isUpdatingDraft && (categoryId || sizeId || patternId || subcategoryId !== undefined)) {
-      console.log('🔄 [PRODUTO UPDATE] Alterando categoria/tamanho/estampa, validando...');
+    const needsValidation = !isUpdatingDraft && (
+      isConvertingToFinal || // Sempre validar ao converter rascunho para produto final
+      categoryId || sizeId || patternId || subcategoryId !== undefined // Ou se estiver alterando campos relevantes
+    );
+    
+    if (needsValidation) {
+      if (isConvertingToFinal) {
+        console.log('🔄 [PRODUTO UPDATE] Convertendo rascunho para produto final, validando e gerando código de barras...');
+      } else {
+        console.log('🔄 [PRODUTO UPDATE] Alterando categoria/tamanho/estampa, validando...');
+      }
       
+      // Ao converter rascunho para produto final, usar os valores enviados OU os valores atuais do produto
+      // Mas se estiver convertendo, os valores enviados devem existir (não podem ser null)
       const finalCategoryId = categoryId || product.categoryId;
       const finalSubcategoryId = subcategoryId !== undefined ? subcategoryId : product.subcategoryId;
       const finalSizeId = sizeId || product.sizeId;
