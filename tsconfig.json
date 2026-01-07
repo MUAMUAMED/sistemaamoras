@@ -21,8 +21,7 @@
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": true,
     "moduleResolution": "node",
-    "baseUrl": "./",
-    "rootDir": "./src",
+    "baseUrl": "./src",
     "paths": {
       "@/*": ["*"],
       "@/controllers/*": ["controllers/*"],
