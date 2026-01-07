@@ -1435,15 +1435,28 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 }) => {
   const queryClient = useQueryClient();
   
+  // Função auxiliar para normalizar URLs para comparação
+  const normalizeUrl = (url: string | null | undefined): string => {
+    if (!url) return '';
+    // Remover protocolo e domínio, manter apenas o caminho
+    return url.replace(/^https?:\/\/[^/]+/, '').replace(/^\/+/, '/');
+  };
+  
   // Log quando produto ou imageUrl mudar
   useEffect(() => {
     console.log('🔄 [FORM MODAL] Produto atualizado:', {
       productId: product?.id,
       imageUrl: product?.imageUrl,
+      normalizedImageUrl: normalizeUrl(product?.imageUrl),
       hasImages: !!product?.images,
-      imagesCount: product?.images?.length || 0
+      imagesCount: product?.images?.length || 0,
+      images: product?.images?.map(img => ({
+        id: img.id,
+        url: img.url,
+        normalizedUrl: normalizeUrl(img.url)
+      })) || []
     });
-  }, [product?.id, product?.imageUrl]);
+  }, [product?.id, product?.imageUrl, product?.images]);
   
   console.log('🔧 [FORM MODAL] Inicializando formulário:', {
     title,
@@ -2097,7 +2110,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             src={getImageUrl(img.url)}
                             alt="Imagem Roupa"
                             className={`w-full h-20 object-cover rounded border-2 transition-all ${
-                              ((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || '')))
+                              normalizeUrl(product?.imageUrl) === normalizeUrl(img.url)
                                 ? 'border-yellow-400 ring-2 ring-yellow-300' 
                                 : 'border-blue-300 group-hover:border-yellow-400'
                             }`}
@@ -2107,7 +2120,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               Tornar Principal
                             </div>
                           </div>
-                          {((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || ''))) && (
+                          {normalizeUrl(product?.imageUrl) === normalizeUrl(img.url) && (
                             <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
                               ⭐
                             </span>
@@ -2157,7 +2170,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             src={getImageUrl(img.url)}
                             alt="Imagem IA"
                             className={`w-full h-20 object-cover rounded border-2 transition-all ${
-                              ((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || '')))
+                              normalizeUrl(product?.imageUrl) === normalizeUrl(img.url)
                                 ? 'border-yellow-400 ring-2 ring-yellow-300' 
                                 : 'border-purple-300 group-hover:border-yellow-400'
                             }`}
@@ -2167,7 +2180,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               Tornar Principal
                             </div>
                           </div>
-                          {((product?.imageUrl === img.url) || (product?.imageUrl?.endsWith(img.url)) || (img.url?.endsWith(product?.imageUrl || ''))) && (
+                          {normalizeUrl(product?.imageUrl) === normalizeUrl(img.url) && (
                             <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
                               ⭐
                             </span>
