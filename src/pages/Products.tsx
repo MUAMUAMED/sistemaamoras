@@ -302,22 +302,51 @@ const Products: React.FC = () => {
 
   const handleUpdateProduct = async (data: Partial<ProductFormData>, saveAsDraft?: boolean) => {
     if (selectedProduct) {
-      console.log('🔄 [FRONTEND UPDATE] Produto selecionado:', selectedProduct);
-      console.log('🔄 [FRONTEND UPDATE] Dados do formulário recebidos:', data);
-      console.log('🔄 [FRONTEND UPDATE] saveAsDraft:', saveAsDraft);
+      console.log('🔄 [FRONTEND UPDATE] ========== INÍCIO DA ATUALIZAÇÃO ==========');
+      console.log('🔄 [FRONTEND UPDATE] Produto selecionado:', JSON.stringify(selectedProduct, null, 2));
+      console.log('🔄 [FRONTEND UPDATE] Dados do formulário recebidos (RAW):', JSON.stringify(data, null, 2));
+      console.log('🔄 [FRONTEND UPDATE] saveAsDraft (parâmetro):', saveAsDraft);
+      console.log('🔄 [FRONTEND UPDATE] Produto ID:', selectedProduct.id);
+      console.log('🔄 [FRONTEND UPDATE] Status atual do produto:', selectedProduct.status);
       
       try {
+        console.log('🔍 [FRONTEND UPDATE] Passo 1: Separando campos de imagem...');
         const { imageFile, imageFilesRoupa, imageFilesIA, saveAsDraft: dataSaveAsDraft, ...productData } = data as any;
+        console.log('🔍 [FRONTEND UPDATE] Campos de imagem separados:', {
+          hasImageFile: !!imageFile,
+          imageFilesRoupaCount: imageFilesRoupa?.length || 0,
+          imageFilesIACount: imageFilesIA?.length || 0,
+          dataSaveAsDraft: dataSaveAsDraft
+        });
+        console.log('🔍 [FRONTEND UPDATE] productData (após remover imagens):', JSON.stringify(productData, null, 2));
+        
         const isDraft = saveAsDraft ?? dataSaveAsDraft ?? false;
+        console.log('🔍 [FRONTEND UPDATE] Passo 2: Determinando isDraft:', {
+          saveAsDraft,
+          dataSaveAsDraft,
+          isDraft
+        });
         
         // Limpar dados: para rascunhos, não enviar null - apenas campos com valores ou que foram alterados
         const cleanedData: any = {};
+        console.log('🔍 [FRONTEND UPDATE] Passo 3: Iniciando limpeza de dados...');
+        console.log('🔍 [FRONTEND UPDATE] Chaves em productData:', Object.keys(productData));
         
         Object.keys(productData).forEach(key => {
           const value = productData[key];
+          console.log(`🔍 [FRONTEND UPDATE] Processando campo "${key}":`, {
+            value,
+            type: typeof value,
+            isString: typeof value === 'string',
+            isEmpty: value === '',
+            isUndefined: value === undefined,
+            isNull: value === null,
+            isZero: value === 0
+          });
           
           // Pular campos de imagem (já tratados separadamente)
           if (key === 'imageFile' || key === 'imageFilesRoupa' || key === 'imageFilesIA' || key === 'saveAsDraft') {
+            console.log(`⏭️ [FRONTEND UPDATE] Pulando campo "${key}" (campo de imagem ou saveAsDraft)`);
             return;
           }
           
@@ -326,59 +355,133 @@ const Products: React.FC = () => {
             // Isso permite que o backend mantenha os valores atuais dos campos não enviados
             if (value !== '' && value !== undefined && value !== null) {
               cleanedData[key] = value;
+              console.log(`✅ [FRONTEND UPDATE] Campo "${key}" adicionado ao cleanedData:`, value);
             }
             // Campos numéricos podem ser 0
             else if (['stock', 'minStock'].includes(key) && value === 0) {
               cleanedData[key] = 0;
+              console.log(`✅ [FRONTEND UPDATE] Campo numérico "${key}" adicionado como 0`);
             }
             // Campos vazios/null não são enviados - mantém valores atuais no backend
+            else {
+              console.log(`⏭️ [FRONTEND UPDATE] Campo "${key}" não será enviado (vazio/null)`);
+            }
           } else {
             // Para produtos finais: apenas valores válidos (não vazios)
             if (value !== '' && value !== undefined && value !== null) {
               cleanedData[key] = value;
+              console.log(`✅ [FRONTEND UPDATE] Campo "${key}" adicionado ao cleanedData:`, value);
+            } else {
+              console.log(`⏭️ [FRONTEND UPDATE] Campo "${key}" não será enviado (produto final precisa de valor)`);
             }
           }
         });
+        
+        console.log('🔍 [FRONTEND UPDATE] Passo 4: cleanedData após processamento:', JSON.stringify(cleanedData, null, 2));
+        console.log('🔍 [FRONTEND UPDATE] Quantidade de campos em cleanedData:', Object.keys(cleanedData).length);
         
         // Se for rascunho e não há dados para atualizar (apenas imagens), enviar apenas isDraft
         if (isDraft && Object.keys(cleanedData).length === 0) {
           // Apenas marcar como rascunho sem alterar outros campos
           cleanedData.isDraft = true;
+          console.log('⚠️ [FRONTEND UPDATE] Nenhum campo para atualizar, adicionando apenas isDraft: true');
         }
         
-        console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', cleanedData);
+        const finalPayload = { ...cleanedData, isDraft: isDraft };
+        console.log('📤 [FRONTEND UPDATE] Passo 5: Payload final que será enviado:', JSON.stringify(finalPayload, null, 2));
+        console.log('📤 [FRONTEND UPDATE] URL da requisição:', `PUT /api/products/${selectedProduct.id}`);
         console.log('📤 [FRONTEND UPDATE] É rascunho?', isDraft);
         
         // Atualizar dados do produto (sem a imagem)
-        console.log('🚀 [FRONTEND UPDATE] Enviando requisição para atualizar produto...');
-        const updatedProduct = await productsApi.update(selectedProduct.id, { ...cleanedData, isDraft: isDraft });
-        console.log('✅ [FRONTEND UPDATE] Produto atualizado com sucesso:', updatedProduct);
+        console.log('🚀 [FRONTEND UPDATE] Passo 6: Enviando requisição para atualizar produto...');
+        console.log('🚀 [FRONTEND UPDATE] Timestamp:', new Date().toISOString());
+        
+        try {
+          const updatedProduct = await productsApi.update(selectedProduct.id, finalPayload);
+          console.log('✅ [FRONTEND UPDATE] Passo 7: Produto atualizado com sucesso!');
+          console.log('✅ [FRONTEND UPDATE] Resposta do servidor:', JSON.stringify(updatedProduct, null, 2));
+        
+        } catch (apiError: any) {
+          console.error('💥 [FRONTEND UPDATE] ========== ERRO NA REQUISIÇÃO ==========');
+          console.error('💥 [FRONTEND UPDATE] Erro completo:', apiError);
+          console.error('💥 [FRONTEND UPDATE] Tipo do erro:', apiError?.constructor?.name);
+          console.error('💥 [FRONTEND UPDATE] Mensagem do erro:', apiError?.message);
+          console.error('💥 [FRONTEND UPDATE] Código do erro:', apiError?.code);
+          console.error('💥 [FRONTEND UPDATE] Status HTTP:', apiError?.response?.status);
+          console.error('💥 [FRONTEND UPDATE] Status Text:', apiError?.response?.statusText);
+          console.error('💥 [FRONTEND UPDATE] Headers da resposta:', apiError?.response?.headers);
+          console.error('💥 [FRONTEND UPDATE] Dados da resposta:', JSON.stringify(apiError?.response?.data, null, 2));
+          console.error('💥 [FRONTEND UPDATE] Config da requisição:', {
+            url: apiError?.config?.url,
+            method: apiError?.config?.method,
+            baseURL: apiError?.config?.baseURL,
+            data: JSON.stringify(apiError?.config?.data, null, 2),
+            headers: apiError?.config?.headers
+          });
+          console.error('💥 [FRONTEND UPDATE] Stack trace:', apiError?.stack);
+          console.error('💥 [FRONTEND UPDATE] Payload que causou o erro:', JSON.stringify(finalPayload, null, 2));
+          throw apiError;
+        }
         
         // Se há uma nova imagem, fazer o upload (compatibilidade)
+        console.log('🖼️ [FRONTEND UPDATE] Passo 8: Verificando imagens para upload...');
         if (imageFile) {
-          console.log('📷 [FRONTEND UPDATE] Fazendo upload de nova imagem...');
+          console.log('📷 [FRONTEND UPDATE] Fazendo upload de nova imagem (compatibilidade)...');
+          console.log('📷 [FRONTEND UPDATE] Detalhes da imagem:', {
+            name: imageFile.name,
+            size: imageFile.size,
+            type: imageFile.type
+          });
           await productsApi.uploadImage(selectedProduct.id, imageFile);
           console.log('✅ [FRONTEND UPDATE] Imagem atualizada com sucesso');
         }
         // Upload de múltiplas imagens por tipo
         if (imageFilesRoupa && (imageFilesRoupa as File[]).length > 0) {
           console.log('🖼️ [FRONTEND UPDATE] Enviando imagens ROUPA...', (imageFilesRoupa as File[]).length);
+          console.log('🖼️ [FRONTEND UPDATE] Detalhes das imagens ROUPA:', imageFilesRoupa.map((f: File) => ({
+            name: f.name,
+            size: f.size,
+            type: f.type
+          })));
           await productsApi.uploadImages(selectedProduct.id, imageFilesRoupa as File[], 'ROUPA');
+          console.log('✅ [FRONTEND UPDATE] Imagens ROUPA enviadas com sucesso');
         }
         if (imageFilesIA && (imageFilesIA as File[]).length > 0) {
           console.log('🤖 [FRONTEND UPDATE] Enviando imagens IA...', (imageFilesIA as File[]).length);
+          console.log('🤖 [FRONTEND UPDATE] Detalhes das imagens IA:', imageFilesIA.map((f: File) => ({
+            name: f.name,
+            size: f.size,
+            type: f.type
+          })));
           await productsApi.uploadImages(selectedProduct.id, imageFilesIA as File[], 'IA');
+          console.log('✅ [FRONTEND UPDATE] Imagens IA enviadas com sucesso');
         }
         
         // Atualizar a lista de produtos
+        console.log('🔄 [FRONTEND UPDATE] Passo 9: Invalidando cache de produtos...');
         queryClient.invalidateQueries({ queryKey: ['products'] });
+        console.log('✅ [FRONTEND UPDATE] Cache invalidado');
+        
+        console.log('🔄 [FRONTEND UPDATE] Passo 10: Fechando modal e limpando estado...');
         setShowEditModal(false);
         setSelectedProduct(null);
+        console.log('✅ [FRONTEND UPDATE] Modal fechado');
+        
         toast.success(isDraft ? 'Rascunho atualizado com sucesso!' : 'Produto atualizado com sucesso!');
+        console.log('✅ [FRONTEND UPDATE] ========== ATUALIZAÇÃO CONCLUÍDA COM SUCESSO ==========');
       } catch (error: any) {
+        console.error('💥 [FRONTEND UPDATE] ========== ERRO GERAL ==========');
         console.error('💥 [FRONTEND UPDATE] Erro ao atualizar produto:', error);
-        console.error('💥 [FRONTEND UPDATE] Resposta do servidor:', error.response?.data);
-        toast.error(error.response?.data?.error || 'Erro ao atualizar produto');
+        console.error('💥 [FRONTEND UPDATE] Tipo do erro:', error?.constructor?.name);
+        console.error('💥 [FRONTEND UPDATE] Mensagem:', error?.message);
+        console.error('💥 [FRONTEND UPDATE] Stack:', error?.stack);
+        console.error('💥 [FRONTEND UPDATE] Resposta do servidor (se houver):', error?.response?.data);
+        console.error('💥 [FRONTEND UPDATE] Status HTTP:', error?.response?.status);
+        console.error('💥 [FRONTEND UPDATE] URL da requisição:', error?.config?.url);
+        console.error('💥 [FRONTEND UPDATE] Método:', error?.config?.method);
+        console.error('💥 [FRONTEND UPDATE] Payload enviado:', JSON.stringify(error?.config?.data, null, 2));
+        toast.error(error.response?.data?.error || error.response?.data?.message || 'Erro ao atualizar produto');
+        console.error('💥 [FRONTEND UPDATE] ========== FIM DO ERRO ==========');
       }
     } else {
       console.error('❌ [FRONTEND UPDATE] Nenhum produto selecionado!');
