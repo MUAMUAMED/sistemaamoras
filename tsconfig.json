@@ -25,6 +25,13 @@
     }
   },
   "include": ["src", "index.html"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "backend",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 
