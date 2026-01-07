@@ -300,7 +300,7 @@ const Products: React.FC = () => {
     }
   };
 
-  const handleUpdateProduct = async (data: Partial<ProductFormData>, saveAsDraft?: boolean) => {
+  const handleUpdateProduct = async (data: Partial<ProductFormData>, saveAsDraft?: boolean, imagesToDelete?: Set<string>) => {
     if (selectedProduct) {
       console.log('🔄 [FRONTEND UPDATE] ========== INÍCIO DA ATUALIZAÇÃO ==========');
       console.log('🔄 [FRONTEND UPDATE] Produto selecionado:', JSON.stringify(selectedProduct, null, 2));
@@ -438,8 +438,24 @@ const Products: React.FC = () => {
           throw apiError;
         }
         
+        // Deletar imagens marcadas para exclusão
+        console.log('🗑️ [FRONTEND UPDATE] Passo 8: Verificando imagens para deletar...');
+        const imagesToDeleteSet = imagesToDelete || new Set<string>();
+        if (imagesToDeleteSet.size > 0) {
+          console.log('🗑️ [FRONTEND UPDATE] Deletando imagens:', Array.from(imagesToDeleteSet));
+          for (const imageId of imagesToDeleteSet) {
+            try {
+              await productsApi.deleteImage(selectedProduct.id, imageId);
+              console.log(`✅ [FRONTEND UPDATE] Imagem ${imageId} deletada com sucesso`);
+            } catch (error: any) {
+              console.error(`❌ [FRONTEND UPDATE] Erro ao deletar imagem ${imageId}:`, error);
+              // Continuar mesmo se uma falhar
+            }
+          }
+        }
+        
         // Se há uma nova imagem, fazer o upload (compatibilidade)
-        console.log('🖼️ [FRONTEND UPDATE] Passo 8: Verificando imagens para upload...');
+        console.log('🖼️ [FRONTEND UPDATE] Passo 9: Verificando imagens para upload...');
         if (imageFile) {
           console.log('📷 [FRONTEND UPDATE] Fazendo upload de nova imagem (compatibilidade)...');
           console.log('📷 [FRONTEND UPDATE] Detalhes da imagem:', {
@@ -1383,7 +1399,7 @@ interface ProductFormModalProps {
   subcategories: Subcategory[];
   patterns: Pattern[];
   sizes: Size[];
-  onSubmit: (data: ProductFormData, saveAsDraft?: boolean) => void;
+  onSubmit: (data: ProductFormData, saveAsDraft?: boolean, imagesToDelete?: Set<string>) => void;
   onClose: () => void;
   isLoading: boolean;
   setShowCategoryModal: (show: boolean) => void;
@@ -1430,6 +1446,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   // Estado para armazenar imagens existentes do produto
   const [existingImagesRoupa, setExistingImagesRoupa] = useState<Array<{ id: string; url: string; type: string }>>([]);
   const [existingImagesIA, setExistingImagesIA] = useState<Array<{ id: string; url: string; type: string }>>([]);
+  
+  // Estado para rastrear imagens marcadas para exclusão
+  const [imagesToDelete, setImagesToDelete] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState<ProductFormModalData>({
     name: product?.name || '',
@@ -1457,6 +1476,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       images: product?.images?.map(img => ({ id: img.id, url: img.url, type: img.type })) || [],
       productFull: product ? JSON.stringify(product, null, 2).substring(0, 500) : null
     });
+    
+    // Limpar lista de imagens a deletar quando produto mudar
+    setImagesToDelete(new Set());
     
     if (product?.images && Array.isArray(product.images) && product.images.length > 0) {
       const roupaImages = product.images.filter(img => img && img.type === 'ROUPA');
@@ -1614,7 +1636,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         imageFilesIA: submitData.imageFilesIA?.length || 0,
         saveAsDraft: saveAsDraft
       });
-      onSubmit(submitData, saveAsDraft);
+      onSubmit(submitData, saveAsDraft, imagesToDelete);
     } else {
       console.error('❌ [FORM SUBMIT] Validação falhou, não enviando:', errors);
       // Mostrar mensagem de erro para o usuário
@@ -2033,6 +2055,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
+                                  // Adicionar à lista de imagens a serem deletadas
+                                  setImagesToDelete(prev => new Set(prev).add(img.id));
+                                  // Remover da visualização
                                   setExistingImagesRoupa(prev => prev.filter(i => i.id !== img.id));
                                   toast.success('Imagem será removida ao salvar');
                                 }}
@@ -2143,15 +2168,12 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 rounded transition-all duration-200 flex items-center justify-center">
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  try {
-                                    // Aqui você pode adicionar uma chamada para deletar a imagem se necessário
-                                    // Por enquanto, apenas remove da visualização
-                                    setExistingImagesIA(prev => prev.filter(i => i.id !== img.id));
-                                    toast.success('Imagem será removida ao salvar');
-                                  } catch (error) {
-                                    toast.error('Erro ao remover imagem');
-                                  }
+                                onClick={() => {
+                                  // Adicionar à lista de imagens a serem deletadas
+                                  setImagesToDelete(prev => new Set(prev).add(img.id));
+                                  // Remover da visualização
+                                  setExistingImagesIA(prev => prev.filter(i => i.id !== img.id));
+                                  toast.success('Imagem será removida ao salvar');
                                 }}
                                 className="opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-all duration-200"
                               >

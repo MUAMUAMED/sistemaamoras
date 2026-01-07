@@ -375,6 +375,11 @@ export const productsApi = {
     const response = await api.post(`/products/${id}/images?type=${type}`, formData);
     return response.data;
   },
+
+  deleteImage: async (productId: string, imageId: string): Promise<{ message: string; images: any[] }> => {
+    const response = await api.delete(`/products/${productId}/images/${imageId}`);
+    return response.data;
+  },
   
   finishProduction: async (id: string): Promise<Product> => {
     const response = await api.put(`/products/${id}/finish-production`);
