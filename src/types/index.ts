@@ -100,6 +100,7 @@ export interface Product {
   active: boolean;
   inProduction: boolean; // Status de produção (mantido para compatibilidade)
   status: ProductStatus; // Status do produto
+  isDraft?: boolean; // Indica se o produto é um rascunho
   createdAt: string;
   updatedAt: string;
   
