@@ -2126,9 +2126,21 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             src={getImageUrl(img.url)}
                             alt="Imagem Roupa"
                             className={`w-full h-20 object-cover rounded border-2 transition-all ${
-                              normalizeUrl(product?.imageUrl) === normalizeUrl(img.url)
-                                ? 'border-yellow-400 ring-2 ring-yellow-300' 
-                                : 'border-blue-300 group-hover:border-yellow-400'
+                              (() => {
+                                const isMain = normalizeUrl(product?.imageUrl) === normalizeUrl(img.url);
+                                if (isMain) {
+                                  console.log('🟡 [RENDER ROUPA IMAGE] Imagem principal detectada:', {
+                                    productImageUrl: product?.imageUrl,
+                                    imgUrl: img.url,
+                                    normalizedProduct: normalizeUrl(product?.imageUrl),
+                                    normalizedImg: normalizeUrl(img.url),
+                                    match: isMain
+                                  });
+                                }
+                                return isMain
+                                  ? 'border-yellow-400 ring-2 ring-yellow-300' 
+                                  : 'border-blue-300 group-hover:border-yellow-400';
+                              })()
                             }`}
                           />
                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center pointer-events-none">
@@ -2136,11 +2148,23 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               Tornar Principal
                             </div>
                           </div>
-                          {normalizeUrl(product?.imageUrl) === normalizeUrl(img.url) && (
-                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
-                              ⭐
-                            </span>
-                          )}
+                          {(() => {
+                            const isMain = normalizeUrl(product?.imageUrl) === normalizeUrl(img.url);
+                            if (isMain) {
+                              console.log('⭐ [RENDER ROUPA BADGE] Imagem é principal:', {
+                                productImageUrl: product?.imageUrl,
+                                imgUrl: img.url,
+                                normalizedProduct: normalizeUrl(product?.imageUrl),
+                                normalizedImg: normalizeUrl(img.url),
+                                match: isMain
+                              });
+                            }
+                            return isMain ? (
+                              <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
+                                ⭐
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                       ))}
                       
@@ -2186,9 +2210,21 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                             src={getImageUrl(img.url)}
                             alt="Imagem IA"
                             className={`w-full h-20 object-cover rounded border-2 transition-all ${
-                              normalizeUrl(product?.imageUrl) === normalizeUrl(img.url)
-                                ? 'border-yellow-400 ring-2 ring-yellow-300' 
-                                : 'border-purple-300 group-hover:border-yellow-400'
+                              (() => {
+                                const isMain = normalizeUrl(product?.imageUrl) === normalizeUrl(img.url);
+                                if (isMain) {
+                                  console.log('🟣 [RENDER IA IMAGE] Imagem principal detectada:', {
+                                    productImageUrl: product?.imageUrl,
+                                    imgUrl: img.url,
+                                    normalizedProduct: normalizeUrl(product?.imageUrl),
+                                    normalizedImg: normalizeUrl(img.url),
+                                    match: isMain
+                                  });
+                                }
+                                return isMain
+                                  ? 'border-yellow-400 ring-2 ring-yellow-300' 
+                                  : 'border-purple-300 group-hover:border-yellow-400';
+                              })()
                             }`}
                           />
                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center pointer-events-none">
@@ -2196,11 +2232,23 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                               Tornar Principal
                             </div>
                           </div>
-                          {normalizeUrl(product?.imageUrl) === normalizeUrl(img.url) && (
-                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
-                              ⭐
-                            </span>
-                          )}
+                          {(() => {
+                            const isMain = normalizeUrl(product?.imageUrl) === normalizeUrl(img.url);
+                            if (isMain) {
+                              console.log('⭐ [RENDER IA BADGE] Imagem é principal:', {
+                                productImageUrl: product?.imageUrl,
+                                imgUrl: img.url,
+                                normalizedProduct: normalizeUrl(product?.imageUrl),
+                                normalizedImg: normalizeUrl(img.url),
+                                match: isMain
+                              });
+                            }
+                            return isMain ? (
+                              <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
+                                ⭐
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                       ))}
                     </div>
