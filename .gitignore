@@ -79,4 +79,9 @@ Thumbs.db
 
 # Prisma
 prisma/migrations/*/
-!prisma/migrations/migration_lock.toml 
+!prisma/migrations/migration_lock.toml
+
+# Arquivos do frontend que não devem estar no backend
+src/pages/
+src/components/
+src/utils/imageUrl.ts 
