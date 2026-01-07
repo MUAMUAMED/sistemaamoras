@@ -60,7 +60,7 @@ const corsOptions: Parameters<typeof cors>[0] = {
   origin: (
     origin: string | undefined,
     callback: (err: Error | null, allow?: boolean) => void
-  ) => {
+  ): void => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -172,7 +172,7 @@ if (!fs.existsSync(uploadsPath)) {
 }
 
 // Servir arquivos estáticos com headers CORS apropriados
-app.use("/uploads", (req, res, next) => {
+app.use("/uploads", (req: express.Request, res: express.Response, next: express.NextFunction) => {
   // Adicionar headers CORS para imagens
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -180,7 +180,7 @@ app.use("/uploads", (req, res, next) => {
   next();
 }, express.static(uploadsPath, {
   // Configurações adicionais para servir arquivos
-  setHeaders: (res, filePath) => {
+  setHeaders: (res: express.Response, filePath: string) => {
     // Adicionar cache headers para imagens
     if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.png') || filePath.endsWith('.gif') || filePath.endsWith('.webp')) {
       res.setHeader('Cache-Control', 'public, max-age=31536000');
@@ -191,7 +191,7 @@ app.use("/uploads", (req, res, next) => {
 console.log(`📁 [STATIC] Servindo arquivos estáticos de: ${uploadsPath}`);
 
 // Rota de teste para verificar se os arquivos estão sendo servidos
-app.get('/uploads/test', (req, res) => {
+app.get('/uploads/test', (req: express.Request, res: express.Response) => {
   const productsPath = path.join(uploadsPath, 'products');
   const productsFiles = fs.existsSync(productsPath) ? fs.readdirSync(productsPath).slice(0, 20) : [];
   
@@ -207,7 +207,7 @@ app.get('/uploads/test', (req, res) => {
 });
 
 // Rota específica para verificar se um arquivo de imagem existe
-app.get('/uploads/products/:filename', (req, res) => {
+app.get('/uploads/products/:filename', (req: express.Request, res: express.Response) => {
   const filename = req.params.filename;
   const filePath = path.join(uploadsPath, 'products', filename);
   
