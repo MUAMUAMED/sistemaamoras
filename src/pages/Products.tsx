@@ -1420,11 +1420,27 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
-    console.log('📝 [FORM SUBMIT] Iniciando submit:', { saveAsDraft, formData: { ...formData, imageFile: formData.imageFile ? 'File exists' : null, imageFilesRoupa: formData.imageFilesRoupa?.length || 0, imageFilesIA: formData.imageFilesIA?.length || 0 } });
+    console.log('📝 [FORM SUBMIT] Iniciando submit:', { 
+      saveAsDraft, 
+      isEditing: !!product,
+      productStatus: product?.status,
+      formData: { 
+        ...formData, 
+        imageFile: formData.imageFile ? 'File exists' : null, 
+        imageFilesRoupa: formData.imageFilesRoupa?.length || 0, 
+        imageFilesIA: formData.imageFilesIA?.length || 0 
+      } 
+    });
     
-    // Se é rascunho OU se a validação passar, prosseguir
+    // Se for salvar como rascunho, não validar nada
+    // Se for salvar como produto final, validar todos os campos obrigatórios
     const isValid = saveAsDraft || validateForm();
-    console.log('✅ [FORM SUBMIT] Validação:', { saveAsDraft, isValid, errors });
+    
+    console.log('✅ [FORM SUBMIT] Validação:', { 
+      saveAsDraft, 
+      isValid, 
+      errors: isValid ? 'Nenhum erro' : errors 
+    });
     
     if (isValid) {
       const submitData: ProductFormData = {
@@ -1440,7 +1456,13 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         initialLocation: formData.initialLocation || 'LOJA', // Padrão para Loja
         saveAsDraft: saveAsDraft,
       };
-      console.log('🚀 [FORM SUBMIT] Chamando onSubmit com dados:', { ...submitData, imageFile: submitData.imageFile ? 'File exists' : null, imageFilesRoupa: submitData.imageFilesRoupa?.length || 0, imageFilesIA: submitData.imageFilesIA?.length || 0 });
+      console.log('🚀 [FORM SUBMIT] Chamando onSubmit com dados:', { 
+        ...submitData, 
+        imageFile: submitData.imageFile ? 'File exists' : null, 
+        imageFilesRoupa: submitData.imageFilesRoupa?.length || 0, 
+        imageFilesIA: submitData.imageFilesIA?.length || 0,
+        saveAsDraft: saveAsDraft
+      });
       onSubmit(submitData, saveAsDraft);
     } else {
       console.error('❌ [FORM SUBMIT] Validação falhou, não enviando:', errors);
@@ -2055,20 +2077,18 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
               Cancelar
             </button>
             {/* Botão para salvar como rascunho (apenas na criação) */}
-            {!product && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
-                  handleSubmit(e, true);
-                }}
-                disabled={isLoading}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
+                handleSubmit(e, true);
+              }}
+              disabled={isLoading}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
+            </button>
             <button
               type="submit"
               onClick={(e) => handleSubmit(e, false)}
