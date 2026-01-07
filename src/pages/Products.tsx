@@ -310,15 +310,46 @@ const Products: React.FC = () => {
         const { imageFile, imageFilesRoupa, imageFilesIA, saveAsDraft: dataSaveAsDraft, ...productData } = data as any;
         const isDraft = saveAsDraft ?? dataSaveAsDraft ?? false;
         
-        // Se for rascunho, permitir campos vazios
-        const updateData = isDraft ? productData : productData;
+        // Limpar dados: remover campos vazios/undefined e converter strings vazias para null quando for rascunho
+        const cleanedData: any = {};
         
-        console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', updateData);
+        Object.keys(productData).forEach(key => {
+          const value = productData[key];
+          
+          // Pular campos de imagem (já tratados separadamente)
+          if (key === 'imageFile' || key === 'imageFilesRoupa' || key === 'imageFilesIA' || key === 'saveAsDraft') {
+            return;
+          }
+          
+          if (isDraft) {
+            // Para rascunhos: converter strings vazias para null, manter outros valores
+            if (value === '' || value === undefined) {
+              // Campos que podem ser null em rascunhos
+              if (['name', 'description', 'price', 'cost', 'categoryId', 'subcategoryId', 'patternId'].includes(key)) {
+                cleanedData[key] = null;
+              }
+              // Campos numéricos ficam 0
+              else if (['stock', 'minStock'].includes(key)) {
+                cleanedData[key] = 0;
+              }
+              // sizeId vazio não é enviado (mantém o atual)
+            } else {
+              cleanedData[key] = value;
+            }
+          } else {
+            // Para produtos finais: apenas valores válidos (não vazios)
+            if (value !== '' && value !== undefined && value !== null) {
+              cleanedData[key] = value;
+            }
+          }
+        });
+        
+        console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', cleanedData);
         console.log('📤 [FRONTEND UPDATE] É rascunho?', isDraft);
         
         // Atualizar dados do produto (sem a imagem)
         console.log('🚀 [FRONTEND UPDATE] Enviando requisição para atualizar produto...');
-        const updatedProduct = await productsApi.update(selectedProduct.id, { ...updateData, isDraft: isDraft });
+        const updatedProduct = await productsApi.update(selectedProduct.id, { ...cleanedData, isDraft: isDraft });
         console.log('✅ [FRONTEND UPDATE] Produto atualizado com sucesso:', updatedProduct);
         
         // Se há uma nova imagem, fazer o upload (compatibilidade)
