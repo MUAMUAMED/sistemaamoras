@@ -310,7 +310,7 @@ const Products: React.FC = () => {
         const { imageFile, imageFilesRoupa, imageFilesIA, saveAsDraft: dataSaveAsDraft, ...productData } = data as any;
         const isDraft = saveAsDraft ?? dataSaveAsDraft ?? false;
         
-        // Limpar dados: remover campos vazios/undefined e converter strings vazias para null quando for rascunho
+        // Limpar dados: para rascunhos, não enviar null - apenas campos com valores ou que foram alterados
         const cleanedData: any = {};
         
         Object.keys(productData).forEach(key => {
@@ -322,20 +322,16 @@ const Products: React.FC = () => {
           }
           
           if (isDraft) {
-            // Para rascunhos: converter strings vazias para null, manter outros valores
-            if (value === '' || value === undefined) {
-              // Campos que podem ser null em rascunhos
-              if (['name', 'description', 'price', 'cost', 'categoryId', 'subcategoryId', 'patternId'].includes(key)) {
-                cleanedData[key] = null;
-              }
-              // Campos numéricos ficam 0
-              else if (['stock', 'minStock'].includes(key)) {
-                cleanedData[key] = 0;
-              }
-              // sizeId vazio não é enviado (mantém o atual)
-            } else {
+            // Para rascunhos: apenas enviar campos que têm valores (não enviar null ou vazio)
+            // Isso permite que o backend mantenha os valores atuais dos campos não enviados
+            if (value !== '' && value !== undefined && value !== null) {
               cleanedData[key] = value;
             }
+            // Campos numéricos podem ser 0
+            else if (['stock', 'minStock'].includes(key) && value === 0) {
+              cleanedData[key] = 0;
+            }
+            // Campos vazios/null não são enviados - mantém valores atuais no backend
           } else {
             // Para produtos finais: apenas valores válidos (não vazios)
             if (value !== '' && value !== undefined && value !== null) {
@@ -343,6 +339,12 @@ const Products: React.FC = () => {
             }
           }
         });
+        
+        // Se for rascunho e não há dados para atualizar (apenas imagens), enviar apenas isDraft
+        if (isDraft && Object.keys(cleanedData).length === 0) {
+          // Apenas marcar como rascunho sem alterar outros campos
+          cleanedData.isDraft = true;
+        }
         
         console.log('📤 [FRONTEND UPDATE] Dados que serão enviados (sem imagem):', cleanedData);
         console.log('📤 [FRONTEND UPDATE] É rascunho?', isDraft);
