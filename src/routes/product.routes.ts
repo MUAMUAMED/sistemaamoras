@@ -1490,9 +1490,9 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
       }
       
       // Verificar se o arquivo existe no sistema de arquivos
-      const fs = require('fs');
-      const path = require('path');
-      const filePath = path.join(process.cwd(), 'uploads', 'products', file.filename);
+      // Usar mesmo caminho base que o Multer usa
+      const baseDir = process.env.UPLOADS_BASE_DIR || process.cwd();
+      const filePath = path.join(baseDir, 'uploads', 'products', file.filename);
       
       if (!fs.existsSync(filePath)) {
         console.error('❌ [UPLOAD IMAGES] Arquivo não encontrado no sistema de arquivos:', filePath);
@@ -1575,7 +1575,9 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
           exists: fileExists,
           size: fileStats?.size || 0,
           multerPath: file.path,
-          cwd: process.cwd()
+          cwd: process.cwd(),
+          baseDir,
+          UPLOADS_BASE_DIR: process.env.UPLOADS_BASE_DIR
         });
         
         if (!fileExists) {

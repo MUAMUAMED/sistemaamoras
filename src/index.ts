@@ -153,7 +153,17 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 import path from 'path';
 import fs from 'fs';
 
-const uploadsPath = path.join(process.cwd(), 'uploads');
+// Usar caminho consistente - no Docker WORKDIR é /src
+// Mas também suportar variável de ambiente para customização
+const baseDir = process.env.UPLOADS_BASE_DIR || process.cwd();
+const uploadsPath = path.join(baseDir, 'uploads');
+
+console.log('📁 [STATIC] Configuração de uploads:', {
+  baseDir,
+  uploadsPath,
+  cwd: process.cwd(),
+  UPLOADS_BASE_DIR: process.env.UPLOADS_BASE_DIR
+});
 
 // Garantir que o diretório existe
 if (!fs.existsSync(uploadsPath)) {

@@ -4,7 +4,18 @@ import fs from 'fs';
 import { Request } from 'express';
 
 // Garantir que o diretório de upload existe
-const uploadDir = path.join(process.cwd(), 'uploads', 'products');
+// Usar caminho consistente - no Docker WORKDIR é /src
+// Mas também suportar variável de ambiente para customização
+const baseDir = process.env.UPLOADS_BASE_DIR || process.cwd();
+const uploadDir = path.join(baseDir, 'uploads', 'products');
+
+console.log('📁 [MULTER] Configuração de upload:', {
+  baseDir,
+  uploadDir,
+  cwd: process.cwd(),
+  UPLOADS_BASE_DIR: process.env.UPLOADS_BASE_DIR
+});
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
   console.log('📁 [MULTER] Diretório de upload criado:', uploadDir);
