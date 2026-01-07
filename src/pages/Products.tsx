@@ -348,9 +348,20 @@ const Products: React.FC = () => {
           if (key === 'imageFile' || 
               key === 'imageFilesRoupa' || 
               key === 'imageFilesIA' || 
-              key === 'saveAsDraft' ||
-              key === 'initialLocation') { // initialLocation só é usado na criação, não na atualização
-            console.log(`⏭️ [FRONTEND UPDATE] Pulando campo "${key}" (campo de imagem, saveAsDraft ou initialLocation)`);
+              key === 'saveAsDraft') {
+            console.log(`⏭️ [FRONTEND UPDATE] Pulando campo "${key}" (campo de imagem ou saveAsDraft)`);
+            return;
+          }
+          
+          // initialLocation só é usado quando convertendo rascunho para produto final
+          if (key === 'initialLocation' && !isDraft) {
+            // Ao converter rascunho para produto final, enviar initialLocation para definir onde colocar o estoque
+            cleanedData[key] = value;
+            console.log(`✅ [FRONTEND UPDATE] Campo "${key}" adicionado ao cleanedData (conversão para produto final):`, value);
+            return;
+          } else if (key === 'initialLocation') {
+            // Se for rascunho, não enviar initialLocation
+            console.log(`⏭️ [FRONTEND UPDATE] Pulando campo "${key}" (rascunho não precisa de initialLocation)`);
             return;
           }
           
