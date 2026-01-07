@@ -669,6 +669,14 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
  */
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
+    console.log('🔍 [PRODUTO UPDATE] REQUISIÇÃO RECEBIDA:', {
+      method: req.method,
+      url: req.url,
+      params: req.params,
+      bodyKeys: Object.keys(req.body),
+      contentType: req.headers['content-type']
+    });
+
     const { id } = req.params;
     const { 
       name, 
