@@ -1,5 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import QRCode from 'qrcode';
+import fs from 'fs';
+import path from 'path';
 import { prisma } from '../config/database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
@@ -1559,6 +1561,26 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
         if (!file || !file.filename) {
           console.error(`❌ Arquivo ${index + 1} inválido:`, file);
           errors.push(`Arquivo ${index + 1} inválido`);
+          continue;
+        }
+        
+        // Verificar onde o arquivo foi salvo
+        const expectedPath = path.join(process.cwd(), 'uploads', 'products', file.filename);
+        const fileExists = fs.existsSync(expectedPath);
+        const fileStats = fileExists ? fs.statSync(expectedPath) : null;
+        
+        console.log(`📁 [UPLOAD IMAGES] Verificando arquivo ${index + 1}:`, {
+          filename: file.filename,
+          expectedPath,
+          exists: fileExists,
+          size: fileStats?.size || 0,
+          multerPath: file.path,
+          cwd: process.cwd()
+        });
+        
+        if (!fileExists) {
+          console.error(`❌ [UPLOAD IMAGES] Arquivo não encontrado após upload: ${expectedPath}`);
+          errors.push(`Arquivo ${index + 1} não foi salvo corretamente`);
           continue;
         }
         
