@@ -1530,7 +1530,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       } else {
         console.error(`❌ [IMAGES ROUPA] Arquivo ${index + 1} inválido:`, {
           isFile: file instanceof File,
-          size: file?.size,
+          size: file instanceof File ? file.size : undefined,
           type: typeof file
         });
       }
@@ -1585,7 +1585,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       } else {
         console.error(`❌ [IMAGES IA] Arquivo ${index + 1} inválido:`, {
           isFile: file instanceof File,
-          size: file?.size,
+          size: file instanceof File ? file.size : undefined,
           type: typeof file
         });
       }
