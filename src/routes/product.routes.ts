@@ -690,7 +690,8 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       stock,
       minStock,
       cost,
-      isDraft // Novo campo para rascunhos
+      isDraft, // Novo campo para rascunhos
+      initialLocation // Campo para definir localização inicial do estoque ao converter rascunho
     } = req.body;
 
     console.log('🔍 [PRODUTO UPDATE] Dados recebidos:', {
@@ -889,6 +890,26 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       // Se está marcando como rascunho, atualizar status também
       if (isDraft) {
         updateData.status = 'PROCESSANDO';
+      } else if (isConvertingToFinal) {
+        // Se está convertendo rascunho para produto final, atualizar stockLoja e stockArmazem
+        // baseado no initialLocation ou distribuir o estoque total
+        const finalStock = stock !== undefined ? stock : product.stock || 0;
+        const location = initialLocation || 'LOJA'; // Padrão: LOJA
+        
+        if (location === 'LOJA') {
+          updateData.stockLoja = finalStock;
+          updateData.stockArmazem = 0;
+        } else if (location === 'ARMAZEM') {
+          updateData.stockLoja = 0;
+          updateData.stockArmazem = finalStock;
+        }
+        
+        console.log('📦 [PRODUTO UPDATE] Atualizando estoque ao converter rascunho:', {
+          location,
+          finalStock,
+          stockLoja: updateData.stockLoja,
+          stockArmazem: updateData.stockArmazem
+        });
       }
     }
 
