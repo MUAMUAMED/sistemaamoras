@@ -1375,6 +1375,8 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
 
+    console.log('🔍 [FORM MODAL] Validando formulário:', formData);
+
     if (!formData.name.trim()) {
       newErrors.name = 'Nome é obrigatório';
     }
@@ -1397,13 +1399,22 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       newErrors.sizeId = 'Tamanho é obrigatório';
     }
 
+    if (Object.keys(newErrors).length > 0) {
+      console.error('❌ [FORM MODAL] Erros de validação:', newErrors);
+    } else {
+      console.log('✅ [FORM MODAL] Validação passou');
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent, saveAsDraft: boolean = false) => {
     e.preventDefault();
+    console.log('💾 [FORM MODAL] Botão Salvar clicado', { saveAsDraft });
+    
     if (saveAsDraft || validateForm()) {
+      console.log('🚀 [FORM MODAL] Iniciando submissão...');
       const submitData: ProductFormData = {
         ...formData,
         subcategoryId: formData.subcategoryId || undefined,
