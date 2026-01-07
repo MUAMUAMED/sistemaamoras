@@ -2034,38 +2034,41 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     <div className="grid grid-cols-4 gap-2">
                       {/* Imagens ROUPA */}
                       {existingImagesRoupa.map((img) => (
-                        <div key={img.id} className="relative group">
+                        <div 
+                          key={img.id} 
+                          className="relative group cursor-pointer"
+                          onClick={async () => {
+                            if (product?.id) {
+                              try {
+                                const response = await productsApi.setMainImage(product.id, img.id);
+                                toast.success('Imagem definida como principal!');
+                                queryClient.invalidateQueries({ queryKey: ['products'] });
+                                // Atualizar o produto no componente pai se callback disponível
+                                if (response.product && onProductUpdate) {
+                                  onProductUpdate(response.product);
+                                }
+                              } catch (error: any) {
+                                toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
+                              }
+                            }
+                          }}
+                        >
                           <img
                             src={getImageUrl(img.url)}
                             alt="Imagem Roupa"
-                            className={`w-full h-20 object-cover rounded border-2 transition-all cursor-pointer ${
+                            className={`w-full h-20 object-cover rounded border-2 transition-all ${
                               product?.imageUrl === img.url 
                                 ? 'border-yellow-400 ring-2 ring-yellow-300' 
                                 : 'border-blue-300 group-hover:border-yellow-400'
                             }`}
-                            onClick={async () => {
-                              if (product?.id) {
-                                try {
-                                  const response = await productsApi.setMainImage(product.id, img.id);
-                                  toast.success('Imagem definida como principal!');
-                                  queryClient.invalidateQueries({ queryKey: ['products'] });
-                                  // Atualizar o produto no componente pai se callback disponível
-                                  if (response.product && onProductUpdate) {
-                                    onProductUpdate(response.product);
-                                  }
-                                } catch (error: any) {
-                                  toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
-                                }
-                              }
-                            }}
                           />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center pointer-events-none">
                             <div className="opacity-0 group-hover:opacity-100 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-200">
                               Tornar Principal
                             </div>
                           </div>
                           {product?.imageUrl === img.url && (
-                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
+                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
                               ⭐
                             </span>
                           )}
@@ -2074,38 +2077,41 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                       
                       {/* Imagens IA */}
                       {existingImagesIA.map((img) => (
-                        <div key={img.id} className="relative group">
+                        <div 
+                          key={img.id} 
+                          className="relative group cursor-pointer"
+                          onClick={async () => {
+                            if (product?.id) {
+                              try {
+                                const response = await productsApi.setMainImage(product.id, img.id);
+                                toast.success('Imagem definida como principal!');
+                                queryClient.invalidateQueries({ queryKey: ['products'] });
+                                // Atualizar o produto no componente pai se callback disponível
+                                if (response.product && onProductUpdate) {
+                                  onProductUpdate(response.product);
+                                }
+                              } catch (error: any) {
+                                toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
+                              }
+                            }
+                          }}
+                        >
                           <img
                             src={getImageUrl(img.url)}
                             alt="Imagem IA"
-                            className={`w-full h-20 object-cover rounded border-2 transition-all cursor-pointer ${
+                            className={`w-full h-20 object-cover rounded border-2 transition-all ${
                               product?.imageUrl === img.url 
                                 ? 'border-yellow-400 ring-2 ring-yellow-300' 
                                 : 'border-purple-300 group-hover:border-yellow-400'
                             }`}
-                            onClick={async () => {
-                              if (product?.id) {
-                                try {
-                                  const response = await productsApi.setMainImage(product.id, img.id);
-                                  toast.success('Imagem definida como principal!');
-                                  queryClient.invalidateQueries({ queryKey: ['products'] });
-                                  // Atualizar o produto no componente pai se callback disponível
-                                  if (response.product && onProductUpdate) {
-                                    onProductUpdate(response.product);
-                                  }
-                                } catch (error: any) {
-                                  toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
-                                }
-                              }
-                            }}
                           />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center pointer-events-none">
                             <div className="opacity-0 group-hover:opacity-100 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-200">
                               Tornar Principal
                             </div>
                           </div>
                           {product?.imageUrl === img.url && (
-                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
+                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl z-10">
                               ⭐
                             </span>
                           )}
