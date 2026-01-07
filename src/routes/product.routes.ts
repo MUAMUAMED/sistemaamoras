@@ -689,7 +689,6 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       patternId,
       stock,
       minStock,
-      cost,
       isDraft, // Novo campo para rascunhos
       initialLocation // Campo para definir localização inicial do estoque ao converter rascunho
     } = req.body;
@@ -706,8 +705,8 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       patternId,
       stock,
       minStock,
-      cost,
       isDraft,
+      initialLocation,
       bodyCompleto: req.body
     });
 
@@ -855,9 +854,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
     if (price !== undefined) {
       updateData.price = isUpdatingDraft ? (price !== null && price !== undefined ? price : null) : price;
     }
-    if (cost !== undefined) {
-      updateData.cost = cost;
-    }
+    // Nota: campo 'cost' não existe no schema do Prisma, removido
     if (stock !== undefined) {
       updateData.stock = stock;
     }
