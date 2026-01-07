@@ -976,6 +976,11 @@ const Products: React.FC = () => {
                             
                             {/* Status Badge */}
                             <div className="absolute top-3 right-3 flex flex-col gap-1">
+                              {product.isDraft && (
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  Rascunho
+                                </span>
+                              )}
                               <span className={`px-2 py-1 rounded-full text-xs font-medium ${product.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                 {product.active ? 'Ativo' : 'Inativo'}
                               </span>
@@ -2249,19 +2254,21 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             >
               Cancelar
             </button>
-            {/* Botão para salvar como rascunho (disponível tanto na criação quanto na edição) */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
-                handleSubmit(e, true);
-              }}
-              disabled={isLoading}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
-            </button>
+            {/* Botão para salvar como rascunho (apenas na criação ou quando produto já é rascunho) */}
+            {(!product || product.isDraft) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  console.log('📝 [FORM MODAL] Botão Salvar como Rascunho clicado');
+                  handleSubmit(e, true);
+                }}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Salvando...' : 'Salvar como Rascunho'}
+              </button>
+            )}
             <button
               type="submit"
               onClick={(e) => handleSubmit(e, false)}
