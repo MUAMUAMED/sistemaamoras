@@ -1816,6 +1816,90 @@ router.delete('/:id/images/:imageId', authenticateToken, async (req, res, next) 
 
 /**
  * @swagger
+ * /api/products/{id}/images/{imageId}/set-main:
+ *   put:
+ *     summary: Definir imagem como principal do produto
+ *     tags: [Products]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: imageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Imagem definida como principal
+ */
+router.put('/:id/images/:imageId/set-main', authenticateToken, async (req, res, next) => {
+  try {
+    const { id, imageId } = req.params;
+    
+    // Verificar se produto existe
+    const product = await prisma.product.findUnique({ where: { id } });
+    if (!product) {
+      return res.status(404).json({ error: 'Produto não encontrado' });
+    }
+
+    // Buscar a imagem
+    let image: any = null;
+    try {
+      image = await (prisma as any).productImage.findUnique({ where: { id: imageId } });
+    } catch (error: any) {
+      console.warn('⚠️ ProductImage table not found:', error.message);
+      return res.status(404).json({ error: 'Imagem não encontrada ou tabela não existe' });
+    }
+
+    if (!image) {
+      return res.status(404).json({ error: 'Imagem não encontrada' });
+    }
+
+    // Verificar se a imagem pertence ao produto
+    if (image.productId !== id) {
+      return res.status(400).json({ error: 'A imagem não pertence a este produto' });
+    }
+
+    // Atualizar o produto com a URL da imagem como principal
+    const updatedProduct = await prisma.product.update({
+      where: { id },
+      data: { imageUrl: image.url },
+      include: {
+        category: true,
+        subcategory: true,
+        size: true,
+        pattern: true,
+      },
+    });
+
+    // Buscar todas as imagens do produto
+    let images: any[] = [];
+    try {
+      images = await (prisma as any).productImage.findMany({ 
+        where: { productId: id }, 
+        orderBy: { position: 'asc' } 
+      });
+    } catch (error: any) {
+      console.warn('⚠️ ProductImage table not found after update, returning empty array:', error.message);
+    }
+
+    return res.json({ 
+      message: 'Imagem definida como principal com sucesso',
+      product: { ...updatedProduct, images }
+    });
+  } catch (error) {
+    console.error('❌ Erro ao definir imagem principal:', error);
+    return next(error);
+  }
+});
+
+/**
+ * @swagger
  * /api/products/search/{code}:
  *   get:
  *     summary: Buscar produto por código de barras ou SKU
