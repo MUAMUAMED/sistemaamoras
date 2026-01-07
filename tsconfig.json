@@ -39,12 +39,21 @@
     "typeRoots": ["./node_modules/@types"]
   },
   "include": [
-    "src/**/*"
+    "src/routes/**/*",
+    "src/middleware/**/*",
+    "src/config/**/*",
+    "src/services/**/*",
+    "src/types/**/*",
+    "src/scripts/**/*",
+    "src/index.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "src/services/api.ts"
+    "src/services/api.ts",
+    "src/pages/**/*",
+    "src/components/**/*",
+    "src/utils/imageUrl.ts"
   ]
 } 
