@@ -871,6 +871,14 @@ const Products: React.FC = () => {
                                 
                                 <button
                                   onClick={() => {
+                                    console.log('✏️ [EDIT CLICK] Produto selecionado para edição:', {
+                                      id: product.id,
+                                      name: product.name,
+                                      imagesCount: product.images?.length || 0,
+                                      images: product.images?.map(img => ({ id: img.id, url: img.url, type: img.type })) || [],
+                                      hasImages: !!product.images,
+                                      isArray: Array.isArray(product.images)
+                                    });
                                     setSelectedProduct(product);
                                     setShowEditModal(true);
                                   }}
@@ -1286,27 +1294,42 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       hasProduct: !!product,
       hasImages: !!product?.images,
       imagesCount: product?.images?.length || 0,
-      images: product?.images?.map(img => ({ id: img.id, url: img.url, type: img.type })) || []
+      images: product?.images?.map(img => ({ id: img.id, url: img.url, type: img.type })) || [],
+      productFull: product ? JSON.stringify(product, null, 2).substring(0, 500) : null
     });
     
-    if (product?.images && product.images.length > 0) {
-      const roupaImages = product.images.filter(img => img.type === 'ROUPA');
-      const iaImages = product.images.filter(img => img.type === 'IA');
+    if (product?.images && Array.isArray(product.images) && product.images.length > 0) {
+      const roupaImages = product.images.filter(img => img && img.type === 'ROUPA');
+      const iaImages = product.images.filter(img => img && img.type === 'IA');
+      
+      console.log('🖼️ [FORM MODAL] Filtrando imagens:', {
+        total: product.images.length,
+        roupa: roupaImages.length,
+        ia: iaImages.length,
+        allTypes: product.images.map(img => img?.type)
+      });
+      
       setExistingImagesRoupa(roupaImages);
       setExistingImagesIA(iaImages);
+      
       console.log('🖼️ [FORM MODAL] Imagens existentes carregadas:', {
         roupa: roupaImages.length,
         ia: iaImages.length,
         total: product.images.length,
-        roupaImages: roupaImages.map(img => ({ id: img.id, url: img.url })),
-        iaImages: iaImages.map(img => ({ id: img.id, url: img.url }))
+        roupaImages: roupaImages.map(img => ({ id: img.id, url: img.url, type: img.type })),
+        iaImages: iaImages.map(img => ({ id: img.id, url: img.url, type: img.type }))
       });
     } else {
-      console.log('🖼️ [FORM MODAL] Nenhuma imagem encontrada, limpando estados');
+      console.log('🖼️ [FORM MODAL] Nenhuma imagem encontrada, limpando estados', {
+        hasProduct: !!product,
+        hasImages: !!product?.images,
+        isArray: Array.isArray(product?.images),
+        length: product?.images?.length
+      });
       setExistingImagesRoupa([]);
       setExistingImagesIA([]);
     }
-  }, [product?.id, product?.images]);
+  }, [product?.id, product?.images?.length]); // Mudar dependência para usar length ao invés do array inteiro
 
   // Debug apenas quando produto muda
   useEffect(() => {
