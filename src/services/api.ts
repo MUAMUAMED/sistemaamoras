@@ -380,6 +380,11 @@ export const productsApi = {
     const response = await api.delete(`/products/${productId}/images/${imageId}`);
     return response.data;
   },
+
+  setMainImage: async (productId: string, imageId: string): Promise<{ message: string; product: Product }> => {
+    const response = await api.put(`/products/${productId}/images/${imageId}/set-main`);
+    return response.data;
+  },
   
   finishProduction: async (id: string): Promise<Product> => {
     const response = await api.put(`/products/${id}/finish-production`);

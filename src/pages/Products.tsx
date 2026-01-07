@@ -1230,6 +1230,9 @@ const Products: React.FC = () => {
           setShowSubcategoryModal={setShowSubcategoryModal}
           setShowPatternModal={setShowPatternModal}
           setSelectedCategoryId={setSelectedCategoryId}
+          onProductUpdate={(updatedProduct) => {
+            setSelectedProduct(updatedProduct);
+          }}
         />
       )}
 
@@ -1411,6 +1414,7 @@ interface ProductFormModalProps {
   setShowSubcategoryModal: (show: boolean) => void;
   setShowPatternModal: (show: boolean) => void;
   setSelectedCategoryId: (id: string) => void;
+  onProductUpdate?: (product: Product) => void;
 }
 
 const ProductFormModal: React.FC<ProductFormModalProps> = ({
@@ -1427,7 +1431,9 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   setShowSubcategoryModal,
   setShowPatternModal,
   setSelectedCategoryId,
+  onProductUpdate,
 }) => {
+  const queryClient = useQueryClient();
   console.log('🔧 [FORM MODAL] Inicializando formulário:', {
     title,
     product: product ? {
@@ -1993,15 +1999,133 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             />
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Imagem Principal (opcional)</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Compatibilidade com o campo antigo de imagem única</p>
+              {/* Seção de Imagem Principal */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ⭐ Imagem Principal
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  A imagem principal será exibida como destaque do produto. Passe o mouse sobre qualquer imagem abaixo para defini-la como principal.
+                </p>
+                
+                {/* Mostrar imagem principal atual */}
+                {product?.imageUrl && (
+                  <div className="mb-3">
+                    <p className="text-xs text-gray-600 mb-2">Imagem principal atual:</p>
+                    <div className="relative inline-block">
+                      <img
+                        src={getImageUrl(product.imageUrl)}
+                        alt="Imagem principal"
+                        className="w-24 h-24 object-cover rounded border-2 border-yellow-400"
+                      />
+                      <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
+                        Principal
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Mostrar todas as imagens existentes (ROUPA e IA) para escolher como principal */}
+                {(existingImagesRoupa.length > 0 || existingImagesIA.length > 0) && (
+                  <div>
+                    <p className="text-xs text-gray-600 mb-2">
+                      Clique em uma imagem abaixo para torná-la principal:
+                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {/* Imagens ROUPA */}
+                      {existingImagesRoupa.map((img) => (
+                        <div key={img.id} className="relative group">
+                          <img
+                            src={getImageUrl(img.url)}
+                            alt="Imagem Roupa"
+                            className={`w-full h-20 object-cover rounded border-2 transition-all cursor-pointer ${
+                              product?.imageUrl === img.url 
+                                ? 'border-yellow-400 ring-2 ring-yellow-300' 
+                                : 'border-blue-300 group-hover:border-yellow-400'
+                            }`}
+                            onClick={async () => {
+                              if (product?.id) {
+                                try {
+                                  const response = await productsApi.setMainImage(product.id, img.id);
+                                  toast.success('Imagem definida como principal!');
+                                  queryClient.invalidateQueries({ queryKey: ['products'] });
+                                  // Atualizar o produto no componente pai se callback disponível
+                                  if (response.product && onProductUpdate) {
+                                    onProductUpdate(response.product);
+                                  }
+                                } catch (error: any) {
+                                  toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
+                                }
+                              }
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-200">
+                              Tornar Principal
+                            </div>
+                          </div>
+                          {product?.imageUrl === img.url && (
+                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
+                              ⭐
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      
+                      {/* Imagens IA */}
+                      {existingImagesIA.map((img) => (
+                        <div key={img.id} className="relative group">
+                          <img
+                            src={getImageUrl(img.url)}
+                            alt="Imagem IA"
+                            className={`w-full h-20 object-cover rounded border-2 transition-all cursor-pointer ${
+                              product?.imageUrl === img.url 
+                                ? 'border-yellow-400 ring-2 ring-yellow-300' 
+                                : 'border-purple-300 group-hover:border-yellow-400'
+                            }`}
+                            onClick={async () => {
+                              if (product?.id) {
+                                try {
+                                  const response = await productsApi.setMainImage(product.id, img.id);
+                                  toast.success('Imagem definida como principal!');
+                                  queryClient.invalidateQueries({ queryKey: ['products'] });
+                                  // Atualizar o produto no componente pai se callback disponível
+                                  if (response.product && onProductUpdate) {
+                                    onProductUpdate(response.product);
+                                  }
+                                } catch (error: any) {
+                                  toast.error(error.response?.data?.error || 'Erro ao definir imagem principal');
+                                }
+                              }
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded transition-all duration-200 flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium transition-all duration-200">
+                              Tornar Principal
+                            </div>
+                          </div>
+                          {product?.imageUrl === img.url && (
+                            <span className="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs px-1 rounded-bl">
+                              ⭐
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Campo de upload para compatibilidade */}
+                <div className="mt-3 pt-3 border-t border-gray-300">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Upload de nova imagem principal (opcional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Compatibilidade com o campo antigo de imagem única</p>
+                </div>
               </div>
 
               <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -3022,12 +3146,12 @@ const SubcategoryFormModal: React.FC<SubcategoryFormModalProps> = ({
               className={`w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 ${
                 errors.code ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Ex: 001"
+              placeholder="Ex: 00"
             />
             {errors.code && (
               <p className="text-red-500 text-xs mt-1">{errors.code}</p>
             )}
-            <p className="text-gray-500 text-xs mt-1">Máximo 3 dígitos numéricos</p>
+            <p className="text-gray-500 text-xs mt-1">Máximo 2 dígitos numéricos</p>
           </div>
 
           <div>
