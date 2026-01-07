@@ -1281,7 +1281,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
   // Carregar imagens existentes quando o produto mudar
   useEffect(() => {
-    if (product?.images) {
+    console.log('🖼️ [FORM MODAL] useEffect - produto mudou:', {
+      productId: product?.id,
+      hasProduct: !!product,
+      hasImages: !!product?.images,
+      imagesCount: product?.images?.length || 0,
+      images: product?.images?.map(img => ({ id: img.id, url: img.url, type: img.type })) || []
+    });
+    
+    if (product?.images && product.images.length > 0) {
       const roupaImages = product.images.filter(img => img.type === 'ROUPA');
       const iaImages = product.images.filter(img => img.type === 'IA');
       setExistingImagesRoupa(roupaImages);
@@ -1289,9 +1297,12 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
       console.log('🖼️ [FORM MODAL] Imagens existentes carregadas:', {
         roupa: roupaImages.length,
         ia: iaImages.length,
-        total: product.images.length
+        total: product.images.length,
+        roupaImages: roupaImages.map(img => ({ id: img.id, url: img.url })),
+        iaImages: iaImages.map(img => ({ id: img.id, url: img.url }))
       });
     } else {
+      console.log('🖼️ [FORM MODAL] Nenhuma imagem encontrada, limpando estados');
       setExistingImagesRoupa([]);
       setExistingImagesIA([]);
     }
