@@ -2216,7 +2216,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
             >
               Cancelar
             </button>
-            {/* Botão para salvar como rascunho (apenas na criação) */}
+            {/* Botão para salvar como rascunho (disponível tanto na criação quanto na edição) */}
             <button
               type="button"
               onClick={(e) => {
