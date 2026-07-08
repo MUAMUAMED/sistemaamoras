@@ -356,6 +356,22 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.admin-upload-feedback {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.admin-upload-feedback.success {
+  color: #18794e;
+}
+
+.admin-upload-feedback.error {
+  color: #b42318;
 }
 
 .admin-file {

@@ -38,6 +38,7 @@ function ProductAdminRow({
   const [featured, setFeatured] = useState(Boolean(product.featured));
   const [published, setPublished] = useState(product.published !== false);
   const [files, setFiles] = useState<File[]>([]);
+  const [uploadFeedback, setUploadFeedback] = useState('');
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['commercial-admin-products'] });
@@ -64,10 +65,19 @@ function ProductAdminRow({
   });
 
   const uploadMutation = useMutation({
-    mutationFn: () => commercialAdminApi.uploadProductImages(product.id, files),
+    mutationFn: () => commercialAdminApi.replaceProductImages(product.id, files),
+    onMutate: () => setUploadFeedback(''),
     onSuccess: () => {
       setFiles([]);
+      setUploadFeedback('Fotos atualizadas com sucesso.');
       invalidate();
+    },
+    onError: (error: any) => {
+      const status = error.response?.status;
+      const message = status === 413
+        ? 'As fotos excedem o limite permitido. Use arquivos de ate 5 MB cada.'
+        : error.response?.data?.error || 'Nao foi possivel enviar as fotos.';
+      setUploadFeedback(message);
     },
   });
 
@@ -186,7 +196,18 @@ function ProductAdminRow({
               type="file"
               accept="image/*"
               multiple
-              onChange={(event) => setFiles(Array.from(event.target.files || []))}
+              onChange={(event) => {
+                const selected = Array.from(event.target.files || []);
+                const oversized = selected.find((file) => file.size > 5 * 1024 * 1024);
+                if (oversized) {
+                  setFiles([]);
+                  setUploadFeedback(`A foto ${oversized.name} excede 5 MB.`);
+                  event.target.value = '';
+                  return;
+                }
+                setUploadFeedback('');
+                setFiles(selected);
+              }}
             />
           </label>
           <button
@@ -196,7 +217,7 @@ function ProductAdminRow({
             onClick={() => uploadMutation.mutate()}
           >
             <Upload size={18} />
-            Enviar fotos
+            {uploadMutation.isPending ? 'Enviando...' : 'Substituir fotos'}
           </button>
           <button
             type="button"
@@ -207,6 +228,11 @@ function ProductAdminRow({
             <Save size={18} />
             Salvar vitrine
           </button>
+          {uploadFeedback && (
+            <p className={`admin-upload-feedback ${uploadMutation.isError ? 'error' : 'success'}`} role="status">
+              {uploadFeedback}
+            </p>
+          )}
         </div>
       </div>
     </article>
