@@ -331,9 +331,15 @@ router.post(
         return res.status(400).json({ error: 'Nenhuma imagem enviada' });
       }
 
-      const currentCount = product.images?.length || 0;
-      const created = await prisma.$transaction(
-        files.map((file, index) =>
+      const replaceImages = req.query.replace === 'true';
+      const currentCount = replaceImages ? 0 : (product.images?.length || 0);
+      const operations = [
+        ...(replaceImages
+          ? [(prisma as any).commercialProductImage.deleteMany({
+              where: { commercialProductId: product.id },
+            })]
+          : []),
+        ...files.map((file, index) =>
           (prisma as any).commercialProductImage.create({
             data: {
               commercialProductId: product.id,
@@ -343,8 +349,10 @@ router.post(
               position: currentCount + index,
             },
           })
-        )
-      );
+        ),
+      ];
+      const results = await prisma.$transaction(operations);
+      const created = replaceImages ? results.slice(1) : results;
 
       return res.status(201).json({ images: created });
     } catch (error) {
