@@ -55,6 +55,13 @@ const allowedOrigins: string[] = env.CORS_ORIGINS
     ? ["http://localhost:3000", "http://127.0.0.1:3000"]
     : []; // Em produção, DEVE ser configurado via CORS_ORIGINS
 
+if (env.NODE_ENV === 'production' && !env.CORS_ORIGINS) {
+  allowedOrigins.push(
+    "https://amorascapital.zeabur.app",
+    "https://amorasbackend.zeabur.app",
+  );
+}
+
 // === CONFIG CORS ===
 // usamos Parameters<typeof cors>[0] em vez de CorsOptions
 const corsOptions: Parameters<typeof cors>[0] = {
@@ -65,7 +72,9 @@ const corsOptions: Parameters<typeof cors>[0] = {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error("Not allowed by CORS"));
+      const error = new Error("Not allowed by CORS") as Error & { statusCode?: number };
+      error.statusCode = 403;
+      callback(error);
     }
   },
   credentials: true,
