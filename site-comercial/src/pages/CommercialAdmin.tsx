@@ -65,7 +65,7 @@ function ProductAdminRow({
   });
 
   const uploadMutation = useMutation({
-    mutationFn: () => commercialAdminApi.replaceProductImages(product.id, files),
+    mutationFn: () => commercialAdminApi.addProductImages(product.id, files),
     onMutate: () => setUploadFeedback(''),
     onSuccess: () => {
       setFiles([]);
@@ -237,7 +237,7 @@ function ProductAdminRow({
             onClick={() => uploadMutation.mutate()}
           >
             <Upload size={18} />
-            {uploadMutation.isPending ? 'Enviando...' : 'Substituir fotos'}
+            {uploadMutation.isPending ? 'Enviando...' : 'Adicionar fotos'}
           </button>
           <button
             type="button"

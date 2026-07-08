@@ -70,10 +70,10 @@ export const commercialAdminApi = {
     return mapCommercialProduct(response.data);
   },
 
-  replaceProductImages: async (id: string, files: File[]): Promise<void> => {
+  addProductImages: async (id: string, files: File[]): Promise<void> => {
     const formData = new FormData();
     files.forEach((file) => formData.append('images', file));
-    await api.post(`/commercial/admin/products/${id}/images?replace=true`, formData, {
+    await api.post(`/commercial/admin/products/${id}/images`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
