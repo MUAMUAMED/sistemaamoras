@@ -154,6 +154,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
     // Buscar imagens em lote e anexar manualmente (evita tipos até gerar Prisma Client)
     const productIds = productsBase.map((p) => p.id);
     let imagesByProduct: Record<string, any[]> = {};
+    let commercialByProduct: Record<string, any> = {};
     
     if (productIds.length > 0) {
       console.log(`🖼️ [PRODUCT LIST] Buscando imagens para ${productIds.length} produtos...`);
@@ -171,11 +172,33 @@ router.get('/', authenticateToken, async (req, res, next) => {
         console.warn('⚠️ [PRODUCT LIST] ProductImage table not found, returning empty images arrays:', error.message);
         // Manter imagesByProduct como objeto vazio
       }
+
+      try {
+        const commercialProducts = await (prisma as any).commercialProduct.findMany({
+          where: { erpProductId: { in: productIds } },
+          select: {
+            id: true,
+            erpProductId: true,
+            title: true,
+            slug: true,
+            published: true,
+            featured: true,
+            categoryId: true,
+          },
+        });
+        commercialByProduct = commercialProducts.reduce((acc: Record<string, any>, item: any) => {
+          acc[item.erpProductId] = item;
+          return acc;
+        }, {});
+      } catch (error: any) {
+        console.warn('⚠️ [PRODUCT LIST] Commercial catalog tables not found, skipping commercial status:', error.message);
+      }
     }
 
     const products = productsBase.map((p) => ({
       ...p,
       images: imagesByProduct[p.id] || [],
+      commercialProduct: commercialByProduct[p.id] || null,
     }));
 
     console.log(`🎯 [PRODUCT LIST] Retornando ${products.length} produtos com imagens`);
@@ -245,13 +268,31 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
     }
 
     let images: any[] = [];
+    let commercialProduct: any = null;
     try {
       images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found in product details, returning empty images array:', error.message);
     }
     
-    const product = { ...productBase, images } as any;
+    try {
+      commercialProduct = await (prisma as any).commercialProduct.findUnique({
+        where: { erpProductId: id },
+        select: {
+          id: true,
+          erpProductId: true,
+          title: true,
+          slug: true,
+          published: true,
+          featured: true,
+          categoryId: true,
+        },
+      });
+    } catch (error: any) {
+      console.warn('Commercial catalog tables not found in product details, returning null:', error.message);
+    }
+
+    const product = { ...productBase, images, commercialProduct } as any;
     return res.json(product);
   } catch (error) {
     return next(error);

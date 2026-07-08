@@ -21,6 +21,7 @@ import patternRoutes from './routes/pattern.routes';
 import saleRoutes from './routes/sale.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import webhookRoutes from './routes/webhook.routes';
+import commercialRoutes from './routes/commercial.routes';
 
 // Importar novas rotas ERP
 import sizesRoutes from './routes/sizes';
@@ -148,6 +149,7 @@ app.use('/api/patterns', patternRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/commercial', commercialRoutes);
 
 // Novas rotas ERP
 app.use('/api/sizes', sizesRoutes);

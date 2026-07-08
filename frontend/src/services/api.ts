@@ -377,6 +377,24 @@ export const productsApi = {
     });
     return response.data;
   },
+
+  publishToCommercialSite: async (id: string, data?: {
+    title?: string;
+    slug?: string;
+    description?: string;
+    shortDescription?: string;
+    categoryId?: string | null;
+    featured?: boolean;
+    position?: number;
+  }): Promise<Product['commercialProduct']> => {
+    const response = await api.post(`/commercial/admin/products/publish/${id}`, data || {});
+    return response.data;
+  },
+
+  unpublishFromCommercialSite: async (commercialProductId: string): Promise<Product['commercialProduct']> => {
+    const response = await api.put(`/commercial/admin/products/${commercialProductId}/unpublish`);
+    return response.data;
+  },
 };
 
 // Serviços de movimentações de estoque

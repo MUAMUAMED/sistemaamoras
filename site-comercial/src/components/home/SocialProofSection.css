@@ -1,0 +1,135 @@
+.social-proof {
+  position: relative;
+  padding: var(--space-20) 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--color-blush-50), var(--color-cream));
+}
+
+.social-proof-header {
+  max-width: 720px;
+  margin-bottom: var(--space-8);
+}
+
+.social-proof-header span {
+  color: var(--color-rose-500);
+  font-size: var(--text-sm);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.social-proof-header h2 {
+  margin-top: var(--space-2);
+  font-size: var(--text-4xl);
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+  margin-bottom: var(--space-10);
+}
+
+.review-card {
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.86);
+  box-shadow: var(--shadow-sm);
+}
+
+.review-stars {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+  color: var(--color-gold);
+}
+
+.review-card p {
+  color: var(--color-muted);
+}
+
+.review-card strong {
+  color: var(--color-berry-700);
+}
+
+.instagram-strip {
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: var(--space-5);
+  align-items: stretch;
+}
+
+.instagram-copy {
+  display: grid;
+  align-content: center;
+  padding: var(--space-8);
+  border-radius: var(--radius-md);
+  background: var(--color-berry-700);
+  color: white;
+}
+
+.instagram-copy svg {
+  margin-bottom: var(--space-4);
+}
+
+.instagram-copy strong {
+  font-size: var(--text-2xl);
+}
+
+.instagram-copy span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.instagram-posts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+
+.instagram-posts img {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.whatsapp-float {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 1050;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 50px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-full);
+  background: #2f8f55;
+  color: white;
+  font-weight: 900;
+  box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 900px) {
+  .review-grid,
+  .instagram-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .instagram-posts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .whatsapp-float span {
+    display: none;
+  }
+
+  .whatsapp-float {
+    width: 52px;
+    padding: 0;
+    justify-content: center;
+  }
+}
