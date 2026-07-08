@@ -101,6 +101,7 @@ export interface Product {
   inProduction: boolean; // Status de produção (mantido para compatibilidade)
   status: ProductStatus; // Status do produto
   isDraft?: boolean; // Indica se o produto é um rascunho
+  commercialProduct?: CommercialProductSummary | null;
   createdAt: string;
   updatedAt: string;
   
@@ -109,6 +110,16 @@ export interface Product {
   subcategory?: Subcategory;
   pattern?: Pattern;
   size?: Size; // Relação completa do tamanho
+}
+
+export interface CommercialProductSummary {
+  id: string;
+  erpProductId: string;
+  title: string;
+  slug: string;
+  published: boolean;
+  featured: boolean;
+  categoryId?: string;
 }
 
 export type ProductImageType = 'ROUPA' | 'IA';
@@ -489,4 +500,4 @@ export interface StockReport {
     count: number;
     totalQuantity: number;
   }>;
-} 
+}

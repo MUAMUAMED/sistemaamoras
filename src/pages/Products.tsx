@@ -158,6 +158,33 @@ const Products: React.FC = () => {
     },
   });
 
+  const publishCommercialMutation = useMutation({
+    mutationFn: (product: Product) =>
+      productsApi.publishToCommercialSite(product.id, {
+        title: product.name,
+        description: product.description,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Produto publicado no site comercial!');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao publicar no site comercial');
+    },
+  });
+
+  const unpublishCommercialMutation = useMutation({
+    mutationFn: (commercialProductId: string) =>
+      productsApi.unpublishFromCommercialSite(commercialProductId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('Produto retirado do site comercial.');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || 'Erro ao retirar do site comercial');
+    },
+  });
+
   const generateCodesMutation = useMutation({
     mutationFn: barcodeApi.generate,
     onSuccess: (data) => {
@@ -603,6 +630,27 @@ const Products: React.FC = () => {
     }
   };
 
+  const handleToggleCommercialPublish = async (product: Product) => {
+    if (product.commercialProduct?.published) {
+      if (window.confirm('Retirar este produto do site comercial? Ele continuará no ERP.')) {
+        await unpublishCommercialMutation.mutateAsync(product.commercialProduct.id);
+      }
+      return;
+    }
+
+    if (product.stockLoja <= 0) {
+      toast.error('Para publicar no site comercial, o produto precisa ter estoque na loja.');
+      return;
+    }
+
+    if (product.status !== 'ATIVO') {
+      toast.error('Finalize o processo do produto antes de publicar no site comercial.');
+      return;
+    }
+
+    await publishCommercialMutation.mutateAsync(product);
+  };
+
   const getStockStatus = (product: Product) => {
     if (product.stock <= 0) return { color: 'text-red-600 bg-red-100', text: 'Sem estoque' };
     if (product.stock <= product.minStock) return { color: 'text-yellow-600 bg-yellow-100', text: 'Estoque baixo' };
@@ -970,6 +1018,11 @@ const Products: React.FC = () => {
                                   Processando
                                 </span>
                               )}
+                              {product.commercialProduct?.published && (
+                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-pink-100 text-pink-800">
+                                  No site
+                                </span>
+                              )}
 
                             </div>
 
@@ -1095,6 +1148,22 @@ const Products: React.FC = () => {
                                 >
                                   <Trash2 className="w-3 h-3" />
                                   Excluir
+                                </button>
+                              </div>
+
+                              <div className="mt-2">
+                                <button
+                                  onClick={() => handleToggleCommercialPublish(product)}
+                                  disabled={publishCommercialMutation.isPending || unpublishCommercialMutation.isPending}
+                                  className={`w-full px-2 py-1.5 text-xs rounded-md transition-colors duration-200 flex items-center justify-center gap-1 disabled:opacity-50 ${
+                                    product.commercialProduct?.published
+                                      ? 'bg-pink-50 text-pink-700 hover:bg-pink-100'
+                                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  }`}
+                                  title={product.commercialProduct?.published ? 'Retirar do site comercial' : 'Publicar no site comercial'}
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  {product.commercialProduct?.published ? 'Retirar do Site' : 'Publicar no Site'}
                                 </button>
                               </div>
 
@@ -4561,4 +4630,4 @@ const ExitStockModal: React.FC<ExitStockModalProps> = ({ onClose, onSuccess }) =
   );
 };
 
-export default Products; 
+export default Products;
