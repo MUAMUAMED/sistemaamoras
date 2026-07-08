@@ -2666,7 +2666,9 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
         const updatedProduct = await prisma.product.update({
           where: { id },
           data: {
-            description: newDescription
+            description: newDescription,
+            status: 'ATIVO',
+            inProduction: false,
           },
           include: {
             category: true,
@@ -2704,8 +2706,12 @@ router.put('/:id/finish-production', authenticateToken, async (req: Authenticate
       }
     } else {
       console.log('⚠️ [DEBUG FINISH] Produto já tinha marca [FINALIZADO], não atualizando');
-      const updatedProduct = await prisma.product.findUnique({
+      const updatedProduct = await prisma.product.update({
         where: { id },
+        data: {
+          status: 'ATIVO',
+          inProduction: false,
+        },
         include: {
           category: true,
           subcategory: true,
