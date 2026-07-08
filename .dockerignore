@@ -1,0 +1,7 @@
+site-comercial/node_modules
+site-comercial/dist
+site-comercial/.env
+site-comercial/.env.local
+site-comercial/.env.production
+site-comercial/*.tsbuildinfo
+.git
