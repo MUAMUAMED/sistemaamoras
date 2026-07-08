@@ -1,7 +1,13 @@
 import { api } from './api';
 import type { CatalogProduct, CommercialCategory } from '../data/catalog';
 
-const UPLOAD_BASE_URL = import.meta.env.VITE_UPLOAD_URL || import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:3000';
+const configuredUploadUrl = import.meta.env.VITE_UPLOAD_URL;
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const UPLOAD_BASE_URL = configuredUploadUrl !== undefined
+  ? configuredUploadUrl.replace(/\/$/, '')
+  : configuredApiUrl?.startsWith('http')
+    ? configuredApiUrl.replace(/\/api\/?$/, '')
+    : '';
 const PLACEHOLDER_IMAGE = '/amoras-logo.png';
 
 const assetUrl = (url?: string) => {
