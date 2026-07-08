@@ -363,9 +363,34 @@ router.post(
 
 router.delete('/admin/products/:id/images/:imageId', commercialAdmin, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    await (prisma as any).commercialProductImage.delete({
-      where: { id: req.params.imageId },
+    const image = await (prisma as any).commercialProductImage.findFirst({
+      where: {
+        id: req.params.imageId,
+        commercialProductId: req.params.id,
+      },
     });
+
+    if (!image) {
+      return res.status(404).json({ error: 'Imagem comercial nao encontrada' });
+    }
+
+    await (prisma as any).commercialProductImage.delete({
+      where: { id: image.id },
+    });
+
+    if (image.isCover) {
+      const nextImage = await (prisma as any).commercialProductImage.findFirst({
+        where: { commercialProductId: req.params.id },
+        orderBy: { position: 'asc' },
+      });
+
+      if (nextImage) {
+        await (prisma as any).commercialProductImage.update({
+          where: { id: nextImage.id },
+          data: { isCover: true },
+        });
+      }
+    }
 
     return res.json({ message: 'Imagem comercial removida' });
   } catch (error) {
