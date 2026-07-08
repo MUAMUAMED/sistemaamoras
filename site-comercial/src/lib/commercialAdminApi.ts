@@ -73,7 +73,9 @@ export const commercialAdminApi = {
   replaceProductImages: async (id: string, files: File[]): Promise<void> => {
     const formData = new FormData();
     files.forEach((file) => formData.append('images', file));
-    await api.post(`/commercial/admin/products/${id}/images?replace=true`, formData);
+    await api.post(`/commercial/admin/products/${id}/images?replace=true`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
   },
 
   deleteProductImage: async (productId: string, imageId: string): Promise<void> => {
