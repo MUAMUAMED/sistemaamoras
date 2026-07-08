@@ -373,6 +373,36 @@ router.delete('/admin/products/:id/images/:imageId', commercialAdmin, async (req
   }
 });
 
+router.put('/admin/products/:id/images/:imageId/cover', commercialAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const image = await (prisma as any).commercialProductImage.findFirst({
+      where: {
+        id: req.params.imageId,
+        commercialProductId: req.params.id,
+      },
+    });
+
+    if (!image) {
+      return res.status(404).json({ error: 'Imagem comercial nao encontrada' });
+    }
+
+    const [, cover] = await prisma.$transaction([
+      (prisma as any).commercialProductImage.updateMany({
+        where: { commercialProductId: req.params.id },
+        data: { isCover: false },
+      }),
+      (prisma as any).commercialProductImage.update({
+        where: { id: req.params.imageId },
+        data: { isCover: true },
+      }),
+    ]);
+
+    return res.json(cover);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/admin/settings', commercialAdmin, async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const settings = await (prisma as any).commercialSiteSetting.findFirst({
