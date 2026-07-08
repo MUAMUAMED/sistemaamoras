@@ -3643,7 +3643,7 @@ interface StockModalProps {
 }
 
 const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) => {
-  const [operation, setOperation] = useState<'add' | 'remove' | 'add-location' | 'remove-location' | 'history'>('add');
+  const [operation, setOperation] = useState<'add-location' | 'remove-location' | 'history'>('add-location');
   const [quantity, setQuantity] = useState<number>(1);
   const [reason, setReason] = useState<string>('');
   const [location, setLocation] = useState<'LOJA' | 'ARMAZEM'>('LOJA');
@@ -3658,12 +3658,7 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
 
     setIsLoading(true);
     try {
-      if (operation === 'add') {
-        const result = await productsApi.addStock(product.id, quantity, reason);
-        toast.success(result.message);
-      } else if (operation === 'remove') {
-        const result = await productsApi.removeStock(product.id, quantity, reason);
-      } else if (operation === 'add-location') {
+      if (operation === 'add-location') {
         const result = await productsApi.addStockLocation(product.id, quantity, location, reason);
         toast.success(`Estoque adicionado na ${location}`);
       } else if (operation === 'remove-location') {
@@ -3742,46 +3737,7 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
 
           {/* Abas de operação */}
           <div className="space-y-2 mb-6">
-            {/* Operações Gerais */}
-            <div className="text-xs font-medium text-gray-700 mb-1">Estoque Geral:</div>
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setOperation('add')}
-                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
-                  operation === 'add'
-                    ? 'bg-white text-green-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Plus className="w-3 h-3 inline-block mr-1" />
-                Adicionar
-              </button>
-              <button
-                onClick={() => setOperation('remove')}
-                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
-                  operation === 'remove'
-                    ? 'bg-white text-red-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Minus className="w-3 h-3 inline-block mr-1" />
-                Retirar
-              </button>
-              <button
-                onClick={() => setOperation('history')}
-                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
-                  operation === 'history'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <History className="w-3 h-3 inline-block mr-1" />
-                Histórico
-              </button>
-            </div>
-
-            {/* Operações por Localização */}
-            <div className="text-xs font-medium text-gray-700 mb-1">Por Localização:</div>
+            <div className="text-xs font-medium text-gray-700 mb-1">Operação:</div>
             <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setOperation('add-location')}
@@ -3805,7 +3761,19 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
                 <Minus className="w-3 h-3 inline-block mr-1" />
                 Saída
               </button>
+              <button
+                onClick={() => setOperation('history')}
+                className={`flex-1 py-2 px-2 rounded-md text-xs font-medium transition-colors ${
+                  operation === 'history'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <History className="w-3 h-3 inline-block mr-1" />
+                Histórico
+              </button>
             </div>
+
           </div>
 
           {/* Formulário de operação */}
@@ -3863,7 +3831,7 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
                   onChange={(e) => setReason(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder={
-                    operation === 'add' || operation === 'add-location' 
+                    operation === 'add-location'
                       ? 'Ex: Recebimento de fornecedor' 
                       : 'Ex: Produto danificado'
                   }
@@ -3883,14 +3851,12 @@ const StockModal: React.FC<StockModalProps> = ({ product, onClose, onSuccess }) 
                   type="submit"
                   disabled={isLoading}
                   className={`flex-1 px-4 py-2 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                    operation === 'add' || operation === 'add-location'
+                    operation === 'add-location'
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >
                   {isLoading ? 'Processando...' : 
-                    operation === 'add' ? 'Adicionar' :
-                    operation === 'remove' ? 'Retirar' :
                     operation === 'add-location' ? `Adicionar na ${location}` :
                     operation === 'remove-location' ? `Retirar da ${location}` : 'Processar'
                   }
