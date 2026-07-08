@@ -1,0 +1,210 @@
+.header {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: var(--z-sticky);
+  background: rgba(255, 248, 246, 0.72);
+  border-bottom: 1px solid rgba(234, 216, 212, 0.72);
+  backdrop-filter: blur(18px);
+  transition: box-shadow var(--transition-base), background var(--transition-base);
+}
+
+.header-scrolled {
+  background: rgba(255, 253, 249, 0.94);
+  box-shadow: var(--shadow-md);
+}
+
+.header-promo {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 34px;
+  padding: var(--space-2) var(--space-4);
+  color: white;
+  background: var(--color-berry-700);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.header-container {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-6);
+}
+
+.header-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-berry-700);
+  font-family: var(--font-serif);
+  font-size: var(--text-xl);
+  font-weight: 800;
+}
+
+.header-logo img {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(113, 60, 75, 0.16);
+}
+
+.header-nav {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-7, 1.75rem);
+}
+
+.header-link {
+  position: relative;
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.header-link::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -8px;
+  left: 0;
+  height: 2px;
+  background: var(--color-rose-500);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform var(--transition-fast);
+}
+
+.header-link:hover {
+  color: var(--color-berry-700);
+}
+
+.header-link:hover::after {
+  transform: scaleX(1);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.header-icon-btn,
+.header-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-berry-700);
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.header-icon-btn:hover,
+.header-menu-btn:hover {
+  background: var(--color-blush-100);
+  border-color: var(--color-border);
+  transform: translateY(-1px);
+}
+
+.header-cart-btn {
+  position: relative;
+}
+
+.header-cart-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--color-gold);
+  color: var(--color-plum-900);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.header-menu-btn {
+  display: none;
+}
+
+.header-mobile-menu {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .header-promo {
+    justify-content: flex-start;
+    gap: var(--space-5);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .header-promo span:nth-child(n + 2) {
+    display: none;
+  }
+
+  .header-container {
+    grid-template-columns: auto 1fr auto;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .header-menu-btn {
+    display: inline-flex;
+  }
+
+  .header-nav {
+    display: none;
+  }
+
+  .header-logo {
+    justify-self: center;
+    font-size: var(--text-base);
+  }
+
+  .header-logo img {
+    width: 46px;
+    height: 46px;
+  }
+
+  .header-actions .header-icon-btn:nth-child(1),
+  .header-actions .header-icon-btn:nth-child(2),
+  .header-actions .header-icon-btn:nth-child(3) {
+    display: none;
+  }
+
+  .header-mobile-menu {
+    display: block;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-cream);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .header-mobile-nav {
+    display: grid;
+    padding: var(--space-3);
+  }
+
+  .header-mobile-link {
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    color: var(--color-plum-900);
+    font-weight: 800;
+  }
+
+  .header-mobile-link:hover {
+    background: var(--color-blush-100);
+  }
+}

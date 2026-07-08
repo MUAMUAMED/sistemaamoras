@@ -1,0 +1,52 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Import Design System */
+@import './styles/design-system.css';
+
+/* Global Reset & Base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection Style */
+::selection {
+  background-color: var(--color-magenta-subtle);
+  color: white;
+}
+
+/* Scrollbar Custom Style */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-sand);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-green-forest);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-green-deep);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
