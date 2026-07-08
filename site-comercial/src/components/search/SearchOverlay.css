@@ -1,0 +1,135 @@
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  display: grid;
+  place-items: start center;
+  padding: 120px var(--space-4) var(--space-6);
+  background: rgba(57, 35, 45, 0.26);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+}
+
+.search-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.search-panel {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 249, 0.96);
+  box-shadow: var(--shadow-xl);
+}
+
+.search-panel header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.search-panel header span {
+  color: var(--color-rose-500);
+  font-size: var(--text-sm);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.search-panel header h2 {
+  margin-top: var(--space-1);
+  font-size: var(--text-3xl);
+}
+
+.search-panel header button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: white;
+  color: var(--color-berry-700);
+}
+
+.search-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: white;
+  color: var(--color-berry-700);
+}
+
+.search-input input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: var(--color-ink);
+  background: transparent;
+}
+
+.search-results {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.search-results a {
+  display: grid;
+  grid-template-columns: 78px 1fr auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-blush-50);
+}
+
+.search-results img {
+  width: 78px;
+  height: 94px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.search-results strong,
+.search-results span {
+  display: block;
+}
+
+.search-results span {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+
+.search-results b {
+  color: var(--color-berry-700);
+}
+
+.search-empty {
+  color: var(--color-muted);
+  text-align: center;
+}
+
+@media (max-width: 620px) {
+  .search-overlay {
+    padding-top: 104px;
+  }
+
+  .search-results a {
+    grid-template-columns: 64px 1fr;
+  }
+
+  .search-results b {
+    grid-column: 2;
+  }
+}
