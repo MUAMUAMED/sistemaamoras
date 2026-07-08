@@ -80,6 +80,10 @@ export const commercialAdminApi = {
     await api.delete(`/commercial/admin/products/${productId}/images/${imageId}`);
   },
 
+  setProductCover: async (productId: string, imageId: string): Promise<void> => {
+    await api.put(`/commercial/admin/products/${productId}/images/${imageId}/cover`);
+  },
+
   settings: async (): Promise<CommercialSiteSettings | null> => {
     const response = await api.get('/commercial/admin/settings');
     return response.data;

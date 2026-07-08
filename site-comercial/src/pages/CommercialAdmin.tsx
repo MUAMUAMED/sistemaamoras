@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ImagePlus, LogOut, Save, ToggleLeft, ToggleRight, Trash2, Upload } from 'lucide-react';
+import { Check, ImagePlus, LogOut, Save, Star, ToggleLeft, ToggleRight, Trash2, Upload } from 'lucide-react';
 import { commercialAdminApi } from '../lib/commercialAdminApi';
 import type { CommercialSiteSettings } from '../lib/commercialAdminApi';
 import type { CatalogProduct, CommercialCategory } from '../data/catalog';
@@ -75,7 +75,7 @@ function ProductAdminRow({
     onError: (error: any) => {
       const status = error.response?.status;
       const message = status === 413
-        ? 'As fotos excedem o limite permitido. Use arquivos de ate 5 MB cada.'
+        ? 'As fotos excedem o limite permitido. Use arquivos de ate 10 MB cada.'
         : error.response?.data?.error || 'Nao foi possivel enviar as fotos.';
       setUploadFeedback(message);
     },
@@ -84,6 +84,12 @@ function ProductAdminRow({
   const deleteImageMutation = useMutation({
     mutationFn: (imageId: string) => commercialAdminApi.deleteProductImage(product.id, imageId),
     onSuccess: invalidate,
+  });
+
+  const coverImageMutation = useMutation({
+    mutationFn: (imageId: string) => commercialAdminApi.setProductCover(product.id, imageId),
+    onSuccess: invalidate,
+    onError: () => setUploadFeedback('Nao foi possivel definir a foto de capa.'),
   });
 
   return (
@@ -97,13 +103,27 @@ function ProductAdminRow({
               <div className="admin-thumb" key={`${image}-${index}`}>
                 <img src={image} alt={`${product.name} ${index + 1}`} />
                 {storedImage && (
-                  <button
-                    type="button"
-                    aria-label="Remover foto"
-                    onClick={() => deleteImageMutation.mutate(storedImage.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={`admin-cover-button ${storedImage.isCover ? 'active' : ''}`}
+                      aria-label={storedImage.isCover ? 'Foto de capa atual' : 'Definir como foto de capa'}
+                      title={storedImage.isCover ? 'Foto de capa atual' : 'Definir como capa'}
+                      disabled={storedImage.isCover || coverImageMutation.isPending}
+                      onClick={() => coverImageMutation.mutate(storedImage.id)}
+                    >
+                      <Star size={14} fill={storedImage.isCover ? 'currentColor' : 'none'} />
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-delete-image"
+                      aria-label="Remover foto"
+                      title="Remover foto"
+                      onClick={() => deleteImageMutation.mutate(storedImage.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
                 )}
               </div>
             );
@@ -198,10 +218,10 @@ function ProductAdminRow({
               multiple
               onChange={(event) => {
                 const selected = Array.from(event.target.files || []);
-                const oversized = selected.find((file) => file.size > 5 * 1024 * 1024);
+                const oversized = selected.find((file) => file.size > 10 * 1024 * 1024);
                 if (oversized) {
                   setFiles([]);
-                  setUploadFeedback(`A foto ${oversized.name} excede 5 MB.`);
+                  setUploadFeedback(`A foto ${oversized.name} excede 10 MB.`);
                   event.target.value = '';
                   return;
                 }

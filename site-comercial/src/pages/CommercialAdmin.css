@@ -289,7 +289,6 @@
 .admin-thumb button {
   position: absolute;
   top: 4px;
-  right: 4px;
   width: 26px;
   height: 26px;
   border: 0;
@@ -298,6 +297,19 @@
   place-items: center;
   background: rgba(57, 35, 45, 0.78);
   color: white;
+}
+
+.admin-thumb .admin-cover-button {
+  left: 4px;
+}
+
+.admin-thumb .admin-cover-button.active {
+  background: #fff3bf;
+  color: #8a5a00;
+}
+
+.admin-thumb .admin-delete-image {
+  right: 4px;
 }
 
 .admin-product-editor {
