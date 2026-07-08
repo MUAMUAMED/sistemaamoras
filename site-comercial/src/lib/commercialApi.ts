@@ -2,9 +2,10 @@ import { api } from './api';
 import type { CatalogProduct, CommercialCategory } from '../data/catalog';
 
 const UPLOAD_BASE_URL = import.meta.env.VITE_UPLOAD_URL || import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:3000';
+const PLACEHOLDER_IMAGE = '/amoras-logo.png';
 
 const assetUrl = (url?: string) => {
-  if (!url) return 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=900&q=82';
+  if (!url) return PLACEHOLDER_IMAGE;
   if (/^https?:\/\//i.test(url)) return url;
   return `${UPLOAD_BASE_URL}${url}`;
 };

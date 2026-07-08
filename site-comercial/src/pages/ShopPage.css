@@ -6,8 +6,7 @@
 .shop-hero {
   padding: 168px 0 var(--space-12);
   background:
-    linear-gradient(110deg, rgba(255, 248, 246, 0.97), rgba(248, 207, 199, 0.72)),
-    url('https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=1800&q=80') center/cover;
+    linear-gradient(110deg, rgba(255, 248, 246, 0.98), rgba(248, 207, 199, 0.76));
 }
 
 .shop-hero-grid {

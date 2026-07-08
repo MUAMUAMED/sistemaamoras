@@ -1,4 +1,6 @@
 import { MessageCircle, Share2, Star } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { commercialApi } from '../../lib/commercialApi';
 import './SocialProofSection.css';
 
 const reviews = [
@@ -7,14 +9,13 @@ const reviews = [
   { name: 'Camila', text: 'Atendimento rapido no WhatsApp e troca super tranquila.' },
 ];
 
-const posts = [
-  'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=700&q=82',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=700&q=82',
-  'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=700&q=82',
-  'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=700&q=82',
-];
-
 export function SocialProofSection() {
+  const { data } = useQuery({
+    queryKey: ['commercial-catalog'],
+    queryFn: commercialApi.catalog,
+  });
+  const posts = data?.products.slice(0, 4) || [];
+
   return (
     <section className="social-proof">
       <div className="container">
@@ -43,11 +44,13 @@ export function SocialProofSection() {
             <strong>@amoras.capital</strong>
             <span>Novidades, provador e bastidores da colecao.</span>
           </div>
-          <div className="instagram-posts">
-            {posts.map((post) => (
-              <img src={post} alt="Look Amoras Capital" key={post} />
-            ))}
-          </div>
+          {posts.length > 0 && (
+            <div className="instagram-posts">
+              {posts.map((product) => (
+                <img src={product.image} alt={product.name} key={product.id} />
+              ))}
+            </div>
+          )}
         </div>
 
         <a className="whatsapp-float" href="https://wa.me/" aria-label="Falar no WhatsApp">

@@ -4,8 +4,7 @@
   padding: 118px var(--space-5) var(--space-10);
   overflow: hidden;
   background:
-    linear-gradient(120deg, rgba(255, 248, 246, 0.92), rgba(248, 207, 199, 0.82)),
-    url('https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=1800&q=80') center/cover;
+    linear-gradient(120deg, rgba(255, 248, 246, 0.96), rgba(248, 207, 199, 0.84));
 }
 
 .hero::before {
@@ -219,6 +218,38 @@
 .hero-carousel-dots button.active {
   width: 58px;
   background: var(--color-blush-50);
+}
+
+.hero-empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  background: var(--color-blush-100);
+  color: var(--color-berry-700);
+  text-align: center;
+}
+
+.hero-empty-state img {
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: var(--shadow-md);
+}
+
+.hero-empty-state strong {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+}
+
+.hero-empty-state span {
+  max-width: 310px;
+  color: var(--color-muted);
 }
 
 .hero-media-badge {
