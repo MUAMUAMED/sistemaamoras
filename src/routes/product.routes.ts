@@ -1981,12 +1981,19 @@ router.get('/search/:code', authenticateToken, async (req, res, next) => {
 router.put('/:id/stock/add', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { id } = req.params;
-    const { quantity, reason = 'Adição manual de estoque' } = req.body;
+    const { quantity, location = 'LOJA', reason = 'Adição manual de estoque' } = req.body;
 
     if (!quantity || quantity <= 0) {
       return res.status(400).json({
         error: 'Quantidade inválida',
         message: 'A quantidade deve ser maior que zero',
+      });
+    }
+
+    if (!['LOJA', 'ARMAZEM'].includes(location)) {
+      return res.status(400).json({
+        error: 'Localização inválida',
+        message: 'Localização deve ser LOJA ou ARMAZEM',
       });
     }
 
@@ -2006,32 +2013,38 @@ router.put('/:id/stock/add', authenticateToken, async (req: AuthenticatedRequest
       });
     }
 
-    // Atualizar estoque
+    const stockField = location === 'LOJA' ? 'stockLoja' : 'stockArmazem';
     const newStock = product.stock + quantity;
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: { stock: newStock },
-      include: {
-        category: true,
-        pattern: true,
-      },
-    });
-
-    // Registrar movimentação
-    await prisma.stockMovement.create({
-      data: {
-        productId: id,
-        type: 'ENTRY',
-        quantity,
-        reason,
-        userId: req.user!.id,
-      },
-    });
+    const newLocationStock = product[stockField] + quantity;
+    const [updatedProduct] = await prisma.$transaction([
+      prisma.product.update({
+        where: { id },
+        data: {
+          stock: newStock,
+          [stockField]: newLocationStock,
+        },
+        include: {
+          category: true,
+          pattern: true,
+        },
+      }),
+      prisma.stockMovement.create({
+        data: {
+          productId: id,
+          type: 'ENTRY',
+          quantity,
+          location,
+          reason,
+          userId: req.user!.id,
+        },
+      }),
+    ]);
 
     return res.json({
       message: `Estoque adicionado com sucesso. Novo estoque: ${newStock}`,
       product: updatedProduct,
       stockAdded: quantity,
+      location,
       previousStock: product.stock,
       newStock,
     });
@@ -2077,12 +2090,19 @@ router.put('/:id/stock/add', authenticateToken, async (req: AuthenticatedRequest
 router.put('/:id/stock/remove', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { id } = req.params;
-    const { quantity, reason = 'Retirada manual de estoque' } = req.body;
+    const { quantity, location = 'LOJA', reason = 'Retirada manual de estoque' } = req.body;
 
     if (!quantity || quantity <= 0) {
       return res.status(400).json({
         error: 'Quantidade inválida',
         message: 'A quantidade deve ser maior que zero',
+      });
+    }
+
+    if (!['LOJA', 'ARMAZEM'].includes(location)) {
+      return res.status(400).json({
+        error: 'Localização inválida',
+        message: 'Localização deve ser LOJA ou ARMAZEM',
       });
     }
 
@@ -2102,42 +2122,49 @@ router.put('/:id/stock/remove', authenticateToken, async (req: AuthenticatedRequ
       });
     }
 
-    // Verificar se há estoque suficiente
-    if (product.stock < quantity) {
+    const stockField = location === 'LOJA' ? 'stockLoja' : 'stockArmazem';
+    const currentLocationStock = product[stockField];
+
+    if (currentLocationStock < quantity) {
       return res.status(400).json({
         error: 'Estoque insuficiente',
-        message: `Estoque atual: ${product.stock}. Não é possível retirar ${quantity} unidades.`,
-        currentStock: product.stock,
+        message: `Estoque atual na ${location}: ${currentLocationStock}. Não é possível retirar ${quantity} unidades.`,
+        currentStock: currentLocationStock,
         requestedQuantity: quantity,
       });
     }
 
-    // Atualizar estoque
     const newStock = product.stock - quantity;
-    const updatedProduct = await prisma.product.update({
-      where: { id },
-      data: { stock: newStock },
-      include: {
-        category: true,
-        pattern: true,
-      },
-    });
-
-    // Registrar movimentação
-    await prisma.stockMovement.create({
-      data: {
-        productId: id,
-        type: 'EXIT',
-        quantity,
-        reason,
-        userId: req.user!.id,
-      },
-    });
+    const newLocationStock = currentLocationStock - quantity;
+    const [updatedProduct] = await prisma.$transaction([
+      prisma.product.update({
+        where: { id },
+        data: {
+          stock: newStock,
+          [stockField]: newLocationStock,
+        },
+        include: {
+          category: true,
+          pattern: true,
+        },
+      }),
+      prisma.stockMovement.create({
+        data: {
+          productId: id,
+          type: 'EXIT',
+          quantity,
+          location,
+          reason,
+          userId: req.user!.id,
+        },
+      }),
+    ]);
 
     return res.json({
       message: `Estoque retirado com sucesso. Novo estoque: ${newStock}`,
       product: updatedProduct,
       stockRemoved: quantity,
+      location,
       previousStock: product.stock,
       newStock,
     });
@@ -2726,4 +2753,4 @@ router.get('/debug/:id', authenticateToken, async (req: AuthenticatedRequest, re
   }
 });
 
-export default router; 
+export default router;
