@@ -173,6 +173,31 @@ import fs from 'fs';
 // Mas também suportar variável de ambiente para customização
 const baseDir = process.env.UPLOADS_BASE_DIR || process.cwd();
 const uploadsPath = path.join(baseDir, 'uploads');
+const uploadCandidatePaths = Array.from(new Set([
+  uploadsPath,
+  process.env.UPLOAD_DIR,
+  path.join(process.cwd(), 'uploads'),
+  path.join(path.dirname(process.cwd()), 'uploads'),
+  '/src/uploads',
+  '/app/uploads',
+  '/data/uploads',
+  '/mnt/data/uploads',
+  '/var/lib/data/uploads',
+].filter(Boolean) as string[]));
+
+const findUploadedProductFile = (filename: string) => {
+  for (const candidateUploadsPath of uploadCandidatePaths) {
+    const candidateFilePath = path.join(candidateUploadsPath, 'products', filename);
+    if (fs.existsSync(candidateFilePath)) {
+      return {
+        filePath: candidateFilePath,
+        uploadsPath: candidateUploadsPath,
+      };
+    }
+  }
+
+  return null;
+};
 
 console.log('📁 [STATIC] Configuração de uploads:', {
   baseDir,
@@ -210,6 +235,19 @@ console.log(`📁 [STATIC] Servindo arquivos estáticos de: ${uploadsPath}`);
 app.get('/uploads/test', (req: express.Request, res: express.Response) => {
   const productsPath = path.join(uploadsPath, 'products');
   const productsFiles = fs.existsSync(productsPath) ? fs.readdirSync(productsPath).slice(0, 20) : [];
+  const candidates = uploadCandidatePaths.map((candidateUploadsPath) => {
+    const candidateProductsPath = path.join(candidateUploadsPath, 'products');
+    const candidateProductsExists = fs.existsSync(candidateProductsPath);
+
+    return {
+      uploadsPath: candidateUploadsPath,
+      exists: fs.existsSync(candidateUploadsPath),
+      productsPath: candidateProductsPath,
+      productsExists: candidateProductsExists,
+      productsFiles: candidateProductsExists ? fs.readdirSync(candidateProductsPath).slice(0, 20) : [],
+      productsFilesCount: candidateProductsExists ? fs.readdirSync(candidateProductsPath).length : 0,
+    };
+  });
   
   res.json({
     uploadsPath,
@@ -218,19 +256,21 @@ app.get('/uploads/test', (req: express.Request, res: express.Response) => {
     productsPath,
     productsExists: fs.existsSync(productsPath),
     productsFiles,
-    productsFilesCount: productsFiles.length
+    productsFilesCount: productsFiles.length,
+    candidates,
   });
 });
 
 // Rota específica para verificar se um arquivo de imagem existe
 app.get('/uploads/products/:filename', (req: express.Request, res: express.Response) => {
   const filename = req.params.filename;
-  const filePath = path.join(uploadsPath, 'products', filename);
+  const resolvedFile = findUploadedProductFile(filename);
+  const filePath = resolvedFile?.filePath || path.join(uploadsPath, 'products', filename);
   
   console.log(`🔍 [IMAGE CHECK] Verificando arquivo: ${filePath}`);
   console.log(`🔍 [IMAGE CHECK] Arquivo existe: ${fs.existsSync(filePath)}`);
   
-  if (fs.existsSync(filePath)) {
+  if (resolvedFile) {
     const stats = fs.statSync(filePath);
     console.log(`✅ [IMAGE CHECK] Arquivo encontrado: ${filename}, tamanho: ${stats.size} bytes`);
     res.sendFile(filePath);
@@ -242,7 +282,8 @@ app.get('/uploads/products/:filename', (req: express.Request, res: express.Respo
       filePath,
       uploadsPath,
       productsPath: path.join(uploadsPath, 'products'),
-      exists: fs.existsSync(path.join(uploadsPath, 'products'))
+      exists: fs.existsSync(path.join(uploadsPath, 'products')),
+      uploadCandidatePaths,
     });
   }
 });
