@@ -83,4 +83,9 @@ export const commercialApi = {
     const response = await api.get(`/commercial/products/${slug}`);
     return mapCommercialProduct(response.data);
   },
+
+  checkout: async (items: Array<{ commercialProductId: string; quantity: number }>): Promise<{ checkoutUrl: string }> => {
+    const response = await api.post('/commercial/checkout', { items });
+    return response.data;
+  },
 };

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react';
 import { getProductPath } from '../../data/catalog';
 import { useCartStore } from '../../store/cart';
+import { commercialApi } from '../../lib/commercialApi';
 import './CartDrawer.css';
 
 const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
@@ -9,6 +11,25 @@ const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}
 export function CartDrawer() {
   const { items, isOpen, closeCart, removeItem, updateQuantity, getTotal } = useCartStore();
   const total = getTotal();
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+
+  const handleCheckout = async () => {
+    setCheckoutLoading(true);
+    setCheckoutError('');
+    try {
+      const result = await commercialApi.checkout(
+        items.map((item) => ({
+          commercialProductId: item.product.id,
+          quantity: item.quantity,
+        }))
+      );
+      window.location.assign(result.checkoutUrl);
+    } catch (error: any) {
+      setCheckoutError(error.response?.data?.error || error.response?.data?.message || 'Nao foi possivel abrir o checkout.');
+      setCheckoutLoading(false);
+    }
+  };
 
   return (
     <>
@@ -73,7 +94,10 @@ export function CartDrawer() {
                 <strong>{formatPrice(total)}</strong>
               </div>
               <p>Frete e cupom calculados no fechamento do pedido.</p>
-              <button>Finalizar pedido</button>
+              {checkoutError && <p role="alert">{checkoutError}</p>}
+              <button onClick={handleCheckout} disabled={checkoutLoading}>
+                {checkoutLoading ? 'Preparando checkout...' : 'Finalizar pedido'}
+              </button>
               <Link to="/produtos/novidades" onClick={closeCart}>Continuar comprando</Link>
             </footer>
           </>
