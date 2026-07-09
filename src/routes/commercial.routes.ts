@@ -1,4 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { prisma } from '../config/database';
 import { authenticateToken, authorizeRoles, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
@@ -6,6 +8,19 @@ import { createYampiCheckout, syncCommercialProductWithYampi } from '../services
 
 const router = Router();
 const commercialAdmin = [authenticateToken, authorizeRoles('ADMIN', 'MANAGER')];
+const uploadsBaseDir = process.env.UPLOADS_BASE_DIR || process.cwd();
+
+const imageExists = (image: any) => {
+  const url = image?.url;
+  if (!url) return false;
+  if (/^https?:\/\//i.test(url)) return true;
+  if (!url.startsWith('/uploads/')) return true;
+
+  const relativePath = url.replace(/^\/uploads\//, '');
+  return fs.existsSync(path.join(uploadsBaseDir, 'uploads', relativePath));
+};
+
+const filterExistingImages = (images: any[] = []) => images.filter(imageExists);
 
 const slugify = (value: string) =>
   value
@@ -29,7 +44,7 @@ const mapCommercialProduct = (item: any) => {
     featured: item.featured,
     position: item.position,
     category: item.category,
-    images: item.images || [],
+    images: filterExistingImages(item.images || []),
     seoTitle: item.seoTitle,
     seoDescription: item.seoDescription,
     material: item.material,
@@ -52,7 +67,7 @@ const mapCommercialProduct = (item: any) => {
           category: erpProduct.category,
           subcategory: erpProduct.subcategory,
           barcode: erpProduct.barcode,
-          images: erpProduct.images || [],
+          images: filterExistingImages(erpProduct.images || []),
         }
       : null,
   };
