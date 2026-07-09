@@ -7,9 +7,6 @@ WORKDIR /src
 # Instalar dependências do sistema necessárias para o Prisma
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-# Instalar npm globalmente
-RUN npm install -g npm@latest
-
 COPY package*.json ./
 RUN npm install
 
