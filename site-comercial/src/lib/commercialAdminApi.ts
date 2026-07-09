@@ -82,6 +82,10 @@ export const commercialAdminApi = {
     await api.delete(`/commercial/admin/products/${productId}/images/${imageId}`);
   },
 
+  deleteErpProductImage: async (erpProductId: string, imageId: string): Promise<void> => {
+    await api.delete(`/products/${erpProductId}/images/${imageId}`);
+  },
+
   setProductCover: async (productId: string, imageId: string): Promise<void> => {
     await api.put(`/commercial/admin/products/${productId}/images/${imageId}/cover`);
   },

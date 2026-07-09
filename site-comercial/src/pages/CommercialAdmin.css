@@ -268,22 +268,52 @@
   background: var(--color-blush-100);
 }
 
+.admin-gallery-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.admin-gallery-summary strong {
+  color: var(--color-berry-700);
+  font-size: 1.15rem;
+}
+
 .admin-thumbs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .admin-thumb {
   position: relative;
+  min-height: 62px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--color-blush-50);
 }
 
 .admin-thumb img {
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: var(--radius-sm);
+  display: block;
+}
+
+.admin-thumb-empty {
+  grid-column: 1 / -1;
+  min-height: 112px;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  border: 1px dashed var(--color-border);
+  color: var(--color-muted);
+  font-weight: 850;
 }
 
 .admin-thumb button {
@@ -310,6 +340,27 @@
 
 .admin-thumb .admin-delete-image {
   right: 4px;
+}
+
+.admin-thumb .admin-delete-image:disabled {
+  opacity: 0.48;
+}
+
+.admin-image-source {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-berry-700);
+  font-size: 0.64rem;
+  font-weight: 950;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-image-source.erp {
+  color: #3d5a80;
 }
 
 .admin-product-editor {

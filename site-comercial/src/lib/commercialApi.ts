@@ -10,7 +10,7 @@ const UPLOAD_BASE_URL = configuredUploadUrl !== undefined
     : '';
 const PLACEHOLDER_IMAGE = '/amoras-logo.png';
 
-const assetUrl = (url?: string) => {
+export const assetUrl = (url?: string) => {
   if (!url) return PLACEHOLDER_IMAGE;
   if (/^https?:\/\//i.test(url)) return url;
   return `${UPLOAD_BASE_URL}${url}`;
@@ -20,9 +20,11 @@ const fallbackColor = '#bd727a';
 
 export const mapCommercialProduct = (item: any): CatalogProduct => {
   const erp = item.erpProduct || {};
-  const images = Array.isArray(item.images) ? item.images : [];
-  const gallery = images.length
-    ? images.map((image: any) => assetUrl(image.url))
+  const commercialImages = Array.isArray(item.images) ? item.images : [];
+  const erpImages = Array.isArray(erp.images) ? erp.images : [];
+  const visibleImages = commercialImages.length ? commercialImages : erpImages;
+  const gallery = visibleImages.length
+    ? visibleImages.map((image: any) => assetUrl(image.url))
     : [assetUrl(undefined)];
 
   return {
@@ -43,7 +45,8 @@ export const mapCommercialProduct = (item: any): CatalogProduct => {
     colorNotes: item.colorNotes,
     image: gallery[0],
     gallery,
-    commercialImages: images,
+    commercialImages,
+    erpImages,
     colors: [fallbackColor, '#f8cfc7', '#713c4b'],
     sizes: erp.size?.name ? [erp.size.name] : ['Unico'],
     details: [

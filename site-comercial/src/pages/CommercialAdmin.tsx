@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ImagePlus, LogOut, Save, Star, ToggleLeft, ToggleRight, Trash2, Upload } from 'lucide-react';
 import { commercialAdminApi } from '../lib/commercialAdminApi';
 import type { CommercialSiteSettings } from '../lib/commercialAdminApi';
+import { assetUrl } from '../lib/commercialApi';
 import type { CatalogProduct, CommercialCategory } from '../data/catalog';
 import './CommercialAdmin.css';
 
@@ -39,6 +40,20 @@ function ProductAdminRow({
   const [published, setPublished] = useState(product.published !== false);
   const [files, setFiles] = useState<File[]>([]);
   const [uploadFeedback, setUploadFeedback] = useState('');
+  const commercialGallery = (product.commercialImages || []).map((image) => ({
+    id: image.id,
+    url: assetUrl(image.url),
+    isCover: Boolean(image.isCover),
+    source: 'commercial' as const,
+  }));
+  const erpGallery = (product.erpImages || []).map((image) => ({
+    id: image.id,
+    url: assetUrl(image.url),
+    isCover: false,
+    source: 'erp' as const,
+  }));
+  const galleryItems = [...commercialGallery, ...erpGallery];
+  const primaryImage = galleryItems[0]?.url || product.image;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['commercial-admin-products'] });
@@ -84,6 +99,13 @@ function ProductAdminRow({
   const deleteImageMutation = useMutation({
     mutationFn: (imageId: string) => commercialAdminApi.deleteProductImage(product.id, imageId),
     onSuccess: invalidate,
+    onError: () => setUploadFeedback('Nao foi possivel remover a foto comercial.'),
+  });
+
+  const deleteErpImageMutation = useMutation({
+    mutationFn: (imageId: string) => commercialAdminApi.deleteErpProductImage(product.erpProductId, imageId),
+    onSuccess: invalidate,
+    onError: () => setUploadFeedback('Nao foi possivel remover a foto do ERP.'),
   });
 
   const coverImageMutation = useMutation({
@@ -95,36 +117,56 @@ function ProductAdminRow({
   return (
     <article className="admin-product">
       <div className="admin-product-gallery">
-        <img src={product.image} alt={product.name} />
+        <img src={primaryImage} alt={product.name} />
+        <div className="admin-gallery-summary">
+          <strong>{galleryItems.length}</strong>
+          <span>{galleryItems.length === 1 ? 'foto da roupa' : 'fotos da roupa'}</span>
+        </div>
         <div className="admin-thumbs">
-          {product.gallery.map((image, index) => {
-            const storedImage = product.commercialImages?.[index];
+          {galleryItems.length === 0 && (
+            <div className="admin-thumb admin-thumb-empty">
+              <ImagePlus size={22} />
+              <span>Sem fotos</span>
+            </div>
+          )}
+          {galleryItems.map((image, index) => {
+            const isCommercial = image.source === 'commercial';
             return (
-              <div className="admin-thumb" key={`${image}-${index}`}>
-                <img src={image} alt={`${product.name} ${index + 1}`} />
-                {storedImage && (
+              <div className="admin-thumb" key={`${image.source}-${image.id}`}>
+                <img src={image.url} alt={`${product.name} ${index + 1}`} />
+                <span className={`admin-image-source ${image.source}`}>
+                  {isCommercial ? 'Site' : 'ERP'}
+                </span>
+                {isCommercial && (
                   <>
                     <button
                       type="button"
-                      className={`admin-cover-button ${storedImage.isCover ? 'active' : ''}`}
-                      aria-label={storedImage.isCover ? 'Foto de capa atual' : 'Definir como foto de capa'}
-                      title={storedImage.isCover ? 'Foto de capa atual' : 'Definir como capa'}
-                      disabled={storedImage.isCover || coverImageMutation.isPending}
-                      onClick={() => coverImageMutation.mutate(storedImage.id)}
+                      className={`admin-cover-button ${image.isCover ? 'active' : ''}`}
+                      aria-label={image.isCover ? 'Foto de capa atual' : 'Definir como foto de capa'}
+                      title={image.isCover ? 'Foto de capa atual' : 'Definir como capa'}
+                      disabled={image.isCover || coverImageMutation.isPending}
+                      onClick={() => coverImageMutation.mutate(image.id)}
                     >
-                      <Star size={14} fill={storedImage.isCover ? 'currentColor' : 'none'} />
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-delete-image"
-                      aria-label="Remover foto"
-                      title="Remover foto"
-                      onClick={() => deleteImageMutation.mutate(storedImage.id)}
-                    >
-                      <Trash2 size={14} />
+                      <Star size={14} fill={image.isCover ? 'currentColor' : 'none'} />
                     </button>
                   </>
                 )}
+                <button
+                  type="button"
+                  className="admin-delete-image"
+                  aria-label={isCommercial ? 'Remover foto comercial' : 'Remover foto do ERP'}
+                  title={isCommercial ? 'Remover foto comercial' : 'Remover foto do ERP'}
+                  disabled={deleteImageMutation.isPending || deleteErpImageMutation.isPending}
+                  onClick={() => {
+                    if (isCommercial) {
+                      deleteImageMutation.mutate(image.id);
+                      return;
+                    }
+                    deleteErpImageMutation.mutate(image.id);
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             );
           })}

@@ -30,6 +30,7 @@ export interface CatalogProduct {
   image: string;
   gallery: string[];
   commercialImages?: Array<{ id: string; url: string; alt?: string; isCover?: boolean; position: number }>;
+  erpImages?: Array<{ id: string; url: string; type?: string; position: number }>;
   colors: string[];
   sizes: string[];
   details: string[];
@@ -51,6 +52,7 @@ export interface CatalogProduct {
     pattern?: { id: string; name: string; code: string };
     category?: { id: string; name: string; code: string };
     subcategory?: { id: string; name: string; code: string };
+    images?: Array<{ id: string; url: string; type?: string; position: number }>;
   };
 }
 
