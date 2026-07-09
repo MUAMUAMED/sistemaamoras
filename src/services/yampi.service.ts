@@ -140,5 +140,8 @@ export async function createYampiCheckout(items: Array<{ commercialProductId: st
     active: true,
     skus,
   }));
-  return { checkoutUrl: result.link_url, paymentLinkId: String(result.id) };
+  const checkoutUrl = new URL(result.link_url);
+  checkoutUrl.protocol = 'https:';
+  checkoutUrl.host = env.YAMPI_CHECKOUT_DOMAIN || `${env.YAMPI_ALIAS}.pay.yampi.com.br`;
+  return { checkoutUrl: checkoutUrl.toString(), paymentLinkId: String(result.id) };
 }

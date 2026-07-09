@@ -90,6 +90,7 @@ export const env = {
   YAMPI_PRODUCT_HEIGHT: parseFloat(process.env.YAMPI_PRODUCT_HEIGHT || '12'),
   YAMPI_PRODUCT_WIDTH: parseFloat(process.env.YAMPI_PRODUCT_WIDTH || '25'),
   YAMPI_PRODUCT_LENGTH: parseFloat(process.env.YAMPI_PRODUCT_LENGTH || '30'),
+  YAMPI_CHECKOUT_DOMAIN: process.env.YAMPI_CHECKOUT_DOMAIN || '',
   COMMERCIAL_SITE_URL: process.env.COMMERCIAL_SITE_URL || 'https://amorascapital.zeabur.app',
 
   // Sistema
