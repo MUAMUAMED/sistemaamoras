@@ -52,6 +52,7 @@ const mapCommercialProduct = (item: any) => {
           category: erpProduct.category,
           subcategory: erpProduct.subcategory,
           barcode: erpProduct.barcode,
+          images: erpProduct.images || [],
         }
       : null,
   };
@@ -68,6 +69,9 @@ const commercialProductInclude = {
       subcategory: true,
       size: true,
       pattern: true,
+      images: {
+        orderBy: { position: 'asc' },
+      },
     },
   },
 };
