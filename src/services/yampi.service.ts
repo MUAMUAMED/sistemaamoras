@@ -40,7 +40,6 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
   const skuData = {
     sku: skuCode,
     erp_id: numericErpId,
-    barcode: erp.barcode || undefined,
     price_cost: Number(erp.cost || 0),
     price_sale: Number(erp.price),
     weight: env.YAMPI_PRODUCT_WEIGHT,
