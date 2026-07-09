@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database';
 import { authenticateToken, authorizeRoles, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
+import { createYampiCheckout, syncCommercialProductWithYampi } from '../services/yampi.service';
 
 const router = Router();
 const commercialAdmin = [authenticateToken, authorizeRoles('ADMIN', 'MANAGER')];
@@ -96,6 +97,25 @@ router.get('/catalog', async (_req: Request, res: Response, next: NextFunction) 
       categories,
       products: products.map(mapCommercialProduct),
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/checkout', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!items.length || items.length > 20) {
+      return res.status(400).json({ error: 'Sacola invalida' });
+    }
+    const normalized = items.map((item: any) => ({
+      commercialProductId: String(item.commercialProductId || ''),
+      quantity: Number(item.quantity || 0),
+    }));
+    if (normalized.some((item: any) => !item.commercialProductId || item.quantity < 1 || item.quantity > 20)) {
+      return res.status(400).json({ error: 'Itens da sacola invalidos' });
+    }
+    return res.json(await createYampiCheckout(normalized));
   } catch (error) {
     return next(error);
   }
@@ -204,6 +224,14 @@ router.get('/admin/products', commercialAdmin, async (_req: Request, res: Respon
     });
 
     return res.json(products.map(mapCommercialProduct));
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/admin/products/:id/sync-yampi', commercialAdmin, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    return res.json(await syncCommercialProductWithYampi(req.params.id));
   } catch (error) {
     return next(error);
   }

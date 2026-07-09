@@ -1,0 +1,135 @@
+import axios from 'axios';
+import { env } from '../config/env';
+import { prisma } from '../config/database';
+
+const client = axios.create({
+  baseURL: `https://api.dooki.com.br/v2/${env.YAMPI_ALIAS}`,
+  timeout: 20000,
+  headers: {
+    'User-Token': env.YAMPI_USER_TOKEN,
+    'User-Secret-Key': env.YAMPI_USER_SECRET_KEY,
+    'Content-Type': 'application/json',
+  },
+});
+
+const configured = () =>
+  Boolean(env.YAMPI_ALIAS && env.YAMPI_USER_TOKEN && env.YAMPI_USER_SECRET_KEY);
+
+const payload = (response: any) => response?.data?.data ?? response?.data;
+
+export async function syncCommercialProductWithYampi(commercialProductId: string) {
+  if (!configured()) throw new Error('Integracao Yampi nao configurada');
+
+  const product = await (prisma as any).commercialProduct.findUnique({
+    where: { id: commercialProductId },
+    include: {
+      images: { orderBy: [{ isCover: 'desc' }, { position: 'asc' }] },
+      erpProduct: { include: { size: true } },
+    },
+  });
+  if (!product?.erpProduct) throw new Error('Produto ERP vinculado nao encontrado');
+
+  const erp = product.erpProduct;
+  const skuCode = String(erp.barcode || `AMORAS-${erp.id.slice(-12)}`).slice(0, 40);
+  const images = product.images.map((image: any) => ({
+    url: `${env.COMMERCIAL_SITE_URL}${image.url}`,
+  }));
+  const skuData = {
+    sku: skuCode,
+    barcode: erp.barcode || undefined,
+    price_cost: Number(erp.cost || 0),
+    price_sale: Number(erp.price),
+    weight: env.YAMPI_PRODUCT_WEIGHT,
+    height: env.YAMPI_PRODUCT_HEIGHT,
+    width: env.YAMPI_PRODUCT_WIDTH,
+    length: env.YAMPI_PRODUCT_LENGTH,
+    quantity_managed: true,
+    availability: Math.max(0, erp.stockLoja),
+    availability_soldout: 0,
+    blocked_sale: erp.stockLoja <= 0,
+    images,
+  };
+
+  try {
+    let yampiProductId = product.yampiProductId;
+    let yampiSkuId = product.yampiSkuId;
+
+    if (!yampiProductId) {
+      const created = payload(await client.post('/catalog/products', {
+        simple: true,
+        brand_id: env.YAMPI_BRAND_ID,
+        active: product.published && erp.active,
+        searchable: true,
+        is_digital: false,
+        buy_similars: true,
+        priority: product.featured ? 3 : 1,
+        name: product.title,
+        slug: product.slug,
+        description: product.description || erp.description || product.title,
+        seo_title: product.seoTitle || product.title,
+        seo_description: product.seoDescription || product.shortDescription || product.description,
+        skus: [skuData],
+      }));
+      yampiProductId = String(created.id);
+      const skus = payload(await client.get(`/catalog/products/${yampiProductId}/skus`));
+      const skuList = Array.isArray(skus) ? skus : (skus?.data || []);
+      yampiSkuId = String(skuList[0]?.id || '');
+      if (!yampiSkuId) throw new Error('Yampi nao retornou o SKU criado');
+    } else {
+      await client.put(`/catalog/products/${yampiProductId}`, {
+        active: product.published && erp.active,
+        name: product.title,
+        slug: product.slug,
+        description: product.description || erp.description || product.title,
+      });
+      if (yampiSkuId) {
+        await client.put(`/catalog/skus/${yampiSkuId}`, {
+          product_id: Number(yampiProductId),
+          ...skuData,
+        });
+      }
+    }
+
+    return await (prisma as any).commercialProduct.update({
+      where: { id: product.id },
+      data: {
+        yampiProductId,
+        yampiSkuId,
+        yampiSyncedAt: new Date(),
+        yampiSyncError: null,
+      },
+    });
+  } catch (error: any) {
+    const message = error.response?.data?.message || error.response?.data?.error || error.message;
+    await (prisma as any).commercialProduct.update({
+      where: { id: product.id },
+      data: { yampiSyncError: String(message).slice(0, 1000) },
+    });
+    throw new Error(`Falha ao sincronizar com a Yampi: ${message}`);
+  }
+}
+
+export async function createYampiCheckout(items: Array<{ commercialProductId: string; quantity: number }>) {
+  if (!configured()) throw new Error('Integracao Yampi nao configurada');
+  const skus = [];
+
+  for (const item of items) {
+    const quantity = Math.max(1, Math.floor(item.quantity));
+    const synced = await syncCommercialProductWithYampi(item.commercialProductId);
+    const product = await (prisma as any).commercialProduct.findUnique({
+      where: { id: item.commercialProductId },
+      include: { erpProduct: true },
+    });
+    if (!product?.published || product.erpProduct.stockLoja < quantity) {
+      throw new Error(`Estoque indisponivel para ${product?.title || 'produto'}`);
+    }
+    skus.push({ id: Number(synced.yampiSkuId), quantity });
+  }
+
+  const result = payload(await client.post('/checkout/payment-link', {
+    name: `Amoras Capital ${Date.now()}`,
+    active: true,
+    skus,
+  }));
+  return { checkoutUrl: result.link_url, paymentLinkId: String(result.id) };
+}

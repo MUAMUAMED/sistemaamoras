@@ -186,6 +186,10 @@ model CommercialProduct {
   published     Boolean  @default(false)
   featured      Boolean  @default(false)
   position      Int      @default(0)
+  yampiProductId String? @unique
+  yampiSkuId     String? @unique
+  yampiSyncedAt  DateTime?
+  yampiSyncError String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

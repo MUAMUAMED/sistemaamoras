@@ -81,6 +81,15 @@ export const env = {
   N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL || '',
   MP_ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '',
   MP_PUBLIC_KEY: process.env.MP_PUBLIC_KEY || process.env.MERCADO_PAGO_PUBLIC_KEY || '',
+  YAMPI_ALIAS: process.env.YAMPI_ALIAS || '',
+  YAMPI_USER_TOKEN: process.env.YAMPI_USER_TOKEN || '',
+  YAMPI_USER_SECRET_KEY: process.env.YAMPI_USER_SECRET_KEY || '',
+  YAMPI_BRAND_ID: parseInt(process.env.YAMPI_BRAND_ID || '26073154', 10),
+  YAMPI_PRODUCT_WEIGHT: parseFloat(process.env.YAMPI_PRODUCT_WEIGHT || '0.4'),
+  YAMPI_PRODUCT_HEIGHT: parseFloat(process.env.YAMPI_PRODUCT_HEIGHT || '12'),
+  YAMPI_PRODUCT_WIDTH: parseFloat(process.env.YAMPI_PRODUCT_WIDTH || '25'),
+  YAMPI_PRODUCT_LENGTH: parseFloat(process.env.YAMPI_PRODUCT_LENGTH || '30'),
+  COMMERCIAL_SITE_URL: process.env.COMMERCIAL_SITE_URL || 'https://amorascapital.zeabur.app',
 
   // Sistema
   COMPANY_NAME: process.env.COMPANY_NAME || 'Amoras Capital',
