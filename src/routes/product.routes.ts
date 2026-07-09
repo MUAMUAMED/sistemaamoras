@@ -1805,7 +1805,12 @@ router.delete('/:id/images/:imageId', authenticateToken, async (req, res, next) 
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
 
     try {
-      await (prisma as any).productImage.delete({ where: { id: imageId } });
+      await (prisma as any).productImage.deleteMany({
+        where: {
+          id: imageId,
+          productId: id,
+        },
+      });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found in delete, skipping deletion:', error.message);
       return res.status(404).json({ error: 'Imagem não encontrada ou tabela não existe' });
