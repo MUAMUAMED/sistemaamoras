@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import fs from 'fs';
 import { prisma } from '../config/database';
 import { authenticateToken, authorizeRoles, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
@@ -371,17 +372,23 @@ router.post(
               where: { commercialProductId: product.id },
             })]
           : []),
-        ...files.map((file, index) =>
-          (prisma as any).commercialProductImage.create({
+        ...files.map((file, index) => {
+          const imageData = fs.readFileSync(file.path);
+
+          return (prisma as any).commercialProductImage.create({
             data: {
               commercialProductId: product.id,
               url: `/uploads/products/${file.filename}`,
               alt: product.title,
               isCover: currentCount === 0 && index === 0,
               position: currentCount + index,
+              filename: file.filename,
+              mimeType: file.mimetype,
+              size: file.size,
+              data: imageData,
             },
-          })
-        ),
+          });
+        }),
       ];
       const results = await prisma.$transaction(operations);
       const created = replaceImages ? results.slice(1) : results;

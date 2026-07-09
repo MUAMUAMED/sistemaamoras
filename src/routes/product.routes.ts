@@ -1397,6 +1397,7 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
 
     // Construir URL da imagem
     const imageUrl = `/uploads/products/${req.file.filename}`;
+    const imageData = fs.readFileSync(req.file.path);
 
     // Compat: se vier query main=true, salvar também em imageUrl
     const setAsMain = (req.query.main as string) === 'true';
@@ -1412,6 +1413,10 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
           url: imageUrl,
           type: imageType as any,
           position: 0,
+          filename: req.file.filename,
+          mimeType: req.file.mimetype,
+          size: req.file.size,
+          data: imageData,
         },
       });
     } catch (error: any) {
@@ -1696,6 +1701,7 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
           const imageUrl = process.env.APP_URL 
             ? `${process.env.APP_URL}/uploads/products/${file.filename}`
             : `/uploads/products/${file.filename}`;
+          const imageData = fs.readFileSync(expectedPath);
           
           const image = await (prisma as any).productImage.create({
             data: {
@@ -1703,6 +1709,10 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
               url: imageUrl,
               type: imageType as any,
               position: currentImageCount + index,
+              filename: file.filename,
+              mimeType: file.mimetype,
+              size: file.size,
+              data: imageData,
             },
           });
           

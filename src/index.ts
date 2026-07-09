@@ -199,6 +199,60 @@ const findUploadedProductFile = (filename: string) => {
   return null;
 };
 
+const findUploadedProductImageInDatabase = async (filename: string) => {
+  const urlSuffix = `/uploads/products/${filename}`;
+
+  try {
+    const productImage = await (prisma as any).productImage.findFirst({
+      where: {
+        OR: [
+          { filename },
+          { url: urlSuffix },
+          { url: { endsWith: urlSuffix } },
+        ],
+        data: { not: null },
+      },
+      select: {
+        data: true,
+        mimeType: true,
+        size: true,
+      },
+    });
+
+    if (productImage?.data) {
+      return productImage;
+    }
+  } catch (error: any) {
+    console.warn('[IMAGE CHECK] ProductImage database lookup skipped:', error.message);
+  }
+
+  try {
+    const commercialImage = await (prisma as any).commercialProductImage.findFirst({
+      where: {
+        OR: [
+          { filename },
+          { url: urlSuffix },
+          { url: { endsWith: urlSuffix } },
+        ],
+        data: { not: null },
+      },
+      select: {
+        data: true,
+        mimeType: true,
+        size: true,
+      },
+    });
+
+    if (commercialImage?.data) {
+      return commercialImage;
+    }
+  } catch (error: any) {
+    console.warn('[IMAGE CHECK] CommercialProductImage database lookup skipped:', error.message);
+  }
+
+  return null;
+};
+
 console.log('📁 [STATIC] Configuração de uploads:', {
   baseDir,
   uploadsPath,
@@ -262,7 +316,7 @@ app.get('/uploads/test', (req: express.Request, res: express.Response) => {
 });
 
 // Rota específica para verificar se um arquivo de imagem existe
-app.get('/uploads/products/:filename', (req: express.Request, res: express.Response) => {
+app.get('/uploads/products/:filename', async (req: express.Request, res: express.Response) => {
   const filename = req.params.filename;
   const resolvedFile = findUploadedProductFile(filename);
   const filePath = resolvedFile?.filePath || path.join(uploadsPath, 'products', filename);
@@ -275,6 +329,19 @@ app.get('/uploads/products/:filename', (req: express.Request, res: express.Respo
     console.log(`✅ [IMAGE CHECK] Arquivo encontrado: ${filename}, tamanho: ${stats.size} bytes`);
     res.sendFile(filePath);
   } else {
+    const databaseImage = await findUploadedProductImageInDatabase(filename);
+
+    if (databaseImage?.data) {
+      const imageBuffer = Buffer.from(databaseImage.data);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      res.setHeader('Content-Type', databaseImage.mimeType || 'application/octet-stream');
+      res.setHeader('Content-Length', String(databaseImage.size || imageBuffer.length));
+      res.send(imageBuffer);
+      return;
+    }
+
     console.error(`❌ [IMAGE CHECK] Arquivo não encontrado: ${filePath}`);
     res.status(404).json({
       error: 'Arquivo não encontrado',

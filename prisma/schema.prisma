@@ -141,6 +141,10 @@ model ProductImage {
   url       String
   type      ProductImageType  // Tipo da imagem (roupa ou IA)
   position  Int               @default(0) // Ordenação simples
+  filename  String?
+  mimeType  String?
+  size      Int?
+  data      Bytes?
   createdAt DateTime          @default(now())
 
   // Relacionamento
@@ -210,6 +214,10 @@ model CommercialProductImage {
   alt                 String?
   isCover             Boolean  @default(false)
   position            Int      @default(0)
+  filename            String?
+  mimeType            String?
+  size                Int?
+  data                Bytes?
   createdAt           DateTime @default(now())
 
   commercialProduct CommercialProduct @relation(fields: [commercialProductId], references: [id])
