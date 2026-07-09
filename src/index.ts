@@ -22,6 +22,7 @@ import saleRoutes from "./routes/sale.routes";
 import dashboardRoutes from "./routes/dashboard.routes";
 import webhookRoutes from "./routes/webhook.routes";
 import commercialRoutes from "./routes/commercial.routes";
+import yampiRoutes from "./routes/yampi.routes";
 
 // Novas rotas ERP
 import sizesRoutes from "./routes/sizes";
@@ -154,7 +155,12 @@ const limiter = rateLimit({
 app.use("/api", limiter);
 
 // === Parsers ===
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({
+  limit: "10mb",
+  verify: (req: any, _res, buffer) => {
+    req.rawBody = Buffer.from(buffer);
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // === Estáticos ===
@@ -267,6 +273,7 @@ app.use("/api/sales", saleRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/commercial", commercialRoutes);
+app.use("/api/yampi", yampiRoutes);
 
 // Novas rotas ERP
 app.use("/api/sizes", sizesRoutes);

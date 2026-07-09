@@ -235,6 +235,22 @@ model CommercialSiteSetting {
   @@map("commercial_site_settings")
 }
 
+model YampiWebhookEvent {
+  id           String   @id @default(cuid())
+  eventKey     String   @unique
+  eventType    String
+  yampiOrderId String
+  status       String   @default("PROCESSING")
+  saleId       String?
+  payload      Json
+  error        String?
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+
+  @@index([yampiOrderId])
+  @@map("yampi_webhook_events")
+}
+
 // Leads/Clientes
 model Lead {
   id               String     @id @default(cuid())

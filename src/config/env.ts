@@ -84,6 +84,7 @@ export const env = {
   YAMPI_ALIAS: process.env.YAMPI_ALIAS || '',
   YAMPI_USER_TOKEN: process.env.YAMPI_USER_TOKEN || '',
   YAMPI_USER_SECRET_KEY: process.env.YAMPI_USER_SECRET_KEY || '',
+  YAMPI_WEBHOOK_SECRET: process.env.YAMPI_WEBHOOK_SECRET || '',
   YAMPI_BRAND_ID: parseInt(process.env.YAMPI_BRAND_ID || '26073154', 10),
   YAMPI_PRODUCT_WEIGHT: parseFloat(process.env.YAMPI_PRODUCT_WEIGHT || '0.4'),
   YAMPI_PRODUCT_HEIGHT: parseFloat(process.env.YAMPI_PRODUCT_HEIGHT || '12'),
