@@ -31,11 +31,15 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
 
   const erp = product.erpProduct;
   const skuCode = String(erp.barcode || `AMORAS-${erp.id.slice(-12)}`).slice(0, 40);
+  const numericErpId = /^\d+$/.test(String(erp.barcode || ''))
+    ? Number(erp.barcode)
+    : Number.parseInt(erp.id.replace(/\D/g, '').slice(-9), 10) || Date.now() % 1000000000;
   const images = product.images.map((image: any) => ({
     url: `${env.COMMERCIAL_SITE_URL}${image.url}`,
   }));
   const skuData = {
     sku: skuCode,
+    erp_id: numericErpId,
     barcode: erp.barcode || undefined,
     price_cost: Number(erp.cost || 0),
     price_sale: Number(erp.price),
@@ -47,6 +51,8 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
     availability: Math.max(0, erp.stockLoja),
     availability_soldout: 0,
     blocked_sale: erp.stockLoja <= 0,
+    variations_values_ids: [],
+    allow_sell_without_customization: true,
     images,
   };
 
@@ -58,6 +64,7 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
       const created = payload(await client.post('/catalog/products', {
         simple: true,
         brand_id: env.YAMPI_BRAND_ID,
+        erp_id: numericErpId,
         active: product.published && erp.active,
         searchable: true,
         is_digital: false,
@@ -100,7 +107,10 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
       },
     });
   } catch (error: any) {
-    const message = error.response?.data?.message || error.response?.data?.error || error.message;
+    const responseData = error.response?.data;
+    const message = responseData
+      ? JSON.stringify(responseData)
+      : error.message;
     await (prisma as any).commercialProduct.update({
       where: { id: product.id },
       data: { yampiSyncError: String(message).slice(0, 1000) },
