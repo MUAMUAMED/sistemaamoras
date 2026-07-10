@@ -12,6 +12,15 @@ import { useCartStore } from '../store/cart';
 import './ShopPage.css';
 
 const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
+const productExcerpt = (value: string) => {
+  const clean = value
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .find((block) => block.trim().length > 90)
+    ?.trim() || value.trim();
+
+  return clean.length > 132 ? `${clean.slice(0, 132).trim()}...` : clean;
+};
 
 export function ShopPage() {
   const { categorySlug } = useParams();
@@ -94,7 +103,7 @@ export function ShopPage() {
                       <Heart size={18} />
                     </button>
                   </div>
-                  <p>{product.description}</p>
+                  <p>{product.shortDescription || productExcerpt(product.description)}</p>
                   <div className="shop-product-price">
                     <strong>{formatPrice(product.price)}</strong>
                     {product.oldPrice && <del>{formatPrice(product.oldPrice)}</del>}

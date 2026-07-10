@@ -12,6 +12,15 @@ interface SearchOverlayProps {
 }
 
 const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
+const productExcerpt = (value: string) => {
+  const clean = value
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .find((block) => block.trim().length > 90)
+    ?.trim() || value.trim();
+
+  return clean.length > 96 ? `${clean.slice(0, 96).trim()}...` : clean;
+};
 
 export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
   const [query, setQuery] = useState('');
@@ -60,7 +69,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
               <img src={product.image} alt={product.name} />
               <div>
                 <strong>{product.name}</strong>
-                <span>{product.description}</span>
+                <span>{product.shortDescription || productExcerpt(product.description)}</span>
               </div>
               <b>{formatPrice(product.price)}</b>
             </Link>
