@@ -75,7 +75,10 @@ export const mapCommercialProduct = (item: any): CatalogProduct => {
 
 export const commercialApi = {
   catalog: async (): Promise<{ categories: CommercialCategory[]; products: CatalogProduct[] }> => {
-    const response = await api.get('/commercial/catalog');
+    const response = await api.get('/commercial/catalog', {
+      params: { t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
     return {
       categories: response.data.categories || [],
       products: (response.data.products || []).map(mapCommercialProduct),
