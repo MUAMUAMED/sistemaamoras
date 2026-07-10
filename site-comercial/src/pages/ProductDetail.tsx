@@ -12,7 +12,7 @@ const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}
 
 export function ProductDetail() {
   const { productSlug } = useParams();
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isLoading, isError } = useQuery({
     queryKey: ['commercial-product', productSlug],
     queryFn: () => commercialApi.productBySlug(productSlug || ''),
     enabled: Boolean(productSlug),
@@ -44,12 +44,29 @@ export function ProductDetail() {
     [catalog?.products, product]
   );
 
-  if (isLoading || !product) {
+  if (isLoading) {
     return (
       <div className="product-detail-page">
         <section className="product-detail">
           <div className="container">
             <p className="product-loading">Carregando peca comercial...</p>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isError || !product) {
+    return (
+      <div className="product-detail-page">
+        <section className="product-detail">
+          <div className="container">
+            <Link className="product-back-link" to="/produtos/novidades">
+              <ArrowLeft size={18} />
+              Voltar para a loja
+            </Link>
+            <p className="product-loading">Esta peca nao esta publicada no site comercial.</p>
           </div>
         </section>
         <Footer />

@@ -81,13 +81,22 @@ export const commercialApi = {
     });
     return {
       categories: response.data.categories || [],
-      products: (response.data.products || []).map(mapCommercialProduct),
+      products: (response.data.products || [])
+        .map(mapCommercialProduct)
+        .filter((product: CatalogProduct) => product.published !== false),
     };
   },
 
   productBySlug: async (slug: string): Promise<CatalogProduct> => {
-    const response = await api.get(`/commercial/products/${slug}`);
-    return mapCommercialProduct(response.data);
+    const response = await api.get(`/commercial/products/${slug}`, {
+      params: { t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    const product = mapCommercialProduct(response.data);
+    if (product.published === false) {
+      throw new Error('Produto nao publicado');
+    }
+    return product;
   },
 
   checkout: async (items: Array<{ commercialProductId: string; quantity: number }>): Promise<{ checkoutUrl: string }> => {
