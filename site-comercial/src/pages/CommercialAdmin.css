@@ -136,6 +136,47 @@
   margin-bottom: 18px;
 }
 
+.admin-filter-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.admin-filter-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  font-weight: 900;
+}
+
+.admin-filter-tabs button.active {
+  background: var(--color-berry-700);
+  color: white;
+}
+
+.admin-filter-tabs span {
+  min-width: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--color-berry-700);
+  padding: 2px 7px;
+  font-size: 0.74rem;
+}
+
+.admin-filter-tabs button:not(.active) span {
+  background: var(--color-blush-100);
+}
+
 .admin-category-form,
 .admin-form-grid {
   display: grid;

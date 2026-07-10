@@ -10,6 +10,14 @@ import './CommercialAdmin.css';
 
 const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
 
+type ProductVisibilityFilter = 'published' | 'hidden' | 'all';
+
+const productFilterLabels: Record<ProductVisibilityFilter, string> = {
+  published: 'Publicados',
+  hidden: 'Ocultos',
+  all: 'Todos',
+};
+
 const slugify = (value: string) =>
   value
     .normalize('NFD')
@@ -315,6 +323,7 @@ export function CommercialAdmin() {
   const [categorySlug, setCategorySlug] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
   const [categoryImage, setCategoryImage] = useState('');
+  const [productFilter, setProductFilter] = useState<ProductVisibilityFilter>('published');
   const [settingsForm, setSettingsForm] = useState<CommercialSiteSettings>({
     brandName: 'Amoras Capital',
     announcement: '',
@@ -346,6 +355,27 @@ export function CommercialAdmin() {
 
   const categories = categoriesQuery.data || [];
   const products = productsQuery.data || [];
+
+  const productFilterCounts = useMemo(
+    () => ({
+      published: products.filter((product) => product.published !== false).length,
+      hidden: products.filter((product) => product.published === false).length,
+      all: products.length,
+    }),
+    [products]
+  );
+
+  const visibleProducts = useMemo(() => {
+    if (productFilter === 'hidden') {
+      return products.filter((product) => product.published === false);
+    }
+
+    if (productFilter === 'all') {
+      return products;
+    }
+
+    return products.filter((product) => product.published !== false);
+  }, [productFilter, products]);
 
   useEffect(() => {
     if (settingsQuery.data) {
@@ -630,8 +660,21 @@ export function CommercialAdmin() {
       <section className="admin-section">
         <div className="admin-section-heading">
           <div>
-            <span>Produtos publicados pelo ERP</span>
-            <h2>Fotos e textos do site</h2>
+            <span>Catalogo comercial</span>
+            <h2>Fotos e textos da vitrine</h2>
+          </div>
+          <div className="admin-filter-tabs" role="tablist" aria-label="Filtro de produtos">
+            {(Object.keys(productFilterLabels) as ProductVisibilityFilter[]).map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                className={productFilter === filter ? 'active' : ''}
+                onClick={() => setProductFilter(filter)}
+              >
+                {productFilterLabels[filter]}
+                <span>{productFilterCounts[filter]}</span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -641,8 +684,15 @@ export function CommercialAdmin() {
         {!productsQuery.isLoading && products.length === 0 && (
           <p className="admin-empty">Nenhuma roupa publicada pelo ERP ainda.</p>
         )}
+        {!productsQuery.isLoading && products.length > 0 && visibleProducts.length === 0 && (
+          <p className="admin-empty">
+            {productFilter === 'hidden'
+              ? 'Nenhuma roupa oculta no momento.'
+              : 'Nenhuma roupa neste filtro.'}
+          </p>
+        )}
         <div className="admin-products-list">
-          {products.map((product) => (
+          {visibleProducts.map((product) => (
             <ProductAdminRow key={product.id} product={product} categories={categories} />
           ))}
         </div>
