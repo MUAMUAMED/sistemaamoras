@@ -34,6 +34,24 @@ const productFilterLabels: Record<ProductVisibilityFilter, string> = {
   all: 'Todos',
 };
 
+type AdminGalleryItem = {
+  id: string;
+  url: string;
+  isCover: boolean;
+  source: 'commercial' | 'erp';
+};
+
+const uniqueGalleryItems = (items: AdminGalleryItem[]) => {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = item.url.split('?')[0];
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 const slugify = (value: string) =>
   value
     .normalize('NFD')
@@ -77,7 +95,7 @@ function ProductAdminRow({
     isCover: false,
     source: 'erp' as const,
   }));
-  const galleryItems = [...commercialGallery, ...erpGallery];
+  const galleryItems = uniqueGalleryItems([...commercialGallery, ...erpGallery]);
   const primaryImage = galleryItems[0]?.url || product.image;
 
   const invalidate = () => {

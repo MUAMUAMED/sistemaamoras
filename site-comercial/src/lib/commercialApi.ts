@@ -18,10 +18,21 @@ export const assetUrl = (url?: string) => {
 
 const fallbackColor = '#bd727a';
 
+const uniqueImagesByUrl = (images: any[]) => {
+  const seen = new Set<string>();
+
+  return images.filter((image) => {
+    const key = assetUrl(image.url).split('?')[0];
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 export const mapCommercialProduct = (item: any): CatalogProduct => {
   const erp = item.erpProduct || {};
-  const commercialImages = Array.isArray(item.images) ? item.images : [];
-  const erpImages = Array.isArray(erp.images) ? erp.images : [];
+  const commercialImages = uniqueImagesByUrl(Array.isArray(item.images) ? item.images : []);
+  const erpImages = uniqueImagesByUrl(Array.isArray(erp.images) ? erp.images : []);
   const visibleImages = commercialImages.length ? commercialImages : erpImages;
   const gallery = visibleImages.length
     ? visibleImages.map((image: any) => assetUrl(image.url))
