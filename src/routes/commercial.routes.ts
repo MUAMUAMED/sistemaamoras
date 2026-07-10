@@ -106,6 +106,8 @@ const commercialProductInclude = {
 
 router.get('/catalog', async (_req: Request, res: Response, next: NextFunction) => {
   try {
+    res.setHeader('Cache-Control', 'no-store');
+
     const [categories, products] = await Promise.all([
       (prisma as any).commercialCategory.findMany({
         where: { active: true },
