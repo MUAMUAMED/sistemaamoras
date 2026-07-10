@@ -20,6 +20,15 @@ const productImageSelect = {
   createdAt: true,
 };
 
+const normalizeImagePath = (url?: string | null) => {
+  if (!url) return '';
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
+  }
+};
+
 // Função para gerar código de barras com subcategoria opcional
 function generateBarcode(sizeCode: string, categoryCode: string, subcategoryCode: string | null, patternCode: string): string {
   const subCode = subcategoryCode || '00'; // Usar '00' como padrão quando não há subcategoria
@@ -1818,7 +1827,16 @@ router.delete('/:id/images/:imageId', authenticateToken, async (req, res, next) 
     const product = await prisma.product.findUnique({ where: { id } });
     if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
 
+    let imageToDelete: any = null;
     try {
+      imageToDelete = await (prisma as any).productImage.findFirst({
+        where: {
+          id: imageId,
+          productId: id,
+        },
+        select: productImageSelect,
+      });
+
       await (prisma as any).productImage.deleteMany({
         where: {
           id: imageId,
@@ -1837,7 +1855,18 @@ router.delete('/:id/images/:imageId', authenticateToken, async (req, res, next) 
       console.warn('⚠️ ProductImage table not found after delete, returning empty array:', error.message);
     }
 
-    return res.json({ message: 'Imagem removida', images });
+    const deletedWasMainImage = imageToDelete?.url
+      && normalizeImagePath(product.imageUrl) === normalizeImagePath(imageToDelete.url);
+    const nextImageUrl = deletedWasMainImage ? (images[0]?.url || null) : product.imageUrl;
+
+    if (deletedWasMainImage) {
+      await prisma.product.update({
+        where: { id },
+        data: { imageUrl: nextImageUrl },
+      });
+    }
+
+    return res.json({ message: 'Imagem removida', images, imageUrl: nextImageUrl });
   } catch (error) {
     return next(error);
   }
