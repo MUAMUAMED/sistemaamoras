@@ -20,6 +20,16 @@ const productImageSelect = {
   createdAt: true,
 };
 
+const commercialProductSummarySelect = {
+  id: true,
+  erpProductId: true,
+  title: true,
+  slug: true,
+  published: true,
+  featured: true,
+  categoryId: true,
+};
+
 const normalizeImagePath = (url?: string | null) => {
   if (!url) return '';
   try {
@@ -166,6 +176,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
             subcategory: true,
             size: true,
             pattern: true,
+            commercialProduct: {
+              select: commercialProductSummarySelect,
+            },
           },
           skip,
           take,
@@ -263,6 +276,9 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
         subcategory: true,
         size: true,
         pattern: true,
+        commercialProduct: {
+          select: commercialProductSummarySelect,
+        },
         stockMovements: {
           orderBy: {
             createdAt: 'desc',
