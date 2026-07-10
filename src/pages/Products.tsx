@@ -1535,6 +1535,14 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
   
   // Estado para rastrear imagens marcadas para exclusão
   const [imagesToDelete, setImagesToDelete] = useState<Set<string>>(new Set());
+  const visibleExistingImages = [...existingImagesRoupa, ...existingImagesIA];
+  const visibleMainImageUrl = product?.imageUrl
+    && (
+      (!product.images || product.images.length === 0)
+      || visibleExistingImages.some((image) => normalizeUrl(image.url) === normalizeUrl(product.imageUrl))
+    )
+    ? product.imageUrl
+    : '';
 
   const [formData, setFormData] = useState<ProductFormModalData>({
     name: product?.name || '',
@@ -2091,27 +2099,27 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                     normalizedImageUrl: normalizeUrl(product?.imageUrl),
                     productId: product?.id
                   });
-                  return product?.imageUrl ? (
+                  return visibleMainImageUrl ? (
                     <div className="mb-3">
                       <p className="text-xs text-gray-600 mb-2">Imagem principal atual:</p>
                       <div className="relative inline-block">
                         <img
-                          src={getImageUrl(product.imageUrl)}
+                          src={getImageUrl(visibleMainImageUrl)}
                           alt="Imagem principal"
                           className="w-24 h-24 object-cover rounded border-2 border-yellow-400"
-                          key={`main-${product.imageUrl}`}
+                          key={`main-${visibleMainImageUrl}`}
                           onError={(e) => {
                             console.error('❌ [MAIN IMAGE] Erro ao carregar imagem principal:', {
-                              imageUrl: product.imageUrl,
-                              finalUrl: getImageUrl(product.imageUrl),
+                              imageUrl: visibleMainImageUrl,
+                              finalUrl: getImageUrl(visibleMainImageUrl),
                               error: e
                             });
                           }}
                           onLoad={() => {
                             console.log('✅ [MAIN IMAGE] Imagem principal carregada:', {
-                              imageUrl: product.imageUrl,
-                              finalUrl: getImageUrl(product.imageUrl),
-                              key: `main-${product.imageUrl}`
+                              imageUrl: visibleMainImageUrl,
+                              finalUrl: getImageUrl(visibleMainImageUrl),
+                              key: `main-${visibleMainImageUrl}`
                             });
                           }}
                         />
