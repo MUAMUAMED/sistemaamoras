@@ -8,6 +8,18 @@ import { uploadProductImage } from '../middleware/upload';
 
 const router = Router();
 
+const productImageSelect = {
+  id: true,
+  productId: true,
+  url: true,
+  type: true,
+  position: true,
+  filename: true,
+  mimeType: true,
+  size: true,
+  createdAt: true,
+};
+
 // Função para gerar código de barras com subcategoria opcional
 function generateBarcode(sizeCode: string, categoryCode: string, subcategoryCode: string | null, patternCode: string): string {
   const subCode = subcategoryCode || '00'; // Usar '00' como padrão quando não há subcategoria
@@ -174,6 +186,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
         const allImages = await (prisma as any).productImage.findMany({
           where: { productId: { in: productIds } },
           orderBy: { position: 'asc' },
+          select: productImageSelect,
         });
         imagesByProduct = allImages.reduce((acc: Record<string, any[]>, img: any) => {
           (acc[img.productId] = acc[img.productId] || []).push(img);
@@ -259,7 +272,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 
     let images: any[] = [];
     try {
-      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' },         select: productImageSelect,       });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found in product details, returning empty images array:', error.message);
     }
@@ -1456,7 +1469,7 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
 
     let images: any[] = [];
     try {
-      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' },         select: productImageSelect,       });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found, returning empty images array:', error.message);
     }
@@ -1502,6 +1515,7 @@ router.get('/:id/images', authenticateToken, async (req, res, next) => {
       images = await (prisma as any).productImage.findMany({
         where: { productId: id },
         orderBy: { position: 'asc' },
+        select: productImageSelect,
       });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found in images list, returning empty array:', error.message);
@@ -1748,7 +1762,7 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
 
     let images: any[] = [];
     try {
-      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' },         select: productImageSelect,       });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found, returning empty images array:', error.message);
     }
@@ -1818,7 +1832,7 @@ router.delete('/:id/images/:imageId', authenticateToken, async (req, res, next) 
 
     let images: any[] = [];
     try {
-      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' } });
+      images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' },         select: productImageSelect,       });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found after delete, returning empty array:', error.message);
     }
@@ -1897,8 +1911,9 @@ router.put('/:id/images/:imageId/set-main', authenticateToken, async (req, res, 
     try {
       images = await (prisma as any).productImage.findMany({ 
         where: { productId: id }, 
-        orderBy: { position: 'asc' } 
-      });
+        orderBy: { position: 'asc' }, 
+              select: productImageSelect, 
+            });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found after update, returning empty array:', error.message);
     }
@@ -2775,3 +2790,4 @@ router.get('/debug/:id', authenticateToken, async (req: AuthenticatedRequest, re
 });
 
 export default router;
+

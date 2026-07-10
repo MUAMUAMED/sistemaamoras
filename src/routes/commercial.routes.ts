@@ -8,6 +8,31 @@ import { createYampiCheckout, syncCommercialProductWithYampi } from '../services
 const router = Router();
 const commercialAdmin = [authenticateToken, authorizeRoles('ADMIN', 'MANAGER')];
 
+const productImageSelect = {
+  id: true,
+  productId: true,
+  url: true,
+  type: true,
+  position: true,
+  filename: true,
+  mimeType: true,
+  size: true,
+  createdAt: true,
+};
+
+const commercialProductImageSelect = {
+  id: true,
+  commercialProductId: true,
+  url: true,
+  alt: true,
+  isCover: true,
+  position: true,
+  filename: true,
+  mimeType: true,
+  size: true,
+  createdAt: true,
+};
+
 const slugify = (value: string) =>
   value
     .normalize('NFD')
@@ -63,6 +88,7 @@ const commercialProductInclude = {
   category: true,
   images: {
     orderBy: [{ isCover: 'desc' }, { position: 'asc' }],
+    select: commercialProductImageSelect,
   },
   erpProduct: {
     include: {
@@ -72,6 +98,7 @@ const commercialProductInclude = {
       pattern: true,
       images: {
         orderBy: { position: 'asc' },
+        select: productImageSelect,
       },
     },
   },
