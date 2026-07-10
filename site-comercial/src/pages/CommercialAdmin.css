@@ -414,14 +414,104 @@
 
 .admin-product {
   display: grid;
-  grid-template-columns: 228px minmax(0, 1fr);
-  gap: 16px;
-  padding: 14px;
+  gap: 0;
+  padding: 0;
   overflow: hidden;
 }
 
 .admin-product.is-hidden {
   background: #f7f2f0;
+}
+
+.admin-product-summary {
+  width: 100%;
+  min-height: 72px;
+  border: 0;
+  background: transparent;
+  color: var(--admin-ink);
+  display: grid;
+  grid-template-columns: 48px minmax(220px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+}
+
+.admin-product-summary:hover {
+  background: rgba(127, 61, 82, 0.06);
+}
+
+.admin-product-summary img {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--admin-accent-soft);
+}
+
+.admin-product-summary-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-product-summary-main strong,
+.admin-product-summary-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-product-summary-main strong {
+  font-weight: 950;
+}
+
+.admin-product-summary-main small,
+.admin-product-summary-meta {
+  color: var(--admin-muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.admin-status-pill {
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.admin-status-pill.published {
+  background: #e5f2e8;
+  color: var(--admin-success);
+}
+
+.admin-status-pill.hidden {
+  background: #f2e7e3;
+  color: var(--admin-warning);
+}
+
+.admin-product-summary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: end;
+  color: var(--admin-accent);
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.admin-product.is-expanded .admin-product-summary-action svg {
+  transform: rotate(180deg);
+}
+
+.admin-product-details {
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  gap: 16px;
+  border-top: 1px solid var(--admin-line);
+  padding: 14px;
 }
 
 .admin-product-gallery > img {
@@ -656,7 +746,7 @@
   }
 
   .admin-grid-two,
-  .admin-product,
+  .admin-product-details,
   .admin-editor-panels {
     grid-template-columns: 1fr;
   }
@@ -669,6 +759,15 @@
 @media (max-width: 760px) {
   .admin-workspace {
     padding: 18px;
+  }
+
+  .admin-product-summary {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .admin-product-summary .admin-status-pill,
+  .admin-product-summary-meta {
+    display: none;
   }
 
   .admin-topbar,

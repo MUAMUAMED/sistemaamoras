@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
+  ChevronDown,
   Eye,
   ImagePlus,
   LayoutDashboard,
@@ -61,6 +62,7 @@ function ProductAdminRow({
   const [categoryId, setCategoryId] = useState(product.categoryId || '');
   const [featured, setFeatured] = useState(Boolean(product.featured));
   const [published, setPublished] = useState(product.published !== false);
+  const [expanded, setExpanded] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [uploadFeedback, setUploadFeedback] = useState('');
   const commercialGallery = (product.commercialImages || []).map((image) => ({
@@ -138,8 +140,30 @@ function ProductAdminRow({
   });
 
   return (
-    <article className={`admin-product ${published ? 'is-published' : 'is-hidden'}`}>
-      <div className="admin-product-gallery">
+    <article className={`admin-product ${expanded ? 'is-expanded' : ''} ${published ? 'is-published' : 'is-hidden'}`}>
+      <button
+        type="button"
+        className="admin-product-summary"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <img src={primaryImage} alt="" />
+        <span className="admin-product-summary-main">
+          <strong>{product.name}</strong>
+          <small>{product.erpProduct.name}</small>
+        </span>
+        <span className={`admin-status-pill ${published ? 'published' : 'hidden'}`}>
+          {published ? 'Publicado' : 'Oculto'}
+        </span>
+        <span className="admin-product-summary-action">
+          Editar
+          <ChevronDown size={18} />
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="admin-product-details">
+          <div className="admin-product-gallery">
         <img src={primaryImage} alt={product.name} />
         <div className="admin-gallery-summary">
           <strong>{galleryItems.length}</strong>
@@ -194,7 +218,7 @@ function ProductAdminRow({
             );
           })}
         </div>
-      </div>
+          </div>
 
       <div className="admin-product-editor">
         <header className="admin-product-topline">
@@ -346,6 +370,8 @@ function ProductAdminRow({
           )}
         </div>
       </div>
+        </div>
+      )}
     </article>
   );
 }
