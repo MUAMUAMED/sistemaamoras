@@ -78,12 +78,13 @@ export function HeroSection() {
             <>
               <div className="hero-carousel-track">
                 {heroLooks.map((look, index) => (
-                  <img
+                  <div
                     key={look.id}
-                    src={look.image}
-                    alt={look.name}
-                    className={index === activeLook ? 'active' : ''}
-                  />
+                    className={`hero-carousel-slide ${index === activeLook ? 'active' : ''}`}
+                  >
+                    <img className="hero-carousel-blur" src={look.image} alt="" aria-hidden="true" />
+                    <img className="hero-carousel-main" src={look.image} alt={look.name} />
+                  </div>
                 ))}
               </div>
               <button className="hero-carousel-btn previous" onClick={goToPrevious} aria-label="Look anterior">
