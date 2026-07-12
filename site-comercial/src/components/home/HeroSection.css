@@ -113,17 +113,18 @@
 
 .hero-media {
   position: relative;
-  width: 100%;
+  width: calc(100% + max(var(--space-5), (100vw - 1320px) / 2));
   min-height: 640px;
   align-self: stretch;
-  justify-self: stretch;
+  justify-self: start;
   overflow: hidden;
   border: 8px solid rgba(255, 253, 249, 0.68);
-  border-radius: 28px;
+  border-right: 0;
+  border-radius: 28px 0 0 28px;
   box-shadow: 0 28px 80px rgba(57, 35, 45, 0.16);
   isolation: isolate;
   transform: translateZ(0);
-  clip-path: inset(0 round 28px);
+  clip-path: inset(0 round 28px 0 0 28px);
 }
 
 .hero-carousel-track {
@@ -338,6 +339,8 @@
   .hero-media {
     min-height: 440px;
     width: min(100%, 560px);
+    justify-self: center;
+    border: 8px solid rgba(255, 253, 249, 0.68);
     border-radius: 28px 28px 8px 8px;
     clip-path: inset(0 round 28px 28px 8px 8px);
   }
