@@ -17,6 +17,39 @@ const configured = () =>
 
 const payload = (response: any) => response?.data?.data ?? response?.data;
 
+const normalizeBaseUrl = (value: string) => value.replace(/\/+$/, '');
+
+const publicImageUrl = (url?: string | null) => {
+  if (!url) return null;
+
+  const trimmed = String(url).trim();
+  if (!trimmed) return null;
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/^http:\/\//i, 'https://');
+  }
+
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  const baseUrl = normalizeBaseUrl(env.APP_URL || env.COMMERCIAL_SITE_URL);
+  return `${baseUrl}${path}`;
+};
+
+const uniqueYampiImages = (images: any[]) => {
+  const seen = new Set<string>();
+
+  return images
+    .map((image) => publicImageUrl(image?.url))
+    .filter((url): url is string => Boolean(url))
+    .filter((url) => {
+      const key = url.split('?')[0];
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 10)
+    .map((url) => ({ url }));
+};
+
 export async function syncCommercialProductWithYampi(commercialProductId: string) {
   if (!configured()) throw new Error('Integracao Yampi nao configurada');
 
@@ -24,7 +57,12 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
     where: { id: commercialProductId },
     include: {
       images: { orderBy: [{ isCover: 'desc' }, { position: 'asc' }] },
-      erpProduct: { include: { size: true } },
+      erpProduct: {
+        include: {
+          size: true,
+          images: { orderBy: { position: 'asc' } },
+        },
+      },
     },
   });
   if (!product?.erpProduct) throw new Error('Produto ERP vinculado nao encontrado');
@@ -34,9 +72,11 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
   const numericErpId = /^\d+$/.test(String(erp.barcode || ''))
     ? Number(erp.barcode)
     : Number.parseInt(erp.id.replace(/\D/g, '').slice(-9), 10) || Date.now() % 1000000000;
-  const images = product.images.map((image: any) => ({
-    url: `${env.COMMERCIAL_SITE_URL}${image.url}`,
-  }));
+  const images = uniqueYampiImages([
+    ...(product.images || []),
+    ...(erp.images || []),
+    erp.imageUrl ? { url: erp.imageUrl } : null,
+  ].filter(Boolean));
   const skuData = {
     sku: skuCode,
     erp_id: numericErpId,
