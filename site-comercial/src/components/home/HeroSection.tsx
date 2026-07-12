@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ChevronLeft, ChevronRight, CreditCard, RefreshCw, Truck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -38,8 +39,12 @@ export function HeroSection() {
     setActiveLook((current) => (current + 1) % heroLooks.length);
   };
 
+  const heroStyle = {
+    '--hero-bg-image': heroLooks[activeLook]?.image ? `url("${heroLooks[activeLook].image}")` : 'none',
+  } as CSSProperties;
+
   return (
-    <section className="hero">
+    <section className="hero" style={heroStyle}>
       <div className="hero-shell">
         <motion.div
           className="hero-content"

@@ -3,6 +3,7 @@
   min-height: 88vh;
   padding: 118px var(--space-5) var(--space-10);
   overflow: hidden;
+  isolation: isolate;
   background:
     linear-gradient(120deg, rgba(255, 248, 246, 0.96), rgba(248, 207, 199, 0.84));
 }
@@ -11,14 +12,30 @@
   content: '';
   position: absolute;
   inset: 0;
+  z-index: 1;
   background:
-    linear-gradient(90deg, rgba(255, 253, 249, 0.96) 0%, rgba(255, 248, 246, 0.8) 48%, rgba(113, 60, 75, 0.18) 100%);
+    linear-gradient(90deg, rgba(255, 253, 249, 0.94) 0%, rgba(255, 248, 246, 0.76) 42%, rgba(248, 207, 199, 0.38) 100%);
+  pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: -52px;
+  z-index: 0;
+  background-image: var(--hero-bg-image);
+  background-position: 72% 45%;
+  background-repeat: no-repeat;
+  background-size: min(72vw, 1160px) auto;
+  filter: blur(46px) saturate(1.12);
+  opacity: 0.46;
+  transform: scale(1.08);
   pointer-events: none;
 }
 
 .hero-shell {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 0.88fr) minmax(460px, 0.98fr);
   align-items: center;
@@ -142,9 +159,9 @@
   height: 116%;
   object-fit: contain;
   padding: var(--space-8);
-  filter: blur(38px) saturate(1.14);
+  filter: blur(24px) saturate(1.08);
   transform: scale(1.18);
-  opacity: 0.82;
+  opacity: 0.38;
 }
 
 .hero-carousel-main {
