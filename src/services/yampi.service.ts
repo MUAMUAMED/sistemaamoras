@@ -50,6 +50,8 @@ const uniqueYampiImages = (images: any[]) => {
     .map((url) => ({ url }));
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const syncYampiSkuImages = async (skuId: string, images: Array<{ url: string }>) => {
   if (!skuId || !images.length) return;
 
@@ -64,9 +66,23 @@ const syncYampiSkuImages = async (skuId: string, images: Array<{ url: string }>)
       )
   );
 
-  await client.post(`/catalog/skus/${skuId}/images`, {
+  const created = payload(await client.post(`/catalog/skus/${skuId}/images`, {
     images,
-  });
+    upload_option: 'resize',
+  }));
+
+  const createdList = Array.isArray(created) ? created : (created?.data || []);
+  if (createdList.some((image: any) => image?.processed === false)) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      await sleep(750);
+
+      const refreshed = payload(await client.get(`/catalog/skus/${skuId}/images?skipCache=true`));
+      const refreshedList = Array.isArray(refreshed) ? refreshed : (refreshed?.data || []);
+      if (refreshedList.length && refreshedList.every((image: any) => image?.processed !== false)) {
+        break;
+      }
+    }
+  }
 };
 
 export async function syncCommercialProductWithYampi(commercialProductId: string) {
