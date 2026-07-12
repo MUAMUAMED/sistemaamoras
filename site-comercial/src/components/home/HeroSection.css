@@ -27,9 +27,9 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  filter: blur(22px) saturate(1.04);
-  opacity: 0.32;
-  transform: scale(1.04);
+  filter: blur(1px) saturate(1.02);
+  opacity: 0.24;
+  transform: scale(1.01);
   pointer-events: none;
 }
 
