@@ -112,7 +112,9 @@
   overflow: hidden;
   border-radius: inherit;
   clip-path: inherit;
-  background: var(--color-blush-100);
+  background:
+    radial-gradient(circle at 58% 46%, rgba(255, 253, 249, 0.6), transparent 42%),
+    linear-gradient(135deg, rgba(248, 207, 199, 0.42), rgba(255, 253, 249, 0.78));
 }
 
 .hero-carousel-slide {
@@ -138,10 +140,11 @@
 }
 
 .hero-carousel-blur {
-  object-fit: cover;
-  filter: blur(22px) saturate(1.05);
-  transform: scale(1.12);
-  opacity: 0.74;
+  object-fit: contain;
+  padding: var(--space-3);
+  filter: blur(28px) saturate(1.08);
+  transform: scale(1.08);
+  opacity: 0.62;
 }
 
 .hero-carousel-main {
