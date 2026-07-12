@@ -38,14 +38,16 @@
   z-index: 2;
   display: grid;
   grid-template-columns: minmax(0, 0.88fr) minmax(460px, 0.98fr);
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-10);
   width: 100%;
   max-width: 1320px;
+  min-height: calc(88vh - 118px - var(--space-10));
   margin: 0 auto;
 }
 
 .hero-content {
+  align-self: center;
   max-width: 650px;
 }
 
@@ -111,9 +113,10 @@
 
 .hero-media {
   position: relative;
-  width: min(100%, 640px);
-  min-height: 560px;
-  justify-self: center;
+  width: 100%;
+  min-height: 640px;
+  align-self: stretch;
+  justify-self: stretch;
   overflow: hidden;
   border: 8px solid rgba(255, 253, 249, 0.68);
   border-radius: 28px;
@@ -153,7 +156,7 @@
   inset: 0;
   width: 100%;
   height: 100%;
-  min-height: 560px;
+  min-height: 640px;
 }
 
 .hero-carousel-blur {
@@ -324,6 +327,8 @@
 
   .hero-shell {
     grid-template-columns: 1fr;
+    align-items: start;
+    min-height: auto;
   }
 
   .hero-content {
