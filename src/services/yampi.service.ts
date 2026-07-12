@@ -30,7 +30,7 @@ const publicImageUrl = (url?: string | null) => {
   }
 
   const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-  const baseUrl = normalizeBaseUrl(env.APP_URL || env.COMMERCIAL_SITE_URL);
+  const baseUrl = normalizeBaseUrl(env.COMMERCIAL_SITE_URL || env.APP_URL);
   return `${baseUrl}${path}`;
 };
 
@@ -48,6 +48,25 @@ const uniqueYampiImages = (images: any[]) => {
     })
     .slice(0, 10)
     .map((url) => ({ url }));
+};
+
+const syncYampiSkuImages = async (skuId: string, images: Array<{ url: string }>) => {
+  if (!skuId || !images.length) return;
+
+  const currentImages = payload(await client.get(`/catalog/skus/${skuId}/images?skipCache=true`));
+  const currentList = Array.isArray(currentImages) ? currentImages : (currentImages?.data || []);
+
+  await Promise.all(
+    currentList
+      .filter((image: any) => image?.id)
+      .map((image: any) =>
+        client.delete(`/catalog/skus/${skuId}/images/${image.id}`).catch(() => null)
+      )
+  );
+
+  await client.post(`/catalog/skus/${skuId}/images`, {
+    images,
+  });
 };
 
 export async function syncCommercialProductWithYampi(commercialProductId: string) {
@@ -92,7 +111,6 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
     blocked_sale: erp.stockLoja <= 0,
     variations_values_ids: [],
     allow_sell_without_customization: true,
-    images,
   };
 
   try {
@@ -134,6 +152,10 @@ export async function syncCommercialProductWithYampi(commercialProductId: string
           ...skuData,
         });
       }
+    }
+
+    if (yampiSkuId) {
+      await syncYampiSkuImages(yampiSkuId, images);
     }
 
     return await (prisma as any).commercialProduct.update({
