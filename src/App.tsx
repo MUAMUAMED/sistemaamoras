@@ -18,6 +18,7 @@ import Categories from './pages/Categories';
 import Subcategories from './pages/Subcategories';
 import Patterns from './pages/Patterns';
 import Sizes from './pages/Sizes';
+import Fiscal from './pages/Fiscal';
 import { useAuthStore } from './stores/authStore';
 
 const queryClient = new QueryClient();
@@ -64,6 +65,7 @@ export default function App() {
               <Route path="/erp/sizes" element={<Sizes />} />
               <Route path="/erp/sales" element={<Sales />} />
               <Route path="/erp/scanner" element={<Scanner />} />
+              <Route path="/erp/fiscal" element={<Fiscal />} />
               <Route path="/erp/settings" element={<Settings />} />
             </Route>
             {/* CRM Area */}
@@ -79,4 +81,4 @@ export default function App() {
       </BrowserRouter>
     </QueryClientProvider>
   );
-} 
+}

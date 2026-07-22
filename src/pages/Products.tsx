@@ -1448,6 +1448,15 @@ interface ProductFormModalData {
   imageFilesRoupa?: File[];
   imageFilesIA?: File[];
   initialLocation?: 'LOJA' | 'ARMAZEM'; // Nova propriedade para localização inicial
+  ncm?: string;
+  cest?: string;
+  cfop?: string;
+  fiscalOrigin?: string;
+  unitOfMeasure?: string;
+  icmsCst?: string;
+  icmsRate?: string;
+  pisCst?: string;
+  cofinsCst?: string;
 }
 
 interface ProductFormModalProps {
@@ -1555,6 +1564,15 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
     subcategoryId: product?.subcategoryId || '',
     patternId: product?.patternId || '',
     sizeId: product?.sizeId || '',
+    ncm: product?.ncm || '',
+    cest: product?.cest || '',
+    cfop: product?.cfop || '',
+    fiscalOrigin: product?.fiscalOrigin || '0',
+    unitOfMeasure: product?.unitOfMeasure || 'UN',
+    icmsCst: product?.icmsCst || '',
+    icmsRate: product?.icmsRate?.toString() || '',
+    pisCst: product?.pisCst || '',
+    cofinsCst: product?.cofinsCst || '',
     imageFile: null,
     imageFilesRoupa: [],
     imageFilesIA: [],
@@ -1717,6 +1735,7 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
         cost: formData.cost ? normalizePrice(formData.cost) : undefined,
         stock: parseInt(formData.stock) || 0,
         minStock: parseInt(formData.minStock) || 0,
+        icmsRate: formData.icmsRate ? Number(formData.icmsRate) : undefined,
         imageFile: formData.imageFile || undefined,
         imageFilesRoupa: formData.imageFilesRoupa || [],
         imageFilesIA: formData.imageFilesIA || [],
@@ -2554,6 +2573,20 @@ const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 </div>
               </div>
             </div>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Dados fiscais do produto</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[
+                ['ncm', 'NCM'], ['cest', 'CEST'], ['cfop', 'CFOP'], ['fiscalOrigin', 'Origem'],
+                ['unitOfMeasure', 'Unidade'], ['icmsCst', 'CST/CSOSN ICMS'], ['pisCst', 'CST PIS'], ['cofinsCst', 'CST COFINS'],
+              ].map(([key, label]) => (
+                <label key={key} className="block"><span className="block text-xs font-medium text-gray-600 mb-1">{label}</span><input value={(formData as any)[key] || ''} onChange={(e) => setFormData((prev) => ({ ...prev, [key]: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" /></label>
+              ))}
+              <label className="block"><span className="block text-xs font-medium text-gray-600 mb-1">Aliquota ICMS (%)</span><input type="number" step="0.01" min="0" value={formData.icmsRate || ''} onChange={(e) => setFormData((prev) => ({ ...prev, icmsRate: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm" /></label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Quando vazio, o PDV usa o padrao fiscal da empresa. Confirme estes codigos com a contabilidade.</p>
           </div>
 
           <div>

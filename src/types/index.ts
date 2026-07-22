@@ -104,6 +104,15 @@ export interface Product {
   commercialProduct?: CommercialProductSummary | null;
   createdAt: string;
   updatedAt: string;
+  ncm?: string;
+  cest?: string;
+  cfop?: string;
+  fiscalOrigin?: string;
+  unitOfMeasure?: string;
+  icmsCst?: string;
+  icmsRate?: number;
+  pisCst?: string;
+  cofinsCst?: string;
   
   // Relações
   category?: Category;
@@ -220,6 +229,7 @@ export interface Sale {
   leadId?: string;
   leadName?: string;
   leadPhone?: string;
+  customerTaxId?: string;
   total: number;
   discount: number;
   subtotal: number;
@@ -234,6 +244,7 @@ export interface Sale {
   
   // Relações
   items?: SaleItem[];
+  fiscalDocuments?: FiscalDocument[];
   lead?: {
     name: string;
     phone: string;
@@ -360,6 +371,15 @@ export interface ProductFormData {
   imageFilesIA?: File[];    // novas imagens tipo IA
   initialLocation?: 'LOJA' | 'ARMAZEM'; // Localização inicial do estoque
   saveAsDraft?: boolean; // Flag para salvar como rascunho
+  ncm?: string;
+  cest?: string;
+  cfop?: string;
+  fiscalOrigin?: string;
+  unitOfMeasure?: string;
+  icmsCst?: string;
+  icmsRate?: number;
+  pisCst?: string;
+  cofinsCst?: string;
 }
 
 export interface SubcategoryFormData {
@@ -400,6 +420,9 @@ export interface SaleFormData {
   }>;
   discount?: number;
   paymentMethod?: string;
+  leadName?: string;
+  leadPhone?: string;
+  customerTaxId?: string;
 }
 
 // Tipos de filtros
@@ -500,4 +523,56 @@ export interface StockReport {
     count: number;
     totalQuantity: number;
   }>;
+}
+
+export type FiscalDocumentStatus = 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'REJECTED' | 'DENIED' | 'CONTINGENCY' | 'CANCELLED' | 'VOIDED' | 'ERROR';
+
+export interface FiscalDocument {
+  id: string;
+  saleId: string;
+  model: number;
+  series: number;
+  number: number;
+  accessKey?: string;
+  status: FiscalDocumentStatus;
+  statusCode?: number;
+  statusMessage?: string;
+  totalAmount: number;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  issuedAt: string;
+  authorizedAt?: string;
+  cancelledAt?: string;
+  sale?: Pick<Sale, 'saleNumber' | 'leadName' | 'paymentMethod'>;
+}
+
+export interface FiscalConfig {
+  id?: string;
+  active: boolean;
+  companyName: string;
+  tradeName?: string;
+  taxId: string;
+  stateTaxId: string;
+  taxRegime: number;
+  stateCode: string;
+  cityCode: string;
+  cityName: string;
+  street: string;
+  streetNumber: string;
+  district: string;
+  zipCode: string;
+  addressComplement?: string;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  nfeSeries: number;
+  nfceSeries: number;
+  nextNfeNumber: number;
+  nextNfceNumber: number;
+  cscId?: string;
+  certificateValidUntil?: string;
+  defaultNcm?: string;
+  defaultCfop?: string;
+  defaultIcmsCst?: string;
+  defaultPisCst?: string;
+  defaultCofinsCst?: string;
+  hasCscToken?: boolean;
+  hasCertificate?: boolean;
 }

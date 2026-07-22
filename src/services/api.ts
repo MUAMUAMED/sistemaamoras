@@ -30,6 +30,8 @@ import {
   SaleFilters,
   PaginatedResponse,
   ApiResponse,
+  FiscalConfig,
+  FiscalDocument,
 } from '../types';
 
 // Configuração base do Axios
@@ -686,6 +688,18 @@ export const salesApi = {
     const response = await api.delete(`/sales/${id}`);
     return response.data;
   },
+};
+
+export const fiscalApi = {
+  getConfig: async (): Promise<FiscalConfig | null> => (await api.get('/fiscal/config')).data,
+  updateConfig: async (data: Partial<FiscalConfig> & { cscToken?: string; certificatePfxBase64?: string; certificatePassword?: string }): Promise<FiscalConfig> =>
+    (await api.put('/fiscal/config', data)).data,
+  listDocuments: async (params?: { page?: number; limit?: number; status?: string }): Promise<PaginatedResponse<FiscalDocument>> =>
+    (await api.get('/fiscal/documents', { params })).data,
+  issueNfce: async (saleId: string): Promise<FiscalDocument> => (await api.post(`/fiscal/sales/${saleId}/issue-nfce`)).data,
+  retry: async (id: string): Promise<FiscalDocument> => (await api.post(`/fiscal/documents/${id}/retry`)).data,
+  cancel: async (id: string, reason: string) => (await api.post(`/fiscal/documents/${id}/cancel`, { reason })).data,
+  checkStatus: async () => (await api.get('/fiscal/status')).data,
 };
 
 // Serviços de códigos de barras

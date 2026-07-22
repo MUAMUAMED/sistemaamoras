@@ -15,7 +15,8 @@ import {
   TagIcon,
   FolderIcon,
   SwatchIcon,
-  ScaleIcon
+  ScaleIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../stores/authStore';
 
@@ -32,6 +33,7 @@ const navigationERP = [
   { name: 'Tamanhos', href: '/erp/sizes', icon: ScaleIcon },
   { name: 'Vendas', href: '/erp/sales', icon: ShoppingCartIcon },
   { name: 'Scanner', href: '/erp/scanner', icon: QrCodeIcon },
+  { name: 'Fiscal', href: '/erp/fiscal', icon: DocumentTextIcon },
   { name: 'Configurações', href: '/erp/settings', icon: CogIcon },
 ];
 
@@ -197,4 +199,4 @@ export default function Layout({ area }: LayoutProps) {
       </div>
     </div>
   );
-} 
+}

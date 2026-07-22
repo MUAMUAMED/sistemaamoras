@@ -8,7 +8,7 @@ import {
   XMarkIcon,
   CreditCardIcon
 } from '@heroicons/react/24/outline';
-import { barcodeApi, productService, saleService, paymentGatewayApi } from '../services/api';
+import { barcodeApi, productService, saleService, paymentGatewayApi, fiscalApi } from '../services/api';
 import { Product, Sale } from '../types';
 import toast from 'react-hot-toast';
 
@@ -23,6 +23,8 @@ export default function Scanner() {
   const [scanInput, setScanInput] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
+  const [customerTaxId, setCustomerTaxId] = useState('');
+  const [issueNfce, setIssueNfce] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [searchCode, setSearchCode] = useState('');
@@ -54,10 +56,19 @@ export default function Scanner() {
 
   const createSaleMutation = useMutation({
     mutationFn: (saleData: any) => saleService.create(saleData),
-    onSuccess: (sale) => {
+    onSuccess: async (sale) => {
       toast.success('Venda criada com sucesso!');
+      if (issueNfce) {
+        try {
+          const document = await fiscalApi.issueNfce(sale.id);
+          toast.success(`NFC-e ${document.series}/${document.number} autorizada`);
+        } catch (error: any) {
+          toast.error(error.response?.data?.message || 'Venda salva, mas a NFC-e nao foi emitida');
+        }
+      }
       setCart([]);
       setCustomerName('');
+      setCustomerTaxId('');
       setPaymentMethod('');
       setShowPaymentModal(false);
     },
@@ -146,6 +157,7 @@ export default function Scanner() {
       })),
       paymentMethod,
       leadName: customerName || undefined,
+      customerTaxId: customerTaxId || undefined,
     };
 
     createSaleMutation.mutate(saleData);
@@ -308,15 +320,38 @@ export default function Scanner() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4 text-gray-900">Pagamento</h2>
-            <div className="mb-4">
+            <div className="space-y-4 mb-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="Nome opcional" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">CPF/CNPJ na nota</label>
+                <input value={customerTaxId} onChange={(e) => setCustomerTaxId(e.target.value.replace(/\D/g, '').slice(0, 14))} className="w-full border border-gray-300 rounded-md px-3 py-2 font-mono" placeholder="Opcional" />
+              </div>
+              <fieldset>
+                <legend className="block text-sm font-medium text-gray-700 mb-2">Forma de pagamento</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['CASH', 'Dinheiro'], ['PIX', 'Pix'], ['CREDIT_CARD', 'Credito'], ['DEBIT_CARD', 'Debito']].map(([value, label]) => (
+                    <button key={value} type="button" onClick={() => setPaymentMethod(value)} className={`border px-3 py-2 rounded-md text-sm ${paymentMethod === value ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'border-gray-300 text-gray-700'}`}>{label}</button>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={issueNfce} onChange={(e) => setIssueNfce(e.target.checked)} />
+                Emitir NFC-e apos confirmar a venda
+              </label>
+              <div className="flex justify-between border-t pt-3 font-semibold"><span>Total</span><span>R$ {getTotalAmount().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+              <button onClick={handleConfirmSale} disabled={createSaleMutation.isPending || !paymentMethod} className="w-full bg-indigo-600 text-white py-2 rounded-md disabled:opacity-50">
+                {createSaleMutation.isPending ? 'Confirmando...' : 'Confirmar venda'}
+              </button>
               <button
                 onClick={handlePixPayment}
-                className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 mb-2"
+                className="w-full border border-green-600 text-green-700 py-2 rounded-md hover:bg-green-50 flex items-center justify-center gap-2"
                 disabled={pixLoading}
               >
-                {pixLoading ? 'Gerando Pix...' : 'Pagar com Pix'}
+                {pixLoading ? 'Gerando Pix...' : 'Gerar cobranca Pix'}
               </button>
-              {/* ... outros métodos ... */}
             </div>
             <button
               onClick={() => setShowPaymentModal(false)}
@@ -349,4 +384,4 @@ export default function Scanner() {
       )}
     </div>
   );
-} 
+}
