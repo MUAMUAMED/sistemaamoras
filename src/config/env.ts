@@ -92,6 +92,7 @@ export const env = {
   YAMPI_PRODUCT_LENGTH: parseFloat(process.env.YAMPI_PRODUCT_LENGTH || '30'),
   YAMPI_CHECKOUT_DOMAIN: process.env.YAMPI_CHECKOUT_DOMAIN || '',
   COMMERCIAL_SITE_URL: process.env.COMMERCIAL_SITE_URL || 'https://amorascapital.zeabur.app',
+  FISCAL_ENCRYPTION_KEY: process.env.FISCAL_ENCRYPTION_KEY || '',
 
   // Sistema
   COMPANY_NAME: process.env.COMPANY_NAME || 'Amoras Capital',

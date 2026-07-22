@@ -23,6 +23,7 @@ import dashboardRoutes from "./routes/dashboard.routes";
 import webhookRoutes from "./routes/webhook.routes";
 import commercialRoutes from "./routes/commercial.routes";
 import yampiRoutes from "./routes/yampi.routes";
+import fiscalRoutes from "./routes/fiscal.routes";
 
 // Novas rotas ERP
 import sizesRoutes from "./routes/sizes";
@@ -382,6 +383,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/webhooks", webhookRoutes);
 app.use("/api/commercial", commercialRoutes);
 app.use("/api/yampi", yampiRoutes);
+app.use("/api/fiscal", fiscalRoutes);
 
 // Novas rotas ERP
 app.use("/api/sizes", sizesRoutes);

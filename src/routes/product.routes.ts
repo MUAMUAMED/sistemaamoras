@@ -366,6 +366,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       description,
       initialLocation,
       saveAsDraft, // Novo parâmetro para salvar como rascunho
+      ncm, cest, cfop, fiscalOrigin, unitOfMeasure, icmsCst, icmsRate, pisCst, cofinsCst,
     } = req.body;
 
     console.log('🆕 [PRODUTO CREATE] Dados recebidos:', {
@@ -396,6 +397,10 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         stockLoja: initialLocation === 'LOJA' ? (stock || 0) : 0,
         stockArmazem: initialLocation === 'ARMAZEM' ? (stock || 0) : 0,
         description: description || null,
+        ncm: ncm || null, cest: cest || null, cfop: cfop || null,
+        fiscalOrigin: fiscalOrigin || '0', unitOfMeasure: unitOfMeasure || 'UN',
+        icmsCst: icmsCst || null, icmsRate: icmsRate ?? null,
+        pisCst: pisCst || null, cofinsCst: cofinsCst || null,
         isDraft: true,
         // Não gerar barcode nem qrcode para rascunhos
         barcode: null,
@@ -569,6 +574,15 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         barcode,
         qrcodeUrl,
         description,
+        ncm: ncm || null,
+        cest: cest || null,
+        cfop: cfop || null,
+        fiscalOrigin: fiscalOrigin || '0',
+        unitOfMeasure: unitOfMeasure || 'UN',
+        icmsCst: icmsCst || null,
+        icmsRate: icmsRate ?? null,
+        pisCst: pisCst || null,
+        cofinsCst: cofinsCst || null,
         isDraft: false, // Produto normal, não é rascunho
         // inProduction: true, // Temporariamente removido até migration ser aplicada
         // status: 'PROCESSANDO', // Produtos começam sempre como PROCESSANDO (será adicionado após migration)
@@ -726,7 +740,8 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
       stock,
       minStock,
       isDraft, // Novo campo para rascunhos
-      initialLocation // Campo para definir localização inicial do estoque ao converter rascunho
+      initialLocation, // Campo para definir localização inicial do estoque ao converter rascunho
+      ncm, cest, cfop, fiscalOrigin, unitOfMeasure, icmsCst, icmsRate, pisCst, cofinsCst
     } = req.body;
 
     console.log('🔍 [PRODUTO UPDATE] Dados recebidos:', {
@@ -900,6 +915,10 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
     if (description !== undefined) {
       updateData.description = isUpdatingDraft ? (description || null) : description;
     }
+    const fiscalFields = { ncm, cest, cfop, fiscalOrigin, unitOfMeasure, icmsCst, icmsRate, pisCst, cofinsCst };
+    Object.entries(fiscalFields).forEach(([key, value]) => {
+      if (value !== undefined) updateData[key] = value === '' ? null : value;
+    });
     if (active !== undefined) {
       updateData.active = active;
     }

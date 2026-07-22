@@ -109,6 +109,10 @@ router.get('/', authenticateToken, async (req, res, next) => {
               },
             },
           },
+          fiscalDocuments: {
+            select: { id: true, status: true, model: true, series: true, number: true, accessKey: true },
+            orderBy: { createdAt: 'desc' },
+          },
         },
         skip,
         take,
@@ -179,6 +183,10 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
             },
           },
         },
+        fiscalDocuments: {
+          include: { events: { orderBy: { createdAt: 'desc' } } },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
 
@@ -246,7 +254,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     console.log('🛒 [DEBUG] Iniciando criação de venda...');
     console.log('🛒 [DEBUG] Dados recebidos:', JSON.stringify(req.body, null, 2));
     
-    const { leadId, items, paymentMethod, notes, leadName, leadPhone } = req.body;
+    const { leadId, items, paymentMethod, notes, leadName, leadPhone, customerTaxId } = req.body;
 
     // Validações básicas
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -353,10 +361,11 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         leadId: validatedLeadId,
         leadName: leadName || null,
         leadPhone: leadPhone || null,
+        customerTaxId: customerTaxId ? String(customerTaxId).replace(/\D/g, '') : null,
         sellerId: req.user!.id,
         subtotal: total,
         total,
-        status: 'PAID',
+        status: 'PENDING',
         paymentMethod,
         notes,
         items: {
@@ -365,6 +374,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       },
       include: {
         lead: true,
+        fiscalDocuments: true,
         seller: {
           select: {
             id: true,
@@ -389,7 +399,15 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
 
     // Processar pagamento para atualizar estoque e movimentações
     console.log('📦 [DEBUG] Processando pagamento para atualizar estoque...');
-    await processSalePayment(sale.id);
+    try {
+      await processSalePayment(sale.id);
+    } catch (paymentError) {
+      await prisma.$transaction([
+        prisma.saleItem.deleteMany({ where: { saleId: sale.id } }),
+        prisma.sale.delete({ where: { id: sale.id } }),
+      ]);
+      throw paymentError;
+    }
 
     // Nota: Todas as vendas são criadas com status PAID (concluídas)
     // Podem ser excluídas mesmo sendo concluídas
@@ -405,7 +423,16 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     console.log(`   - Pagamento: ${sale.paymentMethod}`);
     console.log(`   - Itens: ${sale.items.length}`);
 
-    return res.status(201).json(sale);
+    const completedSale = await prisma.sale.findUnique({
+      where: { id: sale.id },
+      include: {
+        lead: true,
+        fiscalDocuments: true,
+        seller: { select: { id: true, name: true, email: true } },
+        items: { include: { product: { include: { category: true, pattern: true } } } },
+      },
+    });
+    return res.status(201).json(completedSale);
   } catch (error: any) {
     console.error('❌ [DEBUG] Erro na criação da venda:', error);
     console.error('❌ [DEBUG] Stack trace:', error.stack);
@@ -577,80 +604,51 @@ router.patch('/:id/confirm', authenticateToken, async (req, res, next) => {
 
 // Função auxiliar para processar pagamento
 async function processSalePayment(saleId: string) {
-  const sale = await prisma.sale.findUnique({
-    where: { id: saleId },
-    include: {
-      items: {
-        include: {
-          product: true,
-        },
-      },
-      lead: true,
-    },
-  });
+  await prisma.$transaction(async (tx) => {
+    const sale = await tx.sale.findUnique({
+      where: { id: saleId },
+      include: { items: { include: { product: true } }, lead: true },
+    });
+    if (!sale) throw new Error('Venda não encontrada');
+    if (sale.status === 'PAID') return;
+    if (sale.status !== 'PENDING') throw new Error('Venda não está disponível para pagamento');
 
-  if (!sale) {
-    throw new Error('Venda não encontrada');
-  }
-
-  // Atualizar status da venda
-  await prisma.sale.update({
-    where: { id: saleId },
-    data: { status: 'PAID' },
-  });
-
-  // Atualizar estoque dos produtos
-  for (const item of sale.items) {
-    await Promise.all([
-      // Reduzir estoque
-      prisma.product.update({
-        where: { id: item.productId },
-        data: {
-          stock: {
-            decrement: item.quantity,
-          },
-        },
-      }),
-      // Registrar movimentação de estoque
-      prisma.stockMovement.create({
+    for (const item of sale.items) {
+      const updated = await tx.product.updateMany({
+        where: { id: item.productId, stock: { gte: item.quantity }, stockLoja: { gte: item.quantity } },
+        data: { stock: { decrement: item.quantity }, stockLoja: { decrement: item.quantity } },
+      });
+      if (updated.count !== 1) throw new Error(`Estoque insuficiente na loja para ${item.product.name}`);
+      await tx.stockMovement.create({
         data: {
           productId: item.productId,
           type: 'EXIT',
           quantity: item.quantity,
           reason: `Venda ${sale.id}`,
+          reference: sale.id,
+          location: 'LOJA',
           userId: sale.sellerId,
         },
-      }),
-    ]);
-  }
+      });
+    }
 
-  // Atualizar dados do lead se existe
-  if (sale.lead) {
-    await prisma.lead.update({
-      where: { id: sale.lead.id },
-      data: {
-        status: 'SALE_COMPLETED',
-        totalPurchases: {
-          increment: sale.total,
+    await tx.sale.update({ where: { id: saleId }, data: { status: 'PAID', paidAt: new Date() } });
+    if (sale.lead) {
+      await tx.lead.update({
+        where: { id: sale.lead.id },
+        data: { status: 'SALE_COMPLETED', totalPurchases: { increment: sale.total }, purchaseCount: { increment: 1 }, lastInteraction: new Date() },
+      });
+      await tx.interaction.create({
+        data: {
+          leadId: sale.lead.id,
+          userId: sale.sellerId,
+          type: 'NOTE',
+          title: 'Venda Realizada',
+          description: `Venda realizada no valor de R$ ${sale.total.toFixed(2)}`,
         },
-        purchaseCount: {
-          increment: 1,
-        },
-        lastInteraction: new Date(),
-      },
-    });
-
-    // Registrar interação
-    await prisma.interaction.create({
-      data: {
-        leadId: sale.lead.id,
-        userId: sale.sellerId,
-        type: 'NOTE',
-        title: 'Venda Realizada',
-        description: `Venda realizada no valor de R$ ${sale.total.toFixed(2)}`,
-      },
-    });
-  }
+      });
+    }
+  });
 }
 
 /**
@@ -691,6 +689,7 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
           },
         },
         lead: true,
+        fiscalDocuments: { select: { id: true, status: true } },
       },
     });
 
@@ -699,6 +698,13 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
       return res.status(404).json({
         error: 'Venda não encontrada',
         message: 'A venda solicitada não foi encontrada',
+      });
+    }
+
+    if (sale.fiscalDocuments.length > 0) {
+      return res.status(409).json({
+        error: 'Venda possui documento fiscal',
+        message: 'Vendas com historico fiscal nao podem ser excluidas. Cancele a NFC-e quando aplicavel e preserve o registro para auditoria.',
       });
     }
 
@@ -873,4 +879,4 @@ router.patch('/:id/status', authenticateToken, async (req, res, next) => {
   }
 });
 
-export default router; 
+export default router;
