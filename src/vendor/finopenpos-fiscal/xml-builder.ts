@@ -229,6 +229,11 @@ interface DetResult {
 }
 
 function buildDet(item: InvoiceItemData, data: InvoiceBuildData): DetResult {
+  const description =
+    data.environment === 2 && item.itemNumber === 1
+      ? "NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
+      : item.description;
+
   // Build ICMS using the full tax module
   const isSimples = data.issuer.taxRegime === 1 || data.issuer.taxRegime === 2;
   const icmsResult = buildIcmsXml({
@@ -420,7 +425,7 @@ function buildDet(item: InvoiceItemData, data: InvoiceBuildData): DetResult {
     tag("prod", {}, [
       tag("cProd", {}, item.productCode),
       tag("cEAN", {}, item.cEAN ?? "SEM GTIN"),
-      tag("xProd", {}, item.description),
+      tag("xProd", {}, description),
       tag("NCM", {}, item.ncm),
       ...(item.cest ? [tag("CEST", {}, item.cest)] : []),
       tag("CFOP", {}, item.cfop),
