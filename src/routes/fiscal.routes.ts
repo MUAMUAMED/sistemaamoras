@@ -14,6 +14,19 @@ import { getCertificateInfo } from '../vendor/finopenpos-fiscal';
 const router = Router();
 const fiscalManagers = [authenticateToken, authorizeRoles('ADMIN', 'MANAGER')];
 const digits = (value: unknown) => String(value || '').replace(/\D/g, '');
+const decodeXmlText = (value: string) => value
+  .replace(/^<!\[CDATA\[|\]\]>$/g, '')
+  .replace(/&amp;/g, '&')
+  .replace(/&lt;/g, '<')
+  .replace(/&gt;/g, '>')
+  .replace(/&quot;/g, '"')
+  .replace(/&apos;/g, "'");
+
+const extractXmlTag = (xml: string | null, tag: string) => {
+  if (!xml) return null;
+  const match = xml.match(new RegExp(`<(?:\\w+:)?${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:\\w+:)?${tag}>`, 'i'));
+  return match ? decodeXmlText(match[1].trim()) : null;
+};
 
 const errorResponse = (res: Response, next: NextFunction, error: any) => {
   if (error?.message) {
@@ -149,6 +162,102 @@ router.get('/documents/:id', authenticateToken, async (req, res, next) => {
     });
     if (!document) return res.status(404).json({ error: 'Documento fiscal nao encontrado' });
     return res.json(document);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/documents/:id/danfe', authenticateToken, async (req, res, next) => {
+  try {
+    const [document, config] = await Promise.all([
+      prisma.fiscalDocument.findUnique({
+        where: { id: req.params.id },
+        include: {
+          sale: {
+            select: {
+              saleNumber: true,
+              leadName: true,
+              customerTaxId: true,
+              paymentMethod: true,
+              subtotal: true,
+              discount: true,
+              total: true,
+            },
+          },
+          items: { orderBy: { itemNumber: 'asc' } },
+        },
+      }),
+      prisma.fiscalConfig.findUnique({
+        where: { id: 'default' },
+        select: {
+          companyName: true,
+          tradeName: true,
+          taxId: true,
+          stateTaxId: true,
+          stateCode: true,
+          cityName: true,
+          street: true,
+          streetNumber: true,
+          district: true,
+          zipCode: true,
+          addressComplement: true,
+        },
+      }),
+    ]);
+
+    if (!document || !config) return res.status(404).json({ error: 'Documento fiscal nao encontrado' });
+    if (document.status !== 'AUTHORIZED' || !document.protocolXml) {
+      return res.status(409).json({
+        error: 'Documento ainda nao autorizado',
+        message: document.statusMessage || `Status atual: ${document.status}`,
+      });
+    }
+
+    return res.json({
+      id: document.id,
+      model: document.model,
+      series: document.series,
+      number: document.number,
+      accessKey: document.accessKey,
+      protocolNumber: document.protocolNumber,
+      status: document.status,
+      environment: document.environment,
+      operationNature: document.operationNature,
+      issuedAt: document.issuedAt,
+      authorizedAt: document.authorizedAt,
+      recipientName: document.recipientName,
+      recipientTaxId: document.recipientTaxId,
+      totalAmount: document.totalAmount,
+      qrCodeUrl: extractXmlTag(document.protocolXml, 'qrCode') || extractXmlTag(document.requestXml, 'qrCode'),
+      consultationUrl: extractXmlTag(document.protocolXml, 'urlChave') || extractXmlTag(document.requestXml, 'urlChave'),
+      issuer: config,
+      sale: document.sale,
+      items: document.items,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/documents/:id/xml', authenticateToken, async (req, res, next) => {
+  try {
+    const document = await prisma.fiscalDocument.findUnique({
+      where: { id: req.params.id },
+      select: { status: true, protocolXml: true, series: true, number: true, statusMessage: true },
+    });
+    if (!document) return res.status(404).json({ error: 'Documento fiscal nao encontrado' });
+    if (document.status !== 'AUTHORIZED' || !document.protocolXml) {
+      return res.status(409).json({
+        error: 'XML autorizado indisponivel',
+        message: document.statusMessage || `Status atual: ${document.status}`,
+      });
+    }
+
+    const filename = `nfce-${document.series}-${document.number}.xml`;
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    return res.send(document.protocolXml);
   } catch (error) {
     return next(error);
   }
