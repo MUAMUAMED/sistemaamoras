@@ -209,7 +209,7 @@ export const transmitFiscalDocument = async (documentId: string) => {
       xml: signedXml,
       cscToken: settings.cscToken!,
       cscId: settings.cscId!,
-      version: '200',
+      version: '300',
       qrCodeBaseUrl: DF_NFCE_QRCODE_URL,
       urlChave: consultationUrl,
     });
