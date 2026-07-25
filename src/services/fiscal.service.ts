@@ -26,7 +26,7 @@ import {
   type SefazEnvironment,
 } from '../vendor/finopenpos-fiscal';
 
-const DF_NFCE_QRCODE_URL = 'https://www.fazenda.df.gov.br/nfce/qrcode';
+const DF_NFCE_QRCODE_URL = 'http://www.fazenda.df.gov.br/nfce/qrcode';
 
 const onlyDigits = (value?: string | null) => String(value || '').replace(/\D/g, '');
 const moneyToCents = (value: number | Prisma.Decimal) => Math.round(Number(value) * 100);
