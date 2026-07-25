@@ -74,7 +74,7 @@ export function buildInvoiceXml(data: InvoiceBuildData): {
     return detResult.xml;
   });
 
-  const infNFe = tag("infNFe", { xmlns: NFE_NAMESPACE, versao: NFE_VERSION, Id: infNFeId }, [
+  const infNFe = tag("infNFe", { versao: NFE_VERSION, Id: infNFeId }, [
     buildIde(data, stateIbge, numericCode, accessKey),
     buildEmit(data),
     ...(data.recipient ? [buildDest(data)] : []),
