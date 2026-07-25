@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   QrCodeIcon, 
   ShoppingCartIcon, 
@@ -22,6 +22,7 @@ interface CartItem {
 
 export default function Scanner() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [scanInput, setScanInput] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
@@ -59,6 +60,8 @@ export default function Scanner() {
   const createSaleMutation = useMutation({
     mutationFn: (saleData: any) => saleService.create(saleData),
     onSuccess: async (sale) => {
+      queryClient.removeQueries({ queryKey: ['scanned-product'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success('Venda criada com sucesso!');
       if (issueNfce) {
         try {
@@ -79,16 +82,26 @@ export default function Scanner() {
       setPaymentMethod('');
       setShowPaymentModal(false);
     },
-    onError: (error) => {
-      toast.error('Erro ao criar venda');
+    onError: (error: any) => {
+      const message = error.response?.data?.message || error.response?.data?.error || 'Erro ao criar venda';
+      toast.error(message);
       console.error('Error creating sale:', error);
     },
   });
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find(item => item.product.id === product.id);
-    
+
+    if (product.stock <= 0) {
+      toast.error(`${product.name} esta sem estoque`);
+      return;
+    }
+
     if (existingItem) {
+      if (existingItem.quantity >= product.stock) {
+        toast.error(`Estoque maximo de ${product.stock} unidade(s) para ${product.name}`);
+        return;
+      }
       setCart(cart.map(item => 
         item.product.id === product.id 
           ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * item.unitPrice }
@@ -116,10 +129,17 @@ export default function Scanner() {
       return;
     }
 
-    setCart(cart.map(item => 
-      item.product.id === productId 
-        ? { ...item, quantity: newQuantity, total: newQuantity * item.unitPrice }
-        : item
+    const item = cart.find((cartItem) => cartItem.product.id === productId);
+    if (!item) return;
+    if (newQuantity > item.product.stock) {
+      toast.error(`Estoque maximo de ${item.product.stock} unidade(s) para ${item.product.name}`);
+      return;
+    }
+
+    setCart(cart.map(cartItem =>
+      cartItem.product.id === productId
+        ? { ...cartItem, quantity: newQuantity, total: newQuantity * cartItem.unitPrice }
+        : cartItem
     ));
   };
 
@@ -153,6 +173,13 @@ export default function Scanner() {
   const handleConfirmSale = () => {
     if (!paymentMethod) {
       toast.error('Selecione um método de pagamento!');
+      return;
+    }
+
+    const unavailableItem = cart.find((item) => item.product.stock <= 0 || item.quantity > item.product.stock);
+    if (unavailableItem) {
+      toast.error(`${unavailableItem.product.name} nao possui estoque suficiente`);
+      setShowPaymentModal(false);
       return;
     }
 
@@ -282,7 +309,9 @@ export default function Scanner() {
                     
                     <button
                       onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                      className="p-1 text-gray-500 hover:text-gray-700"
+                      disabled={item.quantity >= item.product.stock}
+                      title={item.quantity >= item.product.stock ? 'Estoque maximo atingido' : 'Adicionar unidade'}
+                      className="p-1 text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-30"
                     >
                       <PlusIcon className="h-4 w-4" />
                     </button>
@@ -299,6 +328,7 @@ export default function Scanner() {
                     <p className="font-medium text-gray-900">
                       R$ {item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </p>
+                    <p className="text-xs text-gray-500">Disponivel: {item.product.stock}</p>
                   </div>
                 </div>
               ))}
