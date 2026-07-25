@@ -27,6 +27,7 @@ import {
 } from '../vendor/finopenpos-fiscal';
 
 const DF_NFCE_QRCODE_URL = 'http://www.fazenda.df.gov.br/nfce/qrcode';
+const HOMOLOGATION_RECIPIENT_NAME = 'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL';
 
 const onlyDigits = (value?: string | null) => String(value || '').replace(/\D/g, '');
 const moneyToCents = (value: number | Prisma.Decimal) => Math.round(Number(value) * 100);
@@ -170,7 +171,9 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     },
     recipient: document.recipientTaxId ? {
       taxId: onlyDigits(document.recipientTaxId),
-      name: document.recipientName || 'CONSUMIDOR',
+      name: settings.environment === 2
+        ? HOMOLOGATION_RECIPIENT_NAME
+        : document.recipientName || 'CONSUMIDOR',
     } : undefined,
     items,
     payments,
