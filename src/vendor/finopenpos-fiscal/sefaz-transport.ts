@@ -5,7 +5,7 @@ import { SOAP_ENVELOPE_NS, NFE_WSDL_NS } from "./constants";
 import type { SefazService } from "./types";
 
 const loadCertificateAuthorities = (): string[] | undefined => {
-  const extraCertificatePath = process.env.SEFAZ_CA_CERT_PATH;
+  const extraCertificatePath = process.env.SEFAZ_CA_CERT_PATH || process.env.NODE_EXTRA_CA_CERTS;
   if (!extraCertificatePath) return undefined;
 
   try {
