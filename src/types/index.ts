@@ -545,6 +545,59 @@ export interface FiscalDocument {
   sale?: Pick<Sale, 'saleNumber' | 'leadName' | 'paymentMethod'>;
 }
 
+export interface FiscalDanfe {
+  id: string;
+  model: number;
+  series: number;
+  number: number;
+  accessKey: string;
+  protocolNumber?: string;
+  status: FiscalDocumentStatus;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  operationNature: string;
+  issuedAt: string;
+  authorizedAt?: string;
+  recipientName?: string;
+  recipientTaxId?: string;
+  totalAmount: number;
+  qrCodeUrl?: string;
+  consultationUrl?: string;
+  issuer: {
+    companyName: string;
+    tradeName?: string;
+    taxId: string;
+    stateTaxId: string;
+    stateCode: string;
+    cityName: string;
+    street: string;
+    streetNumber: string;
+    district: string;
+    zipCode: string;
+    addressComplement?: string;
+  };
+  sale: {
+    saleNumber: string;
+    leadName?: string;
+    customerTaxId?: string;
+    paymentMethod: string;
+    subtotal: number;
+    discount: number;
+    total: number;
+  };
+  items: Array<{
+    id: string;
+    itemNumber: number;
+    productCode: string;
+    description: string;
+    ncm: string;
+    cfop: string;
+    unitOfMeasure: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+}
+
 export interface FiscalConfig {
   id?: string;
   active: boolean;

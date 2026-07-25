@@ -11,6 +11,7 @@ import {
 import { barcodeApi, productService, saleService, paymentGatewayApi, fiscalApi } from '../services/api';
 import { Product, Sale } from '../types';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface CartItem {
   product: Product;
@@ -20,6 +21,7 @@ interface CartItem {
 }
 
 export default function Scanner() {
+  const navigate = useNavigate();
   const [scanInput, setScanInput] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState('');
@@ -61,7 +63,12 @@ export default function Scanner() {
       if (issueNfce) {
         try {
           const document = await fiscalApi.issueNfce(sale.id);
-          toast.success(`NFC-e ${document.series}/${document.number} autorizada`);
+          if (document.status !== 'AUTHORIZED') {
+            toast.error(document.statusMessage || `NFC-e nao autorizada: ${document.status}`);
+          } else {
+            toast.success(`NFC-e ${document.series}/${document.number} autorizada`);
+            navigate(`/erp/fiscal/${document.id}/danfe`, { state: { fromPdv: true } });
+          }
         } catch (error: any) {
           toast.error(error.response?.data?.message || 'Venda salva, mas a NFC-e nao foi emitida');
         }

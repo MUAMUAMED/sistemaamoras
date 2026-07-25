@@ -32,6 +32,7 @@ import {
   ApiResponse,
   FiscalConfig,
   FiscalDocument,
+  FiscalDanfe,
 } from '../types';
 
 // Configuração base do Axios
@@ -700,6 +701,9 @@ export const fiscalApi = {
   retry: async (id: string): Promise<FiscalDocument> => (await api.post(`/fiscal/documents/${id}/retry`)).data,
   cancel: async (id: string, reason: string) => (await api.post(`/fiscal/documents/${id}/cancel`, { reason })).data,
   checkStatus: async () => (await api.get('/fiscal/status')).data,
+  getDanfe: async (id: string): Promise<FiscalDanfe> => (await api.get(`/fiscal/documents/${id}/danfe`)).data,
+  downloadXml: async (id: string): Promise<Blob> =>
+    (await api.get(`/fiscal/documents/${id}/xml`, { responseType: 'blob' })).data,
 };
 
 // Serviços de códigos de barras

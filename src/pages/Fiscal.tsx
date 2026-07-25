@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowPathIcon, CheckCircleIcon, DocumentTextIcon, ExclamationTriangleIcon, SignalIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowPathIcon, CheckCircleIcon, DocumentTextIcon, ExclamationTriangleIcon, EyeIcon, SignalIcon } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { fiscalApi } from '../services/api';
 import { FiscalConfig, FiscalDocument } from '../types';
@@ -51,6 +52,20 @@ export default function Fiscal() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['fiscal-documents'] }); toast.success('Documento reenviado'); },
     onError: (error: any) => toast.error(error.response?.data?.message || 'Falha no reenvio'),
   });
+
+  const downloadXml = async (document: FiscalDocument) => {
+    try {
+      const blob = await fiscalApi.downloadXml(document.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement('a');
+      anchor.href = url;
+      anchor.download = `nfce-${document.series}-${document.number}.xml`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Nao foi possivel baixar o XML');
+    }
+  };
 
   const set = (key: keyof FiscalConfig, value: any) => setForm((current) => ({ ...current, [key]: value }));
   const inputClass = 'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
@@ -129,7 +144,7 @@ export default function Fiscal() {
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500"><tr><th className="px-5 py-3 text-left">Venda</th><th className="px-5 py-3 text-left">NFC-e</th><th className="px-5 py-3 text-left">Emissao</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-left">Retorno</th><th className="px-5 py-3 text-right">Acao</th></tr></thead>
             <tbody className="divide-y divide-gray-100">
-              {documentsQuery.data?.data.map((document: FiscalDocument) => <tr key={document.id}><td className="px-5 py-3 font-medium">#{document.sale?.saleNumber || document.saleId}</td><td className="px-5 py-3 font-mono">{document.series}/{document.number}</td><td className="px-5 py-3">{new Date(document.issuedAt).toLocaleString('pt-BR')}</td><td className="px-5 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ${statusClasses[document.status] || 'bg-gray-100 text-gray-700'}`}>{document.status}</span></td><td className="px-5 py-3 max-w-xs truncate" title={document.statusMessage}>{document.statusMessage || document.accessKey || '-'}</td><td className="px-5 py-3 text-right">{['ERROR', 'REJECTED'].includes(document.status) && <button onClick={() => retryMutation.mutate(document.id)} className="text-indigo-700 font-medium hover:underline">Reenviar</button>}</td></tr>)}
+              {documentsQuery.data?.data.map((document: FiscalDocument) => <tr key={document.id}><td className="px-5 py-3 font-medium">#{document.sale?.saleNumber || document.saleId}</td><td className="px-5 py-3 font-mono">{document.series}/{document.number}</td><td className="px-5 py-3">{new Date(document.issuedAt).toLocaleString('pt-BR')}</td><td className="px-5 py-3"><span className={`rounded px-2 py-1 text-xs font-semibold ${statusClasses[document.status] || 'bg-gray-100 text-gray-700'}`}>{document.status}</span></td><td className="px-5 py-3 max-w-xs truncate" title={document.statusMessage}>{document.statusMessage || document.accessKey || '-'}</td><td className="px-5 py-3"><div className="flex justify-end gap-3">{document.status === 'AUTHORIZED' && <><Link to={`/erp/fiscal/${document.id}/danfe`} className="inline-flex items-center gap-1 text-indigo-700 font-medium hover:underline"><EyeIcon className="h-4 w-4" /> DANFE</Link><button onClick={() => downloadXml(document)} className="inline-flex items-center gap-1 text-gray-700 font-medium hover:underline"><ArrowDownTrayIcon className="h-4 w-4" /> XML</button></>}{['ERROR', 'REJECTED'].includes(document.status) && <button onClick={() => retryMutation.mutate(document.id)} className="text-indigo-700 font-medium hover:underline">Reenviar</button>}</div></td></tr>)}
               {!documentsQuery.data?.data.length && <tr><td colSpan={6} className="px-5 py-10 text-center text-gray-500">Nenhum documento fiscal emitido.</td></tr>}
             </tbody>
           </table>

@@ -3,6 +3,43 @@
 @tailwind components;
 @tailwind utilities;
 
+.danfe-print-root {
+  width: 80mm;
+  min-height: 120mm;
+  padding: 4mm;
+  font-family: Arial, Helvetica, sans-serif;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.12);
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .danfe-print-root,
+  .danfe-print-root * {
+    visibility: visible !important;
+  }
+
+  .danfe-print-root {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 74mm;
+    min-height: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  body[data-danfe-format='a4'] .danfe-print-root {
+    position: relative;
+    width: 100%;
+    max-width: 180mm;
+    margin: 0 auto;
+    padding: 8mm;
+    border: 1px solid #111;
+  }
+}
+
 /* Estilos personalizados para melhorar o design */
 @layer utilities {
   /* Clamp de texto para limitar linhas */
@@ -234,4 +271,4 @@ body {
   .no-print {
     display: none !important;
   }
-} 
+}
