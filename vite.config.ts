@@ -1,9 +1,14 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const proxyTarget = env.VITE_PROXY_TARGET || env.VITE_API_URL || env.REACT_APP_API_URL || 'http://localhost:3001';
+  const proxyHeaders = env.VITE_PROXY_ORIGIN ? { Origin: env.VITE_PROXY_ORIGIN } : undefined;
+
+  return {
   plugins: [react()],
   
   // Servidor de desenvolvimento
@@ -13,9 +18,16 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:3001',
+        target: proxyTarget,
         changeOrigin: true,
         secure: false,
+        headers: proxyHeaders,
+      },
+      '/uploads': {
+        target: proxyTarget,
+        changeOrigin: true,
+        secure: false,
+        headers: proxyHeaders,
       },
     },
   },
@@ -42,5 +54,6 @@ export default defineConfig({
   css: {
     postcss: './postcss.config.js',
   },
+  };
 });
 

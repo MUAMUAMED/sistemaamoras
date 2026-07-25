@@ -20,6 +20,7 @@ import Patterns from './pages/Patterns';
 import Sizes from './pages/Sizes';
 import Fiscal from './pages/Fiscal';
 import DanfeNfce from './pages/DanfeNfce';
+import Pdv from './pages/Pdv';
 import { useAuthStore } from './stores/authStore';
 
 const queryClient = new QueryClient();
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="/erp/sizes" element={<Sizes />} />
               <Route path="/erp/sales" element={<Sales />} />
               <Route path="/erp/scanner" element={<Scanner />} />
+              <Route path="/erp/pdv" element={<Pdv />} />
               <Route path="/erp/fiscal" element={<Fiscal />} />
               <Route path="/erp/fiscal/:id/danfe" element={<DanfeNfce />} />
               <Route path="/erp/settings" element={<Settings />} />

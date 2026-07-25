@@ -18,6 +18,7 @@ import {
   ScaleIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import { MonitorSmartphone } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 interface LayoutProps {
@@ -32,6 +33,7 @@ const navigationERP = [
   { name: 'Estampas', href: '/erp/patterns', icon: SwatchIcon },
   { name: 'Tamanhos', href: '/erp/sizes', icon: ScaleIcon },
   { name: 'Vendas', href: '/erp/sales', icon: ShoppingCartIcon },
+  { name: 'PDV', href: '/erp/pdv', icon: MonitorSmartphone },
   { name: 'Scanner', href: '/erp/scanner', icon: QrCodeIcon },
   { name: 'Fiscal', href: '/erp/fiscal', icon: DocumentTextIcon },
   { name: 'Configurações', href: '/erp/settings', icon: CogIcon },

@@ -99,7 +99,7 @@ export default function DanfeNfce() {
   return (
     <div className="danfe-screen">
       <div className="danfe-no-print mb-5 flex flex-wrap items-center justify-between gap-3">
-        <Link to={location.state?.fromPdv ? '/erp/scanner' : '/erp/fiscal'} className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-950">
+        <Link to={location.state?.pdvPath || (location.state?.fromPdv ? '/erp/scanner' : '/erp/fiscal')} className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-950">
           <ArrowLeftIcon className="h-5 w-5" /> {location.state?.fromPdv ? 'Voltar ao PDV' : 'Central Fiscal'}
         </Link>
         <div className="flex flex-wrap gap-2">

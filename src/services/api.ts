@@ -38,12 +38,13 @@ import {
 // Configuração base do Axios
 // Usa variável de ambiente ou URL relativa (proxy)
 const getBaseURL = () => {
+  const legacyEnv = typeof process !== 'undefined' ? process.env : {};
   // Em Vite, variáveis de ambiente são expostas via import.meta.env
   // Prioridade: REACT_APP_API_URL > VITE_API_URL > process.env.REACT_APP_API_URL
   const apiUrl = 
     import.meta.env.REACT_APP_API_URL || 
     import.meta.env.VITE_API_URL || 
-    process.env.REACT_APP_API_URL;
+    legacyEnv.REACT_APP_API_URL;
   
   // Se REACT_APP_API_URL ou VITE_API_URL estiverem definidas, usa elas (OBRIGATÓRIO em produção)
   if (apiUrl) {
@@ -56,7 +57,7 @@ const getBaseURL = () => {
   }
   
   // Em desenvolvimento, usa proxy relativo
-  if ((import.meta.env.DEV === true) || process.env.NODE_ENV === 'development') {
+  if ((import.meta.env.DEV === true) || legacyEnv.NODE_ENV === 'development') {
     return '/api';
   }
   
@@ -71,7 +72,7 @@ const api = axios.create({
   timeout: parseInt(
     import.meta.env.REACT_APP_API_TIMEOUT || 
     import.meta.env.VITE_API_TIMEOUT || 
-    process.env.REACT_APP_API_TIMEOUT || 
+    (typeof process !== 'undefined' ? process.env.REACT_APP_API_TIMEOUT : undefined) ||
     '30000'
   ),
 });
