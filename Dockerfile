@@ -17,6 +17,7 @@ RUN apt-get update -y \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/icp-brasil-v10.crt
+ENV SEFAZ_CA_CERT_PATH=/usr/local/share/ca-certificates/icp-brasil-v10.crt
 
 COPY package*.json ./
 RUN npm install

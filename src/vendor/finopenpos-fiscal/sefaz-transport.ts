@@ -1,6 +1,20 @@
 import https from "node:https";
+import { readFileSync } from "node:fs";
+import { rootCertificates } from "node:tls";
 import { SOAP_ENVELOPE_NS, NFE_WSDL_NS } from "./constants";
 import type { SefazService } from "./types";
+
+const loadCertificateAuthorities = (): string[] | undefined => {
+  const extraCertificatePath = process.env.SEFAZ_CA_CERT_PATH;
+  if (!extraCertificatePath) return undefined;
+
+  try {
+    return [...rootCertificates, readFileSync(extraCertificatePath, "utf8")];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Could not load SEFAZ CA certificate: ${message}`);
+  }
+};
 
 /**
  * Options for sending a SOAP request to SEFAZ
@@ -94,6 +108,7 @@ export async function sefazRequest(options: SefazRequestOptions): Promise<SefazR
       method: "POST",
       pfx,
       passphrase,
+      ca: loadCertificateAuthorities(),
       rejectUnauthorized: true,
       minVersion: "TLSv1.2",
       timeout,
