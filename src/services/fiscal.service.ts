@@ -233,7 +233,9 @@ export const transmitFiscalDocument = async (documentId: string) => {
         protocolNumber: parsed.protocolNumber,
         statusCode: parsed.statusCode,
         statusMessage: parsed.statusMessage,
-        authorizedAt: parsed.authorizedAt ? new Date(parsed.authorizedAt) : null,
+        authorizedAt: status === 'AUTHORIZED' && parsed.authorizedAt
+          ? new Date(parsed.authorizedAt)
+          : null,
       },
       include: { items: true, events: true },
     });

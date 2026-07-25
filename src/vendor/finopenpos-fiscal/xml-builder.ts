@@ -39,7 +39,7 @@ export function buildInvoiceXml(data: InvoiceBuildData): {
   }
 
   const numericCode = generateNumericCode();
-  const yearMonth = formatYearMonth(data.issuedAt);
+  const yearMonth = formatYearMonth(data.issuedAt, data.issuer.stateCode);
 
   const accessKeyParams: AccessKeyParams = {
     stateCode: stateIbge,
@@ -874,10 +874,11 @@ function generateNumericCode(): string {
   return String(Math.floor(Math.random() * 100000000)).padStart(8, "0");
 }
 
-/** Format date as AAMM */
-function formatYearMonth(date: Date): string {
-  const yy = String(date.getFullYear()).slice(2);
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
+/** Format date as AAMM in the issuer's local timezone. */
+function formatYearMonth(date: Date, stateCode: string): string {
+  const localDate = toStateLocalDate(date, stateCode);
+  const yy = String(localDate.getUTCFullYear()).slice(2);
+  const mm = String(localDate.getUTCMonth() + 1).padStart(2, "0");
   return yy + mm;
 }
 
@@ -886,23 +887,34 @@ function formatYearMonth(date: Date): string {
  * Example: 2025-01-15T10:30:00-03:00
  */
 function formatDateTimeNfe(date: Date, stateCode: string): string {
-  // Brazil timezone offsets by state
-  const offsets: Record<string, string> = {
-    AC: "-05:00", AM: "-04:00", AP: "-03:00", PA: "-03:00", RO: "-04:00",
-    RR: "-04:00", TO: "-03:00", MT: "-04:00", MS: "-04:00",
-    // All others are -03:00 (Brasilia time)
-  };
-  const offset = offsets[stateCode] || "-03:00";
+  const offset = stateTimezoneOffset(stateCode);
+  const localDate = toStateLocalDate(date, stateCode);
 
   const pad = (n: number) => String(n).padStart(2, "0");
-  const y = date.getFullYear();
-  const m = pad(date.getMonth() + 1);
-  const d = pad(date.getDate());
-  const h = pad(date.getHours());
-  const min = pad(date.getMinutes());
-  const s = pad(date.getSeconds());
+  const y = localDate.getUTCFullYear();
+  const m = pad(localDate.getUTCMonth() + 1);
+  const d = pad(localDate.getUTCDate());
+  const h = pad(localDate.getUTCHours());
+  const min = pad(localDate.getUTCMinutes());
+  const s = pad(localDate.getUTCSeconds());
 
   return `${y}-${m}-${d}T${h}:${min}:${s}${offset}`;
+}
+
+function stateTimezoneOffset(stateCode: string): string {
+  const offsets: Record<string, string> = {
+    AC: "-05:00", AM: "-04:00", RO: "-04:00",
+    RR: "-04:00", MT: "-04:00", MS: "-04:00",
+  };
+  return offsets[stateCode] || "-03:00";
+}
+
+function toStateLocalDate(date: Date, stateCode: string): Date {
+  const offset = stateTimezoneOffset(stateCode);
+  const sign = offset.startsWith("-") ? -1 : 1;
+  const [hours, minutes] = offset.slice(1).split(":").map(Number);
+  const offsetMs = sign * (hours * 60 + minutes) * 60_000;
+  return new Date(date.getTime() + offsetMs);
 }
 
 // formatCents and formatDecimal imported from ./format-utils
