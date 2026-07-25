@@ -49,6 +49,9 @@ import { env } from './config/env';
 const app: Application = express();
 const PORT = env.PORT;
 
+// Zeabur terminates HTTPS and forwards the original client IP through one proxy.
+app.set("trust proxy", 1);
+
 // === ORIGENS PERMITIDAS ===
 // Lê de variável de ambiente ou usa padrões
 const allowedOrigins: string[] = env.CORS_ORIGINS

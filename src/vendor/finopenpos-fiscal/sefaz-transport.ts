@@ -4,6 +4,15 @@ import { rootCertificates } from "node:tls";
 import { SOAP_ENVELOPE_NS, NFE_WSDL_NS } from "./constants";
 import type { SefazService } from "./types";
 
+const SERVICE_METADATA: Record<SefazService, { wsdl: string; operation: string }> = {
+  NfeStatusServico: { wsdl: "NFeStatusServico4", operation: "nfeStatusServicoNF" },
+  NfeAutorizacao: { wsdl: "NFeAutorizacao4", operation: "nfeAutorizacaoLote" },
+  NfeRetAutorizacao: { wsdl: "NFeRetAutorizacao4", operation: "nfeRetAutorizacaoLote" },
+  NfeConsultaProtocolo: { wsdl: "NFeConsultaProtocolo4", operation: "nfeConsultaNF" },
+  NfeInutilizacao: { wsdl: "NFeInutilizacao4", operation: "nfeInutilizacaoNF" },
+  RecepcaoEvento: { wsdl: "NFeRecepcaoEvento4", operation: "nfeRecepcaoEvento" },
+};
+
 const loadCertificateAuthorities = (): string[] | undefined => {
   const extraCertificatePath = process.env.SEFAZ_CA_CERT_PATH || process.env.NODE_EXTRA_CA_CERTS;
   if (!extraCertificatePath) return undefined;
@@ -97,6 +106,7 @@ export async function sefazRequest(options: SefazRequestOptions): Promise<SefazR
   const { url, service, xmlContent, pfx, passphrase, timeout = 30000 } = options;
 
   const soapEnvelope = buildSoapEnvelope(service, xmlContent);
+  const soapAction = getSoapAction(service);
 
   return new Promise((resolve, reject) => {
     const endpoint = new URL(url);
@@ -113,7 +123,8 @@ export async function sefazRequest(options: SefazRequestOptions): Promise<SefazR
       minVersion: "TLSv1.2",
       timeout,
       headers: {
-        "Content-Type": "application/soap+xml; charset=utf-8",
+        "Content-Type": `application/soap+xml; charset=utf-8; action="${soapAction}"`,
+        "SOAPAction": `"${soapAction}"`,
         "Content-Length": Buffer.byteLength(soapEnvelope),
       },
     }, (response) => {
@@ -123,7 +134,8 @@ export async function sefazRequest(options: SefazRequestOptions): Promise<SefazR
         const body = Buffer.concat(chunks).toString("utf8").trim();
         const httpStatus = response.statusCode || 0;
         if (httpStatus < 200 || httpStatus >= 300) {
-          reject(new Error(`SEFAZ returned HTTP ${httpStatus}`));
+          const detail = extractSefazError(body);
+          reject(new Error(`SEFAZ returned HTTP ${httpStatus}${detail ? `: ${detail}` : ""}`));
           return;
         }
         resolve({ httpStatus, body, content: extractSoapContent(body) });
@@ -142,19 +154,44 @@ export async function sefazRequest(options: SefazRequestOptions): Promise<SefazR
  * Build SOAP 1.2 envelope wrapping the NF-e request content.
  */
 function buildSoapEnvelope(service: SefazService, xmlContent: string): string {
-  const wsdlAction = `${NFE_WSDL_NS}/${service}`;
+  const wsdlNamespace = `${NFE_WSDL_NS}/${SERVICE_METADATA[service].wsdl}`;
 
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<soap12:Envelope xmlns:soap12="${SOAP_ENVELOPE_NS}">`,
     `<soap12:Header/>`,
     `<soap12:Body>`,
-    `<nfeDadosMsg xmlns="${wsdlAction}">`,
+    `<nfeDadosMsg xmlns="${wsdlNamespace}">`,
     xmlContent,
     `</nfeDadosMsg>`,
     `</soap12:Body>`,
     `</soap12:Envelope>`,
   ].join("");
+}
+
+function getSoapAction(service: SefazService): string {
+  const metadata = SERVICE_METADATA[service];
+  return `${NFE_WSDL_NS}/${metadata.wsdl}/${metadata.operation}`;
+}
+
+function extractSefazError(body: string): string {
+  if (!body) return "";
+
+  const fault =
+    body.match(/<(?:[^:>]+:)?Text[^>]*>([\s\S]*?)<\/(?:[^:>]+:)?Text>/i)?.[1] ||
+    body.match(/<faultstring[^>]*>([\s\S]*?)<\/faultstring>/i)?.[1] ||
+    body;
+
+  return fault
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 1000);
 }
 
 /**
