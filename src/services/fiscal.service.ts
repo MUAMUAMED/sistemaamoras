@@ -188,9 +188,13 @@ export const transmitFiscalDocument = async (documentId: string) => {
   if (!document) throw new Error('Documento fiscal nao encontrado');
   if (document.status === 'AUTHORIZED') return document;
 
-  await prisma.fiscalDocument.update({ where: { id: documentId }, data: { status: 'PROCESSING' } });
+  const issuedAt = new Date();
+  await prisma.fiscalDocument.update({
+    where: { id: documentId },
+    data: { status: 'PROCESSING', issuedAt },
+  });
   try {
-    const data = buildData(document, settings);
+    const data = buildData({ ...document, issuedAt }, settings);
     const built = buildInvoiceXml(data);
     const certificate = loadCertificate(settings.certificatePfx!, settings.certificatePassword!);
     let signedXml = signXml(built.xml, certificate.privateKey, certificate.certificate);
