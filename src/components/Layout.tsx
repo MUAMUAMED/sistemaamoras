@@ -56,6 +56,7 @@ export default function Layout({ area }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuthStore();
   const location = useLocation();
+  const isPdv = location.pathname === '/erp/pdv';
 
   const handleLogout = () => {
     logout();
@@ -192,9 +193,9 @@ export default function Layout({ area }: LayoutProps) {
         </header>
 
         {/* Main content area */}
-        <main className="flex-1 relative overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <main className={`flex-1 relative focus:outline-none ${isPdv ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+          <div className={isPdv ? 'h-full' : 'py-6'}>
+            <div className={isPdv ? 'h-full min-w-0' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
               <Outlet />
             </div>
           </div>

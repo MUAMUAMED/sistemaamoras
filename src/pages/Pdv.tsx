@@ -236,10 +236,10 @@ export default function Pdv() {
   };
 
   return (
-    <div className="-m-4 sm:-m-6 lg:-m-8 min-h-[calc(100vh-5rem)] bg-[#eef1f4] text-slate-900">
-      <div className="flex min-h-[calc(100vh-5rem)] flex-col xl:flex-row">
-        <section className="flex min-h-[43rem] w-full flex-col border-b border-slate-300 bg-white xl:w-[44%] xl:border-b-0 xl:border-r">
-          <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-[#116e78] px-5 text-white">
+    <div className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden bg-[#eef1f4] text-slate-900 xl:overflow-hidden">
+      <div className="flex min-h-full min-w-0 flex-col xl:h-full xl:min-h-0 xl:flex-row">
+        <section className="flex min-h-[42rem] min-w-0 w-full flex-col border-b border-slate-300 bg-white xl:h-full xl:min-h-0 xl:w-[clamp(23rem,30vw,27rem)] xl:flex-none xl:border-b-0 xl:border-r">
+          <header className="flex h-14 flex-none items-center justify-between border-b border-slate-200 bg-[#116e78] px-4 text-white">
             <div className="flex items-center gap-3">
               <ShoppingCart className="h-6 w-6" />
               <div>
@@ -259,7 +259,7 @@ export default function Pdv() {
             </button>
           </header>
 
-          <div className="border-b border-slate-200 p-4">
+          <div className="flex-none border-b border-slate-200 p-3">
             <form onSubmit={submitScan} className="flex gap-2">
               <div className="relative flex-1">
                 <ScanLine className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#116e78]" />
@@ -268,21 +268,21 @@ export default function Pdv() {
                   value={scanCode}
                   onChange={(event) => setScanCode(event.target.value)}
                   placeholder="Leia ou digite o código de barras"
-                  className="h-12 w-full border border-slate-300 bg-slate-50 pl-11 pr-3 font-mono text-sm outline-none focus:border-[#116e78] focus:ring-2 focus:ring-cyan-100"
+                  className="h-11 w-full min-w-0 border border-slate-300 bg-slate-50 pl-11 pr-3 font-mono text-sm outline-none focus:border-[#116e78] focus:ring-2 focus:ring-cyan-100"
                 />
               </div>
               <button
                 type="submit"
                 title="Adicionar pelo código"
                 disabled={!scanCode.trim() || scanMutation.isPending}
-                className="grid h-12 w-12 place-items-center bg-[#116e78] text-white hover:bg-[#0d5961] disabled:opacity-40"
+                className="grid h-11 w-11 flex-none place-items-center bg-[#116e78] text-white hover:bg-[#0d5961] disabled:opacity-40"
               >
                 {scanMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               </button>
             </form>
           </div>
 
-          <div className="custom-scrollbar min-h-[20rem] flex-1 overflow-y-auto">
+          <div className="custom-scrollbar min-h-[18rem] flex-1 overflow-y-auto">
             {cart.length === 0 ? (
               <div className="flex h-full min-h-[24rem] flex-col items-center justify-center px-8 text-center text-slate-400">
                 <PackageOpen className="mb-4 h-14 w-14" />
@@ -294,8 +294,8 @@ export default function Pdv() {
             ) : (
               <div className="divide-y divide-slate-200">
                 {cart.map((item, index) => (
-                  <article key={item.product.id} className="grid grid-cols-[2rem_1fr_auto] gap-3 px-4 py-3">
-                    <span className="pt-1 text-xs font-semibold text-slate-400">{String(index + 1).padStart(2, '0')}</span>
+                  <article key={item.product.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-2 px-3 py-3">
+                    <span className="pt-1 text-[11px] font-semibold text-slate-400">{String(index + 1).padStart(2, '0')}</span>
                     <div className="min-w-0">
                       <h2 className="truncate text-sm font-semibold">{item.product.name}</h2>
                       <p className="mt-1 text-xs text-slate-500">
@@ -341,21 +341,21 @@ export default function Pdv() {
             )}
           </div>
 
-          <footer className="border-t border-slate-300 bg-slate-50 p-4">
+          <footer className="flex-none border-t border-slate-300 bg-slate-50 p-3">
             <div className="grid grid-cols-3 gap-3 text-sm">
               <div><span className="block text-xs uppercase text-slate-500">Itens</span><strong>{itemCount}</strong></div>
               <div><span className="block text-xs uppercase text-slate-500">Subtotal</span><strong>{money(subtotal)}</strong></div>
               <div><span className="block text-xs uppercase text-slate-500">Desconto</span><strong>{money(safeDiscount)}</strong></div>
             </div>
-            <div className="my-4 flex items-end justify-between border-y border-slate-300 py-3">
+            <div className="my-3 flex items-end justify-between border-y border-slate-300 py-2.5">
               <span className="text-sm font-semibold uppercase text-slate-500">Total</span>
-              <strong className="text-3xl font-bold text-[#116e78]">{money(total)}</strong>
+              <strong className="text-2xl font-bold text-[#116e78]">{money(total)}</strong>
             </div>
             <button
               type="button"
               disabled={!cart.length}
               onClick={() => setShowPayment(true)}
-              className="flex h-14 w-full items-center justify-center gap-3 bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="flex h-12 w-full items-center justify-center gap-3 bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               <CreditCard className="h-5 w-5" />
               Receber e finalizar
@@ -363,8 +363,8 @@ export default function Pdv() {
           </footer>
         </section>
 
-        <section className="flex min-h-[43rem] flex-1 flex-col bg-[#eef1f4]">
-          <header className="border-b border-slate-300 bg-white p-4">
+        <section className="flex min-h-[42rem] min-w-0 flex-1 flex-col bg-[#eef1f4] xl:h-full xl:min-h-0">
+          <header className="flex-none border-b border-slate-300 bg-white p-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
@@ -372,7 +372,7 @@ export default function Pdv() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Pesquisar produto, código, tamanho ou estampa"
-                  className="h-12 w-full border border-slate-300 bg-white pl-11 pr-10 text-sm outline-none focus:border-[#116e78] focus:ring-2 focus:ring-cyan-100"
+                  className="h-11 w-full min-w-0 border border-slate-300 bg-white pl-11 pr-10 text-sm outline-none focus:border-[#116e78] focus:ring-2 focus:ring-cyan-100"
                 />
                 {search && (
                   <button
@@ -385,18 +385,18 @@ export default function Pdv() {
                   </button>
                 )}
               </div>
-              <div className="flex h-12 items-center gap-2 border border-slate-300 bg-slate-50 px-4 text-sm font-medium text-slate-600">
+              <div className="flex h-11 flex-none items-center gap-2 border border-slate-300 bg-slate-50 px-4 text-sm font-medium text-slate-600">
                 <Grid3X3 className="h-5 w-5 text-[#116e78]" />
                 {visibleProducts.length} produtos
               </div>
             </div>
           </header>
 
-          <nav className="custom-scrollbar flex gap-2 overflow-x-auto border-b border-slate-300 bg-white p-3">
+          <nav className="custom-scrollbar flex min-w-0 flex-none gap-2 overflow-x-auto border-b border-slate-300 bg-white p-2.5">
             <button
               type="button"
               onClick={() => setCategoryId('all')}
-              className={`h-11 flex-none border px-5 text-sm font-semibold ${
+              className={`h-10 flex-none border px-4 text-sm font-semibold ${
                 categoryId === 'all'
                   ? 'border-[#116e78] bg-[#116e78] text-white'
                   : 'border-slate-300 bg-white text-slate-600 hover:border-[#116e78]'
@@ -409,7 +409,7 @@ export default function Pdv() {
                 type="button"
                 key={category.id}
                 onClick={() => setCategoryId(category.id)}
-                className={`h-11 flex-none border px-5 text-sm font-semibold ${
+                className={`h-10 flex-none border px-4 text-sm font-semibold ${
                   categoryId === category.id
                     ? 'border-[#116e78] bg-[#116e78] text-white'
                     : 'border-slate-300 bg-white text-slate-600 hover:border-[#116e78]'
@@ -420,13 +420,13 @@ export default function Pdv() {
             ))}
           </nav>
 
-          <div className="custom-scrollbar flex-1 overflow-y-auto p-4">
+          <div className="custom-scrollbar min-w-0 flex-1 overflow-y-auto p-3">
             {productsQuery.isLoading ? (
               <div className="grid min-h-80 place-items-center text-slate-500">
                 <Loader2 className="h-8 w-8 animate-spin text-[#116e78]" />
               </div>
             ) : visibleProducts.length ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(11rem,100%),1fr))] gap-3">
                 {visibleProducts.map((product) => {
                   const image = productImage(product);
                   const available = storeStock(product);
@@ -436,9 +436,9 @@ export default function Pdv() {
                       key={product.id}
                       disabled={available <= 0}
                       onClick={() => addProduct(product)}
-                      className="group flex min-h-[13rem] flex-col overflow-hidden border border-slate-300 bg-white text-left hover:border-[#116e78] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-55"
+                      className="group flex min-h-[12rem] min-w-0 flex-col overflow-hidden border border-slate-300 bg-white text-left hover:border-[#116e78] hover:shadow-md disabled:cursor-not-allowed disabled:opacity-55"
                     >
-                      <div className="relative h-28 w-full overflow-hidden bg-slate-100">
+                      <div className="relative h-32 w-full overflow-hidden bg-slate-100">
                         {image ? (
                           <img src={image} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
                         ) : (
