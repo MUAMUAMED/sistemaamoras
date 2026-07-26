@@ -707,6 +707,20 @@ export const fiscalApi = {
   }): Promise<PaginatedResponse<FiscalDocument>> =>
     (await api.get('/fiscal/documents', { params })).data,
   issueNfce: async (saleId: string): Promise<FiscalDocument> => (await api.post(`/fiscal/sales/${saleId}/issue-nfce`)).data,
+  issueManualNfce: async (data: {
+    recipientName?: string;
+    recipientTaxId?: string;
+    paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+    notes?: string;
+    items: Array<{
+      productCode?: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      ncm?: string;
+      cfop?: string;
+    }>;
+  }): Promise<FiscalDocument> => (await api.post('/fiscal/manual/issue-nfce', data)).data,
   retry: async (id: string): Promise<FiscalDocument> => (await api.post(`/fiscal/documents/${id}/retry`)).data,
   cancel: async (id: string, reason: string) => (await api.post(`/fiscal/documents/${id}/cancel`, { reason })).data,
   checkStatus: async () => (await api.get('/fiscal/status')).data,

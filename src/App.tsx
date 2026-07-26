@@ -22,6 +22,8 @@ import Fiscal from './pages/Fiscal';
 import FiscalHistory from './pages/FiscalHistory';
 import DanfeNfce from './pages/DanfeNfce';
 import Pdv from './pages/Pdv';
+import ManualFiscal from './pages/ManualFiscal';
+import AdminRoute from './components/AdminRoute';
 import { useAuthStore } from './stores/authStore';
 
 const queryClient = new QueryClient();
@@ -71,6 +73,7 @@ export default function App() {
               <Route path="/erp/pdv" element={<Pdv />} />
               <Route path="/erp/fiscal" element={<Fiscal />} />
               <Route path="/erp/fiscal/history" element={<FiscalHistory />} />
+              <Route path="/erp/fiscal/manual" element={<AdminRoute><ManualFiscal /></AdminRoute>} />
               <Route path="/erp/fiscal/:id/danfe" element={<DanfeNfce />} />
               <Route path="/erp/settings" element={<Settings />} />
             </Route>

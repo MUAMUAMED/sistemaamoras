@@ -18,7 +18,7 @@ import {
   ScaleIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
-import { FileClock, MonitorSmartphone } from 'lucide-react';
+import { FileClock, MonitorSmartphone, ReceiptText } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 interface LayoutProps {
@@ -37,6 +37,7 @@ const navigationERP = [
   { name: 'Scanner', href: '/erp/scanner', icon: QrCodeIcon },
   { name: 'Fiscal', href: '/erp/fiscal', icon: DocumentTextIcon },
   { name: 'Notas fiscais', href: '/erp/fiscal/history', icon: FileClock },
+  { name: 'Emissor avulso', href: '/erp/fiscal/manual', icon: ReceiptText, adminOnly: true },
   { name: 'Configurações', href: '/erp/settings', icon: CogIcon },
 ];
 
@@ -65,6 +66,7 @@ export default function Layout({ area }: LayoutProps) {
   let navigation = navigationDefault;
   if (area === 'erp') navigation = navigationERP;
   if (area === 'crm') navigation = navigationCRM;
+  navigation = navigation.filter((item: any) => !item.adminOnly || user?.role === 'ADMIN');
 
   return (
     <div className="h-screen flex overflow-hidden bg-gray-100">
