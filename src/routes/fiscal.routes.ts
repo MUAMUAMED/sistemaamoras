@@ -7,6 +7,8 @@ import {
   FiscalAiProvider,
   getFiscalAiProviders,
   parseManualFiscalDraft,
+  saveFiscalAiProvider,
+  testFiscalAiProvider,
 } from '../services/fiscal-ai.service';
 import {
   cancelFiscalDocument,
@@ -330,8 +332,31 @@ router.post('/manual/issue-nfce', authenticateToken, authorizeRoles('ADMIN'), as
   }
 });
 
-router.get('/ai/providers', authenticateToken, authorizeRoles('ADMIN'), (_req, res) => {
-  return res.json(getFiscalAiProviders());
+router.get('/ai/providers', authenticateToken, authorizeRoles('ADMIN'), async (_req, res, next) => {
+  try {
+    return res.json(await getFiscalAiProviders());
+  } catch (error) {
+    return errorResponse(res, next, error);
+  }
+});
+
+router.put('/ai/providers/:provider', authenticateToken, authorizeRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Usuario nao autenticado' });
+    return res.json(await saveFiscalAiProvider(req.params.provider, req.body || {}, req.user.id));
+  } catch (error) {
+    return errorResponse(res, next, error);
+  }
+});
+
+router.post('/ai/providers/:provider/test', authenticateToken, authorizeRoles('ADMIN'), fiscalAiLimiter, async (req, res, next) => {
+  try {
+    return res.json(await testFiscalAiProvider(
+      String(req.params.provider || '').toLowerCase() as FiscalAiProvider
+    ));
+  } catch (error) {
+    return errorResponse(res, next, error);
+  }
 });
 
 router.post('/ai/parse-draft', authenticateToken, authorizeRoles('ADMIN'), fiscalAiLimiter, async (req, res, next) => {

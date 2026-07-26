@@ -444,6 +444,20 @@ model FiscalConfig {
   @@map("fiscal_config")
 }
 
+// Credenciais de IA configuradas pelo ERP. A chave e cifrada pela aplicacao.
+model AiProviderConfig {
+  provider        String   @id
+  apiKeyEncrypted String?
+  model           String
+  enabled         Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("ai_provider_config")
+}
+
 model FiscalDocument {
   id                String               @id @default(cuid())
   saleId            String

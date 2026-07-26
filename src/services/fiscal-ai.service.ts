@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { prisma } from '../config/database';
+import { decryptFiscalSecret, encryptFiscalSecret } from './fiscal-crypto.service';
 
 export type FiscalAiProvider = 'gemini' | 'groq' | 'openrouter';
 
@@ -7,6 +9,9 @@ interface ProviderConfig {
   label: string;
   apiKey: string;
   model: string;
+  enabled: boolean;
+  isDefault: boolean;
+  source: 'database' | 'environment' | null;
 }
 
 export interface FiscalAiDraftItem {
@@ -35,7 +40,7 @@ const PAYMENT_METHODS = new Set<FiscalAiDraft['paymentMethod']>([
   'BANK_TRANSFER',
 ]);
 
-const providerConfigs = (): ProviderConfig[] => [
+const environmentProviderConfigs = (): Omit<ProviderConfig, 'enabled' | 'isDefault' | 'source'>[] => [
   {
     id: 'gemini',
     label: 'Google Gemini',
@@ -56,19 +61,109 @@ const providerConfigs = (): ProviderConfig[] => [
   },
 ];
 
-export const getFiscalAiProviders = () => {
-  const providers = providerConfigs().map(({ id, label, model, apiKey }) => ({
+const providerIds = new Set<FiscalAiProvider>(['gemini', 'groq', 'openrouter']);
+
+const assertProvider = (value: unknown): FiscalAiProvider => {
+  const provider = String(value || '').toLowerCase() as FiscalAiProvider;
+  if (!providerIds.has(provider)) throw new Error('Provedor de IA invalido');
+  return provider;
+};
+
+const getProviderConfigs = async (): Promise<ProviderConfig[]> => {
+  const stored = await prisma.aiProviderConfig.findMany();
+  const storedByProvider = new Map(stored.map((config) => [config.provider, config]));
+
+  return environmentProviderConfigs().map((environmentConfig) => {
+    const databaseConfig = storedByProvider.get(environmentConfig.id);
+    const storedKey = databaseConfig?.apiKeyEncrypted
+      ? decryptFiscalSecret(databaseConfig.apiKeyEncrypted).toString('utf8')
+      : '';
+    const apiKey = storedKey || environmentConfig.apiKey;
+
+    return {
+      ...environmentConfig,
+      apiKey,
+      model: databaseConfig?.model?.trim() || environmentConfig.model,
+      enabled: databaseConfig?.enabled ?? true,
+      isDefault: databaseConfig?.isDefault ?? false,
+      source: storedKey ? 'database' : environmentConfig.apiKey ? 'environment' : null,
+    };
+  });
+};
+
+export const getFiscalAiProviders = async () => {
+  const configs = await getProviderConfigs();
+  const providers = configs.map(({ id, label, model, apiKey, enabled, isDefault, source }) => ({
     id,
     label,
     model,
     configured: Boolean(apiKey),
+    enabled,
+    isDefault,
+    source,
   }));
   const requestedDefault = String(process.env.FISCAL_AI_PROVIDER || '').toLowerCase();
-  const defaultProvider = providers.find((provider) => provider.configured && provider.id === requestedDefault)?.id
-    || providers.find((provider) => provider.configured)?.id
+  const defaultProvider = providers.find((provider) => provider.configured && provider.enabled && provider.isDefault)?.id
+    || providers.find((provider) => provider.configured && provider.enabled && provider.id === requestedDefault)?.id
+    || providers.find((provider) => provider.configured && provider.enabled)?.id
     || null;
 
   return { providers, defaultProvider };
+};
+
+export const saveFiscalAiProvider = async (
+  providerValue: unknown,
+  input: {
+    apiKey?: unknown;
+    model?: unknown;
+    enabled?: unknown;
+    isDefault?: unknown;
+    clearKey?: unknown;
+  },
+  updatedById: string
+) => {
+  const provider = assertProvider(providerValue);
+  const defaults = environmentProviderConfigs().find((config) => config.id === provider)!;
+  const current = await prisma.aiProviderConfig.findUnique({ where: { provider } });
+  const model = String(input.model || current?.model || defaults.model).trim();
+  const apiKey = String(input.apiKey || '').trim();
+  const clearKey = input.clearKey === true;
+  const enabled = input.enabled === undefined ? current?.enabled ?? true : input.enabled === true;
+  const isDefault = input.isDefault === true;
+
+  if (!/^[A-Za-z0-9._:/-]{2,160}$/.test(model)) {
+    throw new Error('Informe um modelo de IA valido');
+  }
+  if (apiKey && (apiKey.length < 10 || apiKey.length > 1000)) {
+    throw new Error('A chave da API deve ter entre 10 e 1000 caracteres');
+  }
+
+  const apiKeyEncrypted = clearKey
+    ? null
+    : apiKey
+      ? encryptFiscalSecret(apiKey)
+      : current?.apiKeyEncrypted ?? null;
+
+  const save = () => prisma.aiProviderConfig.upsert({
+    where: { provider },
+    create: { provider, apiKeyEncrypted, model, enabled, isDefault, updatedById },
+    update: { apiKeyEncrypted, model, enabled, isDefault, updatedById },
+  });
+
+  if (isDefault) {
+    await prisma.$transaction([
+      prisma.aiProviderConfig.updateMany({ data: { isDefault: false } }),
+      prisma.aiProviderConfig.upsert({
+        where: { provider },
+        create: { provider, apiKeyEncrypted, model, enabled, isDefault: true, updatedById },
+        update: { apiKeyEncrypted, model, enabled, isDefault: true, updatedById },
+      }),
+    ]);
+  } else {
+    await save();
+  }
+
+  return getFiscalAiProviders();
 };
 
 const draftSchema = {
@@ -237,8 +332,10 @@ export const parseManualFiscalDraft = async (provider: FiscalAiProvider, prompt:
   if (cleanPrompt.length < 5) throw new Error('Descreva a venda com pelo menos 5 caracteres');
   if (cleanPrompt.length > 5000) throw new Error('A descricao da venda deve ter no maximo 5000 caracteres');
 
-  const config = providerConfigs().find((candidate) => candidate.id === provider);
+  const validProvider = assertProvider(provider);
+  const config = (await getProviderConfigs()).find((candidate) => candidate.id === validProvider);
   if (!config) throw new Error('Provedor de IA invalido');
+  if (!config.enabled) throw new Error(`${config.label} esta desativado`);
   if (!config.apiKey) throw new Error(`${config.label} nao esta configurado no backend`);
 
   try {
@@ -255,4 +352,17 @@ export const parseManualFiscalDraft = async (provider: FiscalAiProvider, prompt:
       ? `${config.label}: ${String(upstreamMessage).slice(0, 240)}`
       : `Nao foi possivel consultar ${config.label}`);
   }
+};
+
+export const testFiscalAiProvider = async (provider: FiscalAiProvider) => {
+  const result = await parseManualFiscalDraft(
+    provider,
+    'Teste de conexao: 1 produto chamado Item de teste por R$ 1,00, pagamento em dinheiro.'
+  );
+  return {
+    success: true,
+    provider: result.provider,
+    model: result.model,
+    message: 'Conexao com o provedor realizada com sucesso',
+  };
 };
