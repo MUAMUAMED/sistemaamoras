@@ -1,14 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
   FileCheck2,
+  KeyRound,
   Loader2,
   Plus,
   ReceiptText,
+  Settings2,
   Sparkles,
   Trash2,
   X,
@@ -55,6 +57,7 @@ const money = (value: number) =>
 
 export default function ManualFiscal() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [recipientName, setRecipientName] = useState('');
   const [recipientTaxId, setRecipientTaxId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
@@ -65,6 +68,12 @@ export default function ManualFiscal() {
   const [aiProvider, setAiProvider] = useState<AiProvider | ''>('');
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [lastAiModel, setLastAiModel] = useState('');
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [settingsProvider, setSettingsProvider] = useState<AiProvider>('gemini');
+  const [settingsApiKey, setSettingsApiKey] = useState('');
+  const [settingsModel, setSettingsModel] = useState('');
+  const [settingsEnabled, setSettingsEnabled] = useState(true);
+  const [settingsDefault, setSettingsDefault] = useState(false);
 
   const configQuery = useQuery({
     queryKey: ['fiscal-config'],
@@ -146,6 +155,47 @@ export default function ManualFiscal() {
     },
   });
 
+  const selectedSettings = providersQuery.data?.providers.find((provider) => provider.id === settingsProvider);
+
+  useEffect(() => {
+    if (!selectedSettings) return;
+    setSettingsModel(selectedSettings.model);
+    setSettingsEnabled(selectedSettings.enabled);
+    setSettingsDefault(selectedSettings.isDefault);
+    setSettingsApiKey('');
+  }, [settingsProvider, selectedSettings?.model, selectedSettings?.enabled, selectedSettings?.isDefault]);
+
+  const saveAiSettingsMutation = useMutation<
+    Awaited<ReturnType<typeof fiscalApi.saveAiProvider>>,
+    any,
+    boolean
+  >({
+    mutationFn: (clearKey: boolean) => fiscalApi.saveAiProvider(settingsProvider, {
+      apiKey: clearKey ? undefined : settingsApiKey.trim() || undefined,
+      model: settingsModel.trim(),
+      enabled: settingsEnabled,
+      isDefault: settingsDefault,
+      clearKey,
+    }),
+    onSuccess: (data, clearKey) => {
+      queryClient.setQueryData(['fiscal-ai-providers'], data);
+      setSettingsApiKey('');
+      if (clearKey) toast.success('Chave removida');
+      else toast.success('Configuração de IA salva');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Não foi possível salvar a configuração');
+    },
+  });
+
+  const testAiSettingsMutation = useMutation({
+    mutationFn: () => fiscalApi.testAiProvider(settingsProvider),
+    onSuccess: ({ model }) => toast.success(`Conexão realizada com ${model}`),
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Falha ao testar o provedor');
+    },
+  });
+
   const updateItem = (id: string, changes: Partial<ManualItem>) => {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...changes } : item)));
   };
@@ -168,7 +218,7 @@ export default function ManualFiscal() {
 
   const config = configQuery.data;
   const production = config?.environment === 'PRODUCTION';
-  const configuredProviders = providersQuery.data?.providers.filter((provider) => provider.configured) || [];
+  const configuredProviders = providersQuery.data?.providers.filter((provider) => provider.configured && provider.enabled) || [];
   const inputClass = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100';
 
   return (
@@ -198,20 +248,33 @@ export default function ManualFiscal() {
                   <p className="mt-0.5 text-xs text-gray-600">Descreva a venda; a IA monta um rascunho para sua revisão.</p>
                 </div>
               </div>
-              <label className="min-w-44 text-xs font-semibold text-gray-600">
-                Provedor
-                <select
-                  value={aiProvider}
-                  onChange={(event) => setAiProvider(event.target.value as AiProvider)}
-                  className={`${inputClass} mt-1 bg-white`}
-                  disabled={!configuredProviders.length}
+              <div className="flex items-end gap-2">
+                <label className="min-w-44 text-xs font-semibold text-gray-600">
+                  Provedor
+                  <select
+                    value={aiProvider}
+                    onChange={(event) => setAiProvider(event.target.value as AiProvider)}
+                    className={`${inputClass} mt-1 bg-white`}
+                    disabled={!configuredProviders.length}
+                  >
+                    {!configuredProviders.length && <option value="">Nenhum configurado</option>}
+                    {configuredProviders.map((provider) => (
+                      <option key={provider.id} value={provider.id}>{provider.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsProvider((aiProvider || providersQuery.data?.providers[0]?.id || 'gemini') as AiProvider);
+                    setAiSettingsOpen(true);
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-100"
+                  title="Configurar provedores de IA"
                 >
-                  {!configuredProviders.length && <option value="">Nenhum configurado</option>}
-                  {configuredProviders.map((provider) => (
-                    <option key={provider.id} value={provider.id}>{provider.label}</option>
-                  ))}
-                </select>
-              </label>
+                  <Settings2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="p-5">
               <textarea
@@ -227,7 +290,7 @@ export default function ManualFiscal() {
                     ? `Último rascunho: ${lastAiModel}`
                     : configuredProviders.length
                       ? 'A IA não emite a nota; ela apenas preenche os campos.'
-                      : 'Configure uma chave de IA nas variáveis do backend.'}
+                      : 'Configure uma chave de IA no botão de configurações.'}
                 </div>
                 <button
                   type="button"
@@ -384,6 +447,106 @@ export default function ManualFiscal() {
               <button type="button" onClick={() => setConfirmOpen(false)} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Voltar</button>
               <button type="button" onClick={() => issueMutation.mutate()} disabled={issueMutation.isPending} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
                 {issueMutation.isPending ? 'Transmitindo...' : 'Emitir NFC-e'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aiSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-xl bg-white shadow-xl">
+            <div className="flex items-start justify-between border-b border-gray-200 p-5">
+              <div className="flex gap-3">
+                <span className="flex h-9 w-9 items-center justify-center bg-indigo-600 text-white">
+                  <KeyRound className="h-4 w-4" />
+                </span>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-950">Configurar inteligência artificial</h2>
+                  <p className="mt-1 text-sm text-gray-600">As chaves são criptografadas no backend e não voltam para o navegador.</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setAiSettingsOpen(false)} className="rounded p-1 text-gray-500 hover:bg-gray-100" title="Fechar">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <label className="block text-sm font-semibold text-gray-700">
+                Provedor
+                <select value={settingsProvider} onChange={(event) => setSettingsProvider(event.target.value as AiProvider)} className={`${inputClass} mt-1.5`}>
+                  {providersQuery.data?.providers.map((provider) => (
+                    <option key={provider.id} value={provider.id}>{provider.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block text-sm font-semibold text-gray-700">
+                Chave da API
+                <input
+                  type="password"
+                  value={settingsApiKey}
+                  onChange={(event) => setSettingsApiKey(event.target.value)}
+                  className={`${inputClass} mt-1.5`}
+                  placeholder={selectedSettings?.configured ? 'Chave já configurada; digite apenas para substituir' : 'Cole a chave do provedor'}
+                  autoComplete="new-password"
+                  maxLength={1000}
+                />
+              </label>
+
+              <label className="block text-sm font-semibold text-gray-700">
+                Modelo
+                <input value={settingsModel} onChange={(event) => setSettingsModel(event.target.value)} className={`${inputClass} mt-1.5`} maxLength={160} />
+              </label>
+
+              <div className="flex flex-wrap gap-5 border-y border-gray-200 py-4">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <input type="checkbox" checked={settingsEnabled} onChange={(event) => setSettingsEnabled(event.target.checked)} className="h-4 w-4 accent-indigo-600" />
+                  Provedor ativo
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <input type="checkbox" checked={settingsDefault} onChange={(event) => setSettingsDefault(event.target.checked)} className="h-4 w-4 accent-indigo-600" />
+                  Usar como padrão
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 text-xs text-gray-500">
+                <span>
+                  {selectedSettings?.configured
+                    ? `Chave configurada via ${selectedSettings.source === 'database' ? 'ERP' : 'ambiente do servidor'}.`
+                    : 'Nenhuma chave configurada.'}
+                </span>
+                {selectedSettings?.configured && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('Remover a chave salva para este provedor?')) saveAiSettingsMutation.mutate(true);
+                    }}
+                    disabled={saveAiSettingsMutation.isPending}
+                    className="font-semibold text-rose-700 hover:text-rose-800 disabled:opacity-50"
+                  >
+                    Remover chave
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3 border-t border-gray-200 p-5">
+              <button
+                type="button"
+                onClick={() => testAiSettingsMutation.mutate()}
+                disabled={!selectedSettings?.configured || testAiSettingsMutation.isPending}
+                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {testAiSettingsMutation.isPending ? 'Testando...' : 'Testar conexão'}
+              </button>
+              <button
+                type="button"
+                onClick={() => saveAiSettingsMutation.mutate(false)}
+                disabled={!settingsModel.trim() || saveAiSettingsMutation.isPending}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saveAiSettingsMutation.isPending ? 'Salvando...' : 'Salvar configuração'}
               </button>
             </div>
           </div>

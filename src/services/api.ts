@@ -721,16 +721,44 @@ export const fiscalApi = {
       cfop?: string;
     }>;
   }): Promise<FiscalDocument> => (await api.post('/fiscal/manual/issue-nfce', data)).data,
-  getAiProviders: async (): Promise<{
-    providers: Array<{
-      id: 'gemini' | 'groq' | 'openrouter';
-      label: string;
-      model: string;
-      configured: boolean;
-    }>;
-    defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
-  }> => (await api.get('/fiscal/ai/providers')).data,
-  parseManualDraft: async (data: {
+    getAiProviders: async (): Promise<{
+      providers: Array<{
+        id: 'gemini' | 'groq' | 'openrouter';
+        label: string;
+        model: string;
+        configured: boolean;
+        enabled: boolean;
+        isDefault: boolean;
+        source: 'database' | 'environment' | null;
+      }>;
+      defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
+    }> => (await api.get('/fiscal/ai/providers')).data,
+    saveAiProvider: async (
+      provider: 'gemini' | 'groq' | 'openrouter',
+      data: {
+        apiKey?: string;
+        model: string;
+        enabled: boolean;
+        isDefault: boolean;
+        clearKey?: boolean;
+      }
+    ): Promise<{
+      providers: Array<{
+        id: 'gemini' | 'groq' | 'openrouter';
+        label: string;
+        model: string;
+        configured: boolean;
+        enabled: boolean;
+        isDefault: boolean;
+        source: 'database' | 'environment' | null;
+      }>;
+      defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
+    }> => (await api.put(`/fiscal/ai/providers/${provider}`, data)).data,
+    testAiProvider: async (
+      provider: 'gemini' | 'groq' | 'openrouter'
+    ): Promise<{ success: boolean; provider: string; model: string; message: string }> =>
+      (await api.post(`/fiscal/ai/providers/${provider}/test`)).data,
+    parseManualDraft: async (data: {
     provider: 'gemini' | 'groq' | 'openrouter';
     prompt: string;
   }): Promise<{
