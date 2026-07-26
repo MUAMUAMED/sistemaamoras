@@ -140,16 +140,55 @@ router.get('/', authenticateToken, async (req, res, next) => {
     }
 
     if (search) {
+      const searchTerm = String(search).trim();
       where.OR = [
         {
           name: {
-        contains: search as string,
-        mode: 'insensitive',
+            contains: searchTerm,
+            mode: 'insensitive',
           },
         },
         {
           barcode: {
-            contains: search as string,
+            contains: searchTerm,
+          },
+        },
+        {
+          description: {
+            contains: searchTerm,
+            mode: 'insensitive',
+          },
+        },
+        {
+          category: {
+            name: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          subcategory: {
+            name: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          size: {
+            name: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
+          },
+        },
+        {
+          pattern: {
+            name: {
+              contains: searchTerm,
+              mode: 'insensitive',
+            },
           },
         },
       ];

@@ -51,7 +51,7 @@ const environmentProviderConfigs = (): Omit<ProviderConfig, 'enabled' | 'isDefau
     id: 'groq',
     label: 'Groq',
     apiKey: String(process.env.GROQ_API_KEY || '').trim(),
-    model: String(process.env.GROQ_MODEL || 'llama-3.3-70b-versatile').trim(),
+    model: String(process.env.GROQ_MODEL || 'openai/gpt-oss-20b').trim(),
   },
   {
     id: 'openrouter',
@@ -250,32 +250,87 @@ const requestGemini = async (config: ProviderConfig, prompt: string) => {
 
 const requestOpenAiCompatible = async (config: ProviderConfig, prompt: string) => {
   const openRouter = config.id === 'openrouter';
-  const response = await axios.post(
-    openRouter
-      ? 'https://openrouter.ai/api/v1/chat/completions'
-      : 'https://api.groq.com/openai/v1/chat/completions',
-    {
-      model: config.model,
-      temperature: 0,
-      messages: [
-        { role: 'system', content: `${systemPrompt}\nEsquema JSON: ${JSON.stringify(draftSchema)}` },
-        { role: 'user', content: prompt },
-      ],
-      response_format: { type: 'json_object' },
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey}`,
-        ...(openRouter ? {
-          'HTTP-Referer': process.env.OPENROUTER_SITE_URL || process.env.APP_URL || 'https://amorinhass.zeabur.app',
-          'X-Title': 'Amoras Capital ERP',
-        } : {}),
+  const url = openRouter
+    ? 'https://openrouter.ai/api/v1/chat/completions'
+    : 'https://api.groq.com/openai/v1/chat/completions';
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${config.apiKey}`,
+    ...(openRouter ? {
+      'HTTP-Referer': process.env.OPENROUTER_SITE_URL || process.env.APP_URL || 'https://amorinhass.zeabur.app',
+      'X-Title': 'Amoras Capital ERP',
+    } : {}),
+  };
+  const messages = [
+    { role: 'system', content: `${systemPrompt}\nEsquema JSON: ${JSON.stringify(draftSchema)}` },
+    { role: 'user', content: prompt },
+  ];
+  const strictGroqModel = !openRouter && ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'].includes(config.model);
+  const responseFormat = strictGroqModel
+    ? {
+        type: 'json_schema',
+        json_schema: {
+          name: 'manual_fiscal_draft',
+          strict: true,
+          schema: draftSchema,
+        },
+      }
+    : { type: 'json_object' };
+
+  try {
+    const response = await axios.post(
+      url,
+      {
+        model: config.model,
+        temperature: 0,
+        messages,
+        response_format: responseFormat,
       },
-      timeout: 35000,
+      { headers, timeout: 35000 }
+    );
+    return response.data?.choices?.[0]?.message?.content || '';
+  } catch (error: any) {
+    if (openRouter || error?.response?.status !== 400) throw error;
+
+    const failedGeneration = error?.response?.data?.error?.failed_generation
+      || error?.response?.data?.failed_generation;
+    if (failedGeneration && typeof failedGeneration === 'object') {
+      return JSON.stringify(failedGeneration);
     }
-  );
-  return response.data?.choices?.[0]?.message?.content || '';
+    if (typeof failedGeneration === 'string') {
+      try {
+        parseJson(failedGeneration);
+        return failedGeneration;
+      } catch {
+        // A segunda tentativa abaixo remove a validacao JSON feita pela Groq.
+      }
+    }
+
+    const validationMessage = String(
+      error?.response?.data?.error?.message
+      || error?.response?.data?.message
+      || ''
+    ).toLowerCase();
+    if (!validationMessage.includes('json') && !validationMessage.includes('validate')) throw error;
+
+    const retry = await axios.post(
+      url,
+      {
+        model: config.model,
+        temperature: 0,
+        messages: [
+          messages[0],
+          {
+            role: 'system',
+            content: 'Retorne somente o objeto JSON puro, sem markdown, comentarios ou texto antes/depois.',
+          },
+          messages[1],
+        ],
+      },
+      { headers, timeout: 35000 }
+    );
+    return retry.data?.choices?.[0]?.message?.content || '';
+  }
 };
 
 const sanitizeDraft = (raw: any) => {
