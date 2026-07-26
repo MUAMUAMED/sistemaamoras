@@ -141,7 +141,40 @@ router.get('/documents', authenticateToken, async (req, res, next) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-    const where = req.query.status ? { status: String(req.query.status) as any } : {};
+    const search = String(req.query.search || '').trim();
+    const status = String(req.query.status || '').trim();
+    const environment = String(req.query.environment || '').trim();
+    const dateFrom = String(req.query.dateFrom || '').trim();
+    const dateTo = String(req.query.dateTo || '').trim();
+    const numericSearch = /^\d+$/.test(search) ? Number(search) : null;
+    const issuedAt = dateFrom || dateTo ? {
+      ...(dateFrom ? { gte: new Date(`${dateFrom}T00:00:00.000`) } : {}),
+      ...(dateTo ? { lte: new Date(`${dateTo}T23:59:59.999`) } : {}),
+    } : undefined;
+    const where: any = {
+      ...(status ? { status } : {}),
+      ...(environment ? { environment } : {}),
+      ...(issuedAt ? { issuedAt } : {}),
+      ...(search ? {
+        OR: [
+          ...(numericSearch !== null ? [{ number: numericSearch }] : []),
+          { accessKey: { contains: search } },
+          { recipientName: { contains: search, mode: 'insensitive' } },
+          { recipientTaxId: { contains: search } },
+          {
+            sale: {
+              is: {
+                OR: [
+                  { saleNumber: { contains: search, mode: 'insensitive' } },
+                  { leadName: { contains: search, mode: 'insensitive' } },
+                  { customerTaxId: { contains: search } },
+                ],
+              },
+            },
+          },
+        ],
+      } : {}),
+    };
     const [data, total] = await Promise.all([
       prisma.fiscalDocument.findMany({
         where, skip: (page - 1) * limit, take: limit, orderBy: { createdAt: 'desc' },
