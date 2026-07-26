@@ -696,7 +696,15 @@ export const fiscalApi = {
   getConfig: async (): Promise<FiscalConfig | null> => (await api.get('/fiscal/config')).data,
   updateConfig: async (data: Partial<FiscalConfig> & { cscToken?: string; certificatePfxBase64?: string; certificatePassword?: string }): Promise<FiscalConfig> =>
     (await api.put('/fiscal/config', data)).data,
-  listDocuments: async (params?: { page?: number; limit?: number; status?: string }): Promise<PaginatedResponse<FiscalDocument>> =>
+  listDocuments: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    environment?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<PaginatedResponse<FiscalDocument>> =>
     (await api.get('/fiscal/documents', { params })).data,
   issueNfce: async (saleId: string): Promise<FiscalDocument> => (await api.post(`/fiscal/sales/${saleId}/issue-nfce`)).data,
   retry: async (id: string): Promise<FiscalDocument> => (await api.post(`/fiscal/documents/${id}/retry`)).data,

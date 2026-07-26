@@ -19,6 +19,7 @@ import Subcategories from './pages/Subcategories';
 import Patterns from './pages/Patterns';
 import Sizes from './pages/Sizes';
 import Fiscal from './pages/Fiscal';
+import FiscalHistory from './pages/FiscalHistory';
 import DanfeNfce from './pages/DanfeNfce';
 import Pdv from './pages/Pdv';
 import { useAuthStore } from './stores/authStore';
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="/erp/scanner" element={<Scanner />} />
               <Route path="/erp/pdv" element={<Pdv />} />
               <Route path="/erp/fiscal" element={<Fiscal />} />
+              <Route path="/erp/fiscal/history" element={<FiscalHistory />} />
               <Route path="/erp/fiscal/:id/danfe" element={<DanfeNfce />} />
               <Route path="/erp/settings" element={<Settings />} />
             </Route>

@@ -18,7 +18,7 @@ import {
   ScaleIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
-import { MonitorSmartphone } from 'lucide-react';
+import { FileClock, MonitorSmartphone } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 interface LayoutProps {
@@ -36,6 +36,7 @@ const navigationERP = [
   { name: 'PDV', href: '/erp/pdv', icon: MonitorSmartphone },
   { name: 'Scanner', href: '/erp/scanner', icon: QrCodeIcon },
   { name: 'Fiscal', href: '/erp/fiscal', icon: DocumentTextIcon },
+  { name: 'Notas fiscais', href: '/erp/fiscal/history', icon: FileClock },
   { name: 'Configurações', href: '/erp/settings', icon: CogIcon },
 ];
 
