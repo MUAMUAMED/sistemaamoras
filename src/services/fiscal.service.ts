@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { decryptFiscalSecret } from './fiscal-crypto.service';
 import {
@@ -31,6 +31,40 @@ const HOMOLOGATION_RECIPIENT_NAME = 'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - S
 
 const onlyDigits = (value?: string | null) => String(value || '').replace(/\D/g, '');
 const moneyToCents = (value: number | Prisma.Decimal) => Math.round(Number(value) * 100);
+const roundMoney = (value: number) => Math.round(value * 100) / 100;
+
+const MANUAL_PAYMENT_METHODS = new Set<PaymentMethod>([
+  'CASH',
+  'PIX',
+  'CREDIT_CARD',
+  'DEBIT_CARD',
+  'BANK_SLIP',
+  'BANK_TRANSFER',
+]);
+
+export interface ManualNfceItemInput {
+  productCode?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  ncm?: string;
+  cest?: string;
+  cfop?: string;
+  unitOfMeasure?: string;
+  fiscalOrigin?: string;
+  icmsCst?: string;
+  icmsRate?: number | null;
+  pisCst?: string;
+  cofinsCst?: string;
+}
+
+export interface ManualNfceInput {
+  recipientName?: string;
+  recipientTaxId?: string;
+  paymentMethod: PaymentMethod;
+  notes?: string;
+  items: ManualNfceItemInput[];
+}
 
 const paymentType = (method: string) => ({
   CASH: PAYMENT_TYPES.cash,
@@ -279,13 +313,12 @@ export const issueNfceForSale = async (saleId: string) => {
   validateFiscalProducts(sale, settings);
 
   const document = await prisma.$transaction(async (tx) => {
-    const config = await tx.fiscalConfig.findUnique({ where: { id: 'default' } });
-    if (!config) throw new Error('Configuracao fiscal nao encontrada');
-    const number = config.nextNfceNumber;
-    await tx.fiscalConfig.update({
+    const config = await tx.fiscalConfig.update({
       where: { id: 'default' },
       data: { nextNfceNumber: { increment: 1 } },
+      select: { nfceSeries: true, nextNfceNumber: true, environment: true },
     });
+    const number = config.nextNfceNumber - 1;
     return tx.fiscalDocument.create({
       data: {
         saleId: sale.id,
@@ -320,6 +353,148 @@ export const issueNfceForSale = async (saleId: string) => {
       },
     });
   });
+  return transmitFiscalDocument(document.id);
+};
+
+export const issueManualNfce = async (input: ManualNfceInput, adminUserId: string) => {
+  const settings = await loadFiscalSettings();
+  const recipientName = String(input.recipientName || '').trim();
+  const recipientTaxId = onlyDigits(input.recipientTaxId);
+  const notes = String(input.notes || '').trim();
+
+  if (!MANUAL_PAYMENT_METHODS.has(input.paymentMethod)) {
+    throw new Error('Forma de pagamento invalida');
+  }
+  if (recipientTaxId && ![11, 14].includes(recipientTaxId.length)) {
+    throw new Error('CPF/CNPJ do destinatario invalido');
+  }
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new Error('Adicione pelo menos um item para emitir a NFC-e');
+  }
+  if (input.items.length > 50) {
+    throw new Error('A NFC-e avulsa permite no maximo 50 itens');
+  }
+
+  const items = input.items.map((rawItem, index) => {
+    const description = String(rawItem.description || '').trim();
+    const quantity = Number(rawItem.quantity);
+    const unitPrice = Number(rawItem.unitPrice);
+    const ncm = onlyDigits(rawItem.ncm) || settings.defaultNcm;
+    const cest = onlyDigits(rawItem.cest) || null;
+    const cfop = onlyDigits(rawItem.cfop) || settings.defaultCfop;
+    const icmsCst = String(rawItem.icmsCst || settings.defaultIcmsCst || '').trim();
+    const pisCst = String(rawItem.pisCst || settings.defaultPisCst || '').trim();
+    const cofinsCst = String(rawItem.cofinsCst || settings.defaultCofinsCst || '').trim();
+    const unitOfMeasure = String(rawItem.unitOfMeasure || 'UN').trim().toUpperCase();
+    const fiscalOrigin = String(rawItem.fiscalOrigin || '0').trim();
+
+    if (description.length < 2 || description.length > 120) {
+      throw new Error(`Item ${index + 1}: a descricao deve ter entre 2 e 120 caracteres`);
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 9999) {
+      throw new Error(`Item ${index + 1}: quantidade invalida`);
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0 || unitPrice > 9999999.99) {
+      throw new Error(`Item ${index + 1}: preco unitario invalido`);
+    }
+    if (!/^\d{8}$/.test(ncm)) throw new Error(`Item ${index + 1}: NCM invalido`);
+    if (!/^\d{4}$/.test(cfop)) throw new Error(`Item ${index + 1}: CFOP invalido`);
+    if (!icmsCst || !pisCst || !cofinsCst) {
+      throw new Error(`Item ${index + 1}: tributacao incompleta na Central Fiscal`);
+    }
+    if (!/^[A-Z]{1,6}$/.test(unitOfMeasure)) {
+      throw new Error(`Item ${index + 1}: unidade de medida invalida`);
+    }
+
+    const totalPrice = roundMoney(quantity * unitPrice);
+    return {
+      productCode: String(rawItem.productCode || `AVULSO${index + 1}`)
+        .trim()
+        .replace(/[^A-Za-z0-9._-]/g, '')
+        .slice(0, 60) || `AVULSO${index + 1}`,
+      description,
+      quantity,
+      unitPrice: roundMoney(unitPrice),
+      totalPrice,
+      ncm,
+      cest,
+      cfop,
+      unitOfMeasure,
+      fiscalOrigin,
+      icmsCst,
+      icmsRate: rawItem.icmsRate == null ? null : Number(rawItem.icmsRate),
+      pisCst,
+      cofinsCst,
+    };
+  });
+
+  const total = roundMoney(items.reduce((sum, item) => sum + item.totalPrice, 0));
+  if (total <= 0) throw new Error('O valor total da NFC-e deve ser maior que zero');
+
+  const document = await prisma.$transaction(async (tx) => {
+    const config = await tx.fiscalConfig.update({
+      where: { id: 'default' },
+      data: { nextNfceNumber: { increment: 1 } },
+      select: { nfceSeries: true, nextNfceNumber: true, environment: true },
+    });
+    const number = config.nextNfceNumber - 1;
+    const saleNumber = `FA${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+    const sale = await tx.sale.create({
+      data: {
+        saleNumber,
+        leadName: recipientName || null,
+        customerTaxId: recipientTaxId || null,
+        sellerId: adminUserId,
+        subtotal: total,
+        discount: 0,
+        total,
+        status: 'PAID',
+        paymentMethod: input.paymentMethod,
+        notes: `[FISCAL_AVULSA]${notes ? ` ${notes}` : ''}`,
+        paidAt: new Date(),
+      },
+    });
+
+    return tx.fiscalDocument.create({
+      data: {
+        saleId: sale.id,
+        model: 65,
+        series: config.nfceSeries,
+        number,
+        environment: config.environment,
+        operationNature: 'VENDA',
+        recipientTaxId: recipientTaxId || null,
+        recipientName: recipientName || null,
+        totalAmount: new Prisma.Decimal(total),
+        paymentSnapshot: {
+          method: input.paymentMethod,
+          total,
+          source: 'MANUAL_ADMIN',
+          issuedBy: adminUserId,
+        },
+        items: {
+          create: items.map((item, index) => ({
+            itemNumber: index + 1,
+            productCode: item.productCode,
+            description: item.description,
+            ncm: item.ncm,
+            cest: item.cest,
+            cfop: item.cfop,
+            unitOfMeasure: item.unitOfMeasure,
+            quantity: new Prisma.Decimal(item.quantity),
+            unitPrice: new Prisma.Decimal(item.unitPrice),
+            totalPrice: new Prisma.Decimal(item.totalPrice),
+            fiscalOrigin: item.fiscalOrigin,
+            icmsCst: item.icmsCst,
+            icmsRate: item.icmsRate == null ? null : new Prisma.Decimal(item.icmsRate),
+            pisCst: item.pisCst,
+            cofinsCst: item.cofinsCst,
+          })),
+        },
+      },
+    });
+  });
+
   return transmitFiscalDocument(document.id);
 };
 

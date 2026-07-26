@@ -6,6 +6,7 @@ import {
   cancelFiscalDocument,
   checkSefaz,
   getPublicFiscalConfig,
+  issueManualNfce,
   issueNfceForSale,
   transmitFiscalDocument,
 } from '../services/fiscal.service';
@@ -299,6 +300,15 @@ router.get('/documents/:id/xml', authenticateToken, async (req, res, next) => {
 router.post('/sales/:saleId/issue-nfce', authenticateToken, async (req, res, next) => {
   try {
     return res.status(201).json(await issueNfceForSale(req.params.saleId));
+  } catch (error) {
+    return errorResponse(res, next, error);
+  }
+});
+
+router.post('/manual/issue-nfce', authenticateToken, authorizeRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Usuario nao autenticado' });
+    return res.status(201).json(await issueManualNfce(req.body, req.user.id));
   } catch (error) {
     return errorResponse(res, next, error);
   }
