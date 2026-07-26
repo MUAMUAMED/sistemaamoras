@@ -282,7 +282,9 @@ app.use("/uploads", (req: express.Request, res: express.Response, next: express.
   setHeaders: (res: express.Response, filePath: string) => {
     // Adicionar cache headers para imagens
     if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.png') || filePath.endsWith('.gif') || filePath.endsWith('.webp')) {
-      res.setHeader('Cache-Control', 'public, max-age=86400');
+      // Os uploads recebem nomes únicos. Uma nova foto gera uma nova URL,
+      // então a versão anterior pode permanecer no cache por longo prazo.
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     }
   }
 }));
@@ -339,7 +341,7 @@ app.get('/uploads/products/:filename', async (req: express.Request, res: express
       const imageBuffer = Buffer.from(databaseImage.data);
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       res.setHeader('Content-Type', databaseImage.mimeType || 'application/octet-stream');
       res.setHeader('Content-Length', String(databaseImage.size || imageBuffer.length));
       res.send(imageBuffer);
