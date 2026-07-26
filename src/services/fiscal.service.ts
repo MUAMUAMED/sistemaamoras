@@ -138,6 +138,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     method: paymentType(sale.paymentMethod),
     amount: moneyToCents(document.totalAmount),
   }];
+  const isCardPayment = ['CREDIT_CARD', 'DEBIT_CARD'].includes(sale.paymentMethod);
 
   return {
     model: 65,
@@ -177,6 +178,9 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     } : undefined,
     items,
     payments,
+    // O PDV registra a venda após confirmação manual na maquininha.
+    // Para tPag 03/04, a SEFAZ exige o grupo card com tpIntegra.
+    paymentCardDetails: isCardPayment ? [{ integType: '2' }] : undefined,
   };
 };
 
