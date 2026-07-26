@@ -135,7 +135,7 @@ export default function DanfeNfce() {
           </div>
           {document.items.map((item) => (
             <div key={item.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 border-t border-gray-300 py-1 text-[9px] leading-3">
-              <span><strong>{item.productCode}</strong> {item.description}<small className="block">NCM {item.ncm} CFOP {item.cfop}</small></span>
+              <span><strong>{item.productCode}</strong> {item.description}</span>
               <span>{Number(item.quantity).toLocaleString('pt-BR')}</span>
               <span>{money(item.unitPrice)}</span>
               <span className="font-semibold">{money(item.totalPrice)}</span>
