@@ -448,6 +448,7 @@ export interface ProductFilters {
   minStock?: number;
   maxStock?: number;
   active?: boolean;
+  isDraft?: boolean;
   page?: number;
   limit?: number;
 }

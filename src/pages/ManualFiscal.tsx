@@ -8,15 +8,18 @@ import {
   FileCheck2,
   KeyRound,
   Loader2,
+  PackagePlus,
   Plus,
   ReceiptText,
+  Search,
   Settings2,
   Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { fiscalApi } from '../services/api';
+import { fiscalApi, productsApi } from '../services/api';
+import type { Product } from '../types';
 
 type PaymentMethod = 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
 type AiProvider = 'gemini' | 'groq' | 'openrouter';
@@ -74,6 +77,8 @@ export default function ManualFiscal() {
   const [settingsModel, setSettingsModel] = useState('');
   const [settingsEnabled, setSettingsEnabled] = useState(true);
   const [settingsDefault, setSettingsDefault] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('');
 
   const configQuery = useQuery({
     queryKey: ['fiscal-config'],
@@ -83,12 +88,30 @@ export default function ManualFiscal() {
     queryKey: ['fiscal-ai-providers'],
     queryFn: fiscalApi.getAiProviders,
   });
+  const productsQuery = useQuery({
+    queryKey: ['manual-fiscal-products', debouncedProductSearch],
+    queryFn: () => productsApi.list({
+      search: debouncedProductSearch,
+      isDraft: false,
+      page: 1,
+      limit: 8,
+    }),
+    enabled: debouncedProductSearch.length >= 2,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     if (!aiProvider && providersQuery.data?.defaultProvider) {
       setAiProvider(providersQuery.data.defaultProvider);
     }
   }, [aiProvider, providersQuery.data?.defaultProvider]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedProductSearch(productSearch.trim());
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [productSearch]);
 
   const total = useMemo(
     () => items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
@@ -203,6 +226,30 @@ export default function ManualFiscal() {
   const removeItem = (id: string) => {
     if (items.length === 1) return toast.error('A nota precisa ter pelo menos um item');
     setItems((current) => current.filter((item) => item.id !== id));
+  };
+
+  const addProductToDocument = (product: Product) => {
+    const fiscalItem: ManualItem = {
+      id: crypto.randomUUID(),
+      productCode: product.barcode || product.id,
+      description: product.name,
+      quantity: 1,
+      unitPrice: Number(product.price) || 0,
+      ncm: product.ncm || '',
+      cfop: product.cfop || '',
+      advanced: Boolean(product.ncm || product.cfop),
+    };
+
+    setItems((current) => {
+      const emptyIndex = current.findIndex((item) =>
+        !item.description.trim() && !item.productCode.trim() && Number(item.unitPrice) === 0
+      );
+      if (emptyIndex < 0) return [...current, fiscalItem];
+      return current.map((item, index) => (index === emptyIndex ? fiscalItem : item));
+    });
+    setProductSearch('');
+    setDebouncedProductSearch('');
+    toast.success(`${product.name} adicionado à nota`);
   };
 
   const requestConfirmation = (event: React.FormEvent) => {
@@ -345,6 +392,52 @@ export default function ManualFiscal() {
               <button type="button" onClick={() => setItems((current) => [...current, newItem()])} className="inline-flex items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
                 <Plus className="h-4 w-4" /> Adicionar item
               </button>
+            </div>
+
+            <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
+              <label className="text-xs font-bold uppercase text-gray-600">Buscar produto no ERP</label>
+              <div className="relative mt-2">
+                <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <input
+                  value={productSearch}
+                  onChange={(event) => setProductSearch(event.target.value)}
+                  className={`${inputClass} pl-9`}
+                  placeholder="Nome, código, categoria, tamanho ou estampa"
+                  autoComplete="off"
+                />
+              </div>
+
+              {debouncedProductSearch.length >= 2 && (
+                <div className="mt-2 max-h-72 divide-y divide-gray-200 overflow-y-auto border border-gray-200 bg-white">
+                  {productsQuery.isLoading && (
+                    <div className="flex items-center gap-2 px-4 py-3 text-sm text-gray-600">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Buscando produtos...
+                    </div>
+                  )}
+                  {!productsQuery.isLoading && productsQuery.data?.data.length === 0 && (
+                    <p className="px-4 py-3 text-sm text-gray-600">Nenhum produto encontrado.</p>
+                  )}
+                  {productsQuery.data?.data.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => addProductToDocument(product)}
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-indigo-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-gray-950">{product.name}</span>
+                        <span className="mt-0.5 block truncate text-xs text-gray-500">
+                          {product.barcode || 'Sem código'} · {product.size?.name || 'Sem tamanho'} · estoque {product.stock}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-3">
+                        <strong className="text-sm text-gray-950">{money(Number(product.price) || 0)}</strong>
+                        <PackagePlus className="h-4 w-4 text-indigo-700" />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="divide-y divide-gray-200">
