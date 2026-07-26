@@ -975,7 +975,12 @@ const Products: React.FC = () => {
                               <img
                                 src={getImageUrl(product.imageUrl)}
                                 alt={product.name || 'Produto sem nome'}
-                                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                                loading="eager"
+                                decoding="async"
+                                className="w-full h-full object-contain opacity-0 group-hover:scale-105 transition-[opacity,transform] duration-200"
+                                onLoad={(e) => {
+                                  e.currentTarget.classList.remove('opacity-0');
+                                }}
                                 onError={(e) => {
                                   const imageUrl = product.imageUrl;
                                   const finalUrl = imageUrl ? getImageUrl(imageUrl) : '';
@@ -992,7 +997,12 @@ const Products: React.FC = () => {
                               <img
                                 src={getImageUrl(product.images[0]?.url)}
                                 alt={product.name || 'Produto sem nome'}
-                                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+                                loading="eager"
+                                decoding="async"
+                                className="w-full h-full object-contain opacity-0 group-hover:scale-105 transition-[opacity,transform] duration-200"
+                                onLoad={(e) => {
+                                  e.currentTarget.classList.remove('opacity-0');
+                                }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
                                   e.currentTarget.nextElementSibling?.classList.remove('hidden');
