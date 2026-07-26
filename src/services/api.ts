@@ -721,6 +721,37 @@ export const fiscalApi = {
       cfop?: string;
     }>;
   }): Promise<FiscalDocument> => (await api.post('/fiscal/manual/issue-nfce', data)).data,
+  getAiProviders: async (): Promise<{
+    providers: Array<{
+      id: 'gemini' | 'groq' | 'openrouter';
+      label: string;
+      model: string;
+      configured: boolean;
+    }>;
+    defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
+  }> => (await api.get('/fiscal/ai/providers')).data,
+  parseManualDraft: async (data: {
+    provider: 'gemini' | 'groq' | 'openrouter';
+    prompt: string;
+  }): Promise<{
+    provider: 'gemini' | 'groq' | 'openrouter';
+    model: string;
+    warnings: string[];
+    draft: {
+      recipientName: string;
+      recipientTaxId: string;
+      paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+      notes: string;
+      items: Array<{
+        productCode: string;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        ncm: string;
+        cfop: string;
+      }>;
+    };
+  }> => (await api.post('/fiscal/ai/parse-draft', data)).data,
   retry: async (id: string): Promise<FiscalDocument> => (await api.post(`/fiscal/documents/${id}/retry`)).data,
   cancel: async (id: string, reason: string) => (await api.post(`/fiscal/documents/${id}/cancel`, { reason })).data,
   checkStatus: async () => (await api.get('/fiscal/status')).data,

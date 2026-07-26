@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -6,8 +6,10 @@ import {
   ChevronDown,
   ChevronUp,
   FileCheck2,
+  Loader2,
   Plus,
   ReceiptText,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -15,6 +17,7 @@ import toast from 'react-hot-toast';
 import { fiscalApi } from '../services/api';
 
 type PaymentMethod = 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+type AiProvider = 'gemini' | 'groq' | 'openrouter';
 
 interface ManualItem {
   id: string;
@@ -58,11 +61,25 @@ export default function ManualFiscal() {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<ManualItem[]>([newItem()]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiProvider, setAiProvider] = useState<AiProvider | ''>('');
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+  const [lastAiModel, setLastAiModel] = useState('');
 
   const configQuery = useQuery({
     queryKey: ['fiscal-config'],
     queryFn: fiscalApi.getConfig,
   });
+  const providersQuery = useQuery({
+    queryKey: ['fiscal-ai-providers'],
+    queryFn: fiscalApi.getAiProviders,
+  });
+
+  useEffect(() => {
+    if (!aiProvider && providersQuery.data?.defaultProvider) {
+      setAiProvider(providersQuery.data.defaultProvider);
+    }
+  }, [aiProvider, providersQuery.data?.defaultProvider]);
 
   const total = useMemo(
     () => items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
@@ -100,6 +117,35 @@ export default function ManualFiscal() {
     },
   });
 
+  const aiMutation = useMutation({
+    mutationFn: () => fiscalApi.parseManualDraft({
+      provider: aiProvider as AiProvider,
+      prompt: aiPrompt.trim(),
+    }),
+    onSuccess: ({ draft, warnings, model }) => {
+      setRecipientName(draft.recipientName);
+      setRecipientTaxId(draft.recipientTaxId);
+      setPaymentMethod(draft.paymentMethod);
+      setNotes(draft.notes);
+      setItems(draft.items.map((item) => ({
+        id: crypto.randomUUID(),
+        productCode: item.productCode,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        ncm: item.ncm,
+        cfop: item.cfop,
+        advanced: Boolean(item.ncm || item.cfop),
+      })));
+      setAiWarnings(warnings);
+      setLastAiModel(model);
+      toast.success('Rascunho preenchido pela IA. Revise antes de emitir.');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Não foi possível interpretar a venda');
+    },
+  });
+
   const updateItem = (id: string, changes: Partial<ManualItem>) => {
     setItems((current) => current.map((item) => (item.id === id ? { ...item, ...changes } : item)));
   };
@@ -122,6 +168,7 @@ export default function ManualFiscal() {
 
   const config = configQuery.data;
   const production = config?.environment === 'PRODUCTION';
+  const configuredProviders = providersQuery.data?.providers.filter((provider) => provider.configured) || [];
   const inputClass = 'w-full rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100';
 
   return (
@@ -140,6 +187,69 @@ export default function ManualFiscal() {
 
       <form onSubmit={requestConfirmation} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
+          <section className="border border-indigo-200 bg-white">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-indigo-100 bg-indigo-50 px-5 py-4">
+              <div className="flex gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-indigo-600 text-white">
+                  <Sparkles className="h-5 w-5" />
+                </span>
+                <div>
+                  <h2 className="font-semibold text-gray-950">Preencher com IA</h2>
+                  <p className="mt-0.5 text-xs text-gray-600">Descreva a venda; a IA monta um rascunho para sua revisão.</p>
+                </div>
+              </div>
+              <label className="min-w-44 text-xs font-semibold text-gray-600">
+                Provedor
+                <select
+                  value={aiProvider}
+                  onChange={(event) => setAiProvider(event.target.value as AiProvider)}
+                  className={`${inputClass} mt-1 bg-white`}
+                  disabled={!configuredProviders.length}
+                >
+                  {!configuredProviders.length && <option value="">Nenhum configurado</option>}
+                  {configuredProviders.map((provider) => (
+                    <option key={provider.id} value={provider.id}>{provider.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="p-5">
+              <textarea
+                value={aiPrompt}
+                onChange={(event) => setAiPrompt(event.target.value)}
+                className={`${inputClass} min-h-28 resize-y`}
+                maxLength={5000}
+                placeholder="Ex.: Venda para Maria, CPF 000.000.000-00, 2 vestidos envelope a R$ 179,90 cada, pagamento no Pix."
+              />
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs text-gray-500">
+                  {lastAiModel
+                    ? `Último rascunho: ${lastAiModel}`
+                    : configuredProviders.length
+                      ? 'A IA não emite a nota; ela apenas preenche os campos.'
+                      : 'Configure uma chave de IA nas variáveis do backend.'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => aiMutation.mutate()}
+                  disabled={!aiProvider || aiPrompt.trim().length < 5 || aiMutation.isPending}
+                  className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {aiMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {aiMutation.isPending ? 'Interpretando...' : 'Preencher formulário'}
+                </button>
+              </div>
+              {aiWarnings.length > 0 && (
+                <div className="mt-4 border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs font-bold uppercase text-amber-800">Revise estes pontos</p>
+                  <ul className="mt-2 space-y-1 text-sm text-amber-900">
+                    {aiWarnings.map((warning) => <li key={warning}>• {warning}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </section>
+
           <section className="border border-gray-200 bg-white p-5">
             <div className="mb-4 flex items-center gap-2">
               <ReceiptText className="h-5 w-5 text-indigo-700" />
