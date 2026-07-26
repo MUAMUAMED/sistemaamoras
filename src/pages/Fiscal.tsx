@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { fiscalApi } from '../services/api';
 import { FiscalConfig, FiscalDocument } from '../types';
+import { getFiscalFileName } from '../utils/fiscalFileName';
 
 const emptyConfig: FiscalConfig = {
   active: false, companyName: 'Amoras Capital', tradeName: 'Amoras Capital', taxId: '', stateTaxId: '', taxRegime: 1,
@@ -59,7 +60,7 @@ export default function Fiscal() {
       const url = URL.createObjectURL(blob);
       const anchor = window.document.createElement('a');
       anchor.href = url;
-      anchor.download = `nfce-${document.series}-${document.number}.xml`;
+      anchor.download = `${getFiscalFileName(document.sale?.leadName)}.xml`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error: any) {

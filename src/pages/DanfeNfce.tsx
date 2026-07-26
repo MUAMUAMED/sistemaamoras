@@ -5,6 +5,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 import { fiscalApi } from '../services/api';
+import { getFiscalFileName } from '../utils/fiscalFileName';
 
 const money = (value: number | string) =>
   Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -48,6 +49,7 @@ export default function DanfeNfce() {
   }, [document?.qrCodeUrl]);
 
   const print = (format: '80mm' | 'a4') => {
+    if (!document) return;
     const style = window.document.createElement('style');
     style.id = 'danfe-print-size';
     style.textContent = format === '80mm'
@@ -56,7 +58,13 @@ export default function DanfeNfce() {
     window.document.getElementById(style.id)?.remove();
     window.document.head.appendChild(style);
     window.document.body.dataset.danfeFormat = format;
-    window.print();
+    const previousTitle = window.document.title;
+    window.document.title = getFiscalFileName(document.recipientName || document.sale.leadName);
+    try {
+      window.print();
+    } finally {
+      window.document.title = previousTitle;
+    }
   };
 
   const downloadXml = async () => {
@@ -66,7 +74,7 @@ export default function DanfeNfce() {
       const url = URL.createObjectURL(blob);
       const anchor = window.document.createElement('a');
       anchor.href = url;
-      anchor.download = `nfce-${document.series}-${document.number}.xml`;
+      anchor.download = `${getFiscalFileName(document.recipientName || document.sale.leadName)}.xml`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error: any) {

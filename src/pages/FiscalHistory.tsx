@@ -15,6 +15,7 @@ import {
 import toast from 'react-hot-toast';
 import { fiscalApi } from '../services/api';
 import { FiscalDocument, FiscalDocumentStatus } from '../types';
+import { getFiscalFileName } from '../utils/fiscalFileName';
 
 const statusOptions: Array<{ value: string; label: string }> = [
   { value: '', label: 'Todos os status' },
@@ -103,7 +104,7 @@ export default function FiscalHistory() {
       const url = URL.createObjectURL(blob);
       const anchor = window.document.createElement('a');
       anchor.href = url;
-      anchor.download = `nfce-${document.series}-${document.number}.xml`;
+      anchor.download = `${getFiscalFileName(document.sale?.leadName)}.xml`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error: any) {
