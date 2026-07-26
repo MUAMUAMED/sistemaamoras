@@ -1,7 +1,13 @@
 import { Router, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '../config/database';
 import { authenticateToken, authorizeRoles, AuthenticatedRequest } from '../middleware/auth';
 import { encryptFiscalSecret } from '../services/fiscal-crypto.service';
+import {
+  FiscalAiProvider,
+  getFiscalAiProviders,
+  parseManualFiscalDraft,
+} from '../services/fiscal-ai.service';
 import {
   cancelFiscalDocument,
   checkSefaz,
@@ -14,6 +20,16 @@ import { getCertificateInfo } from '../vendor/finopenpos-fiscal';
 
 const router = Router();
 const fiscalManagers = [authenticateToken, authorizeRoles('ADMIN', 'MANAGER')];
+const fiscalAiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Limite temporario de IA atingido',
+    message: 'Aguarde alguns minutos antes de interpretar outro rascunho.',
+  },
+});
 const digits = (value: unknown) => String(value || '').replace(/\D/g, '');
 const decodeXmlText = (value: string) => value
   .replace(/^<!\[CDATA\[|\]\]>$/g, '')
@@ -309,6 +325,21 @@ router.post('/manual/issue-nfce', authenticateToken, authorizeRoles('ADMIN'), as
   try {
     if (!req.user) return res.status(401).json({ error: 'Usuario nao autenticado' });
     return res.status(201).json(await issueManualNfce(req.body, req.user.id));
+  } catch (error) {
+    return errorResponse(res, next, error);
+  }
+});
+
+router.get('/ai/providers', authenticateToken, authorizeRoles('ADMIN'), (_req, res) => {
+  return res.json(getFiscalAiProviders());
+});
+
+router.post('/ai/parse-draft', authenticateToken, authorizeRoles('ADMIN'), fiscalAiLimiter, async (req, res, next) => {
+  try {
+    return res.json(await parseManualFiscalDraft(
+      String(req.body?.provider || '').toLowerCase() as FiscalAiProvider,
+      req.body?.prompt
+    ));
   } catch (error) {
     return errorResponse(res, next, error);
   }
