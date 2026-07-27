@@ -137,7 +137,7 @@ export default function ManualFiscal() {
       setConfirmOpen(false);
       if (document.status === 'AUTHORIZED') {
         toast.success('NFC-e autorizada');
-        navigate(`/erp/fiscal/${document.id}/danfe`, { state: { fromManualFiscal: true } });
+        navigate(`/erp/fiscal/${document.id}/danfe`, { state: { fromManualFiscal: true, shareFiscal: true } });
         return;
       }
       toast.error(document.statusMessage || `A SEFAZ retornou o status ${document.status}`);

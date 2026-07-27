@@ -8,6 +8,7 @@ import {
   Eye,
   FileClock,
   Loader2,
+  MessageCircle,
   RefreshCw,
   RotateCw,
   Search,
@@ -382,6 +383,13 @@ function DocumentActions({
             className="grid h-9 w-9 place-items-center border border-gray-300 text-indigo-700 hover:bg-indigo-50"
           >
             <Eye className="h-4 w-4" />
+          </Link>
+          <Link
+            to={`/erp/fiscal/${document.id}/danfe?share=1`}
+            title="Enviar pelo WhatsApp ou compartilhar"
+            className="grid h-9 w-9 place-items-center border border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+          >
+            <MessageCircle className="h-4 w-4" />
           </Link>
           <button
             type="button"

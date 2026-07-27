@@ -168,7 +168,7 @@ export default function Pdv() {
             toast.success(`NFC-e ${document.series}/${document.number} autorizada`);
             resetSale();
             navigate(`/erp/fiscal/${document.id}/danfe`, {
-              state: { fromPdv: true, pdvPath: '/erp/pdv' },
+              state: { fromPdv: true, pdvPath: '/erp/pdv', shareFiscal: true },
             });
             return;
           }

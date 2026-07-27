@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowDownTrayIcon, ArrowLeftIcon, DocumentTextIcon, PrinterIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useParams } from 'react-router-dom';
+import { Download, Loader2, MessageCircle, Share2, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 import { fiscalApi } from '../services/api';
 import { getFiscalFileName } from '../utils/fiscalFileName';
+import { createFiscalPdfFile, downloadFile } from '../utils/fiscalPdf';
 
 const money = (value: number | string) =>
   Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -31,6 +33,11 @@ export default function DanfeNfce() {
   const { id = '' } = useParams();
   const location = useLocation();
   const [qrCode, setQrCode] = useState('');
+  const [shareOpen, setShareOpen] = useState(
+    () => Boolean(location.state?.shareFiscal || new URLSearchParams(location.search).get('share') === '1')
+  );
+  const [phone, setPhone] = useState('');
+  const [sharing, setSharing] = useState<'pdf' | 'native' | 'whatsapp' | null>(null);
   const query = useQuery({
     queryKey: ['fiscal-danfe', id],
     queryFn: () => fiscalApi.getDanfe(id),
@@ -82,6 +89,79 @@ export default function DanfeNfce() {
     }
   };
 
+  const createPdf = async () => {
+    if (!document) throw new Error('Documento fiscal indisponivel');
+    const element = window.document.getElementById('danfe-document');
+    if (!element) throw new Error('DANFE ainda nao esta pronta');
+    return createFiscalPdfFile(
+      element,
+      getFiscalFileName(document.recipientName || document.sale.leadName)
+    );
+  };
+
+  const downloadPdf = async () => {
+    try {
+      setSharing('pdf');
+      downloadFile(await createPdf());
+      toast.success('PDF da nota fiscal baixado');
+    } catch (error: any) {
+      toast.error(error.message || 'Nao foi possivel gerar o PDF');
+    } finally {
+      setSharing(null);
+    }
+  };
+
+  const shareNative = async () => {
+    try {
+      setSharing('native');
+      const file = await createPdf();
+      const shareData = {
+        title: `NFC-e ${document?.series}/${document?.number}`,
+        text: `Nota fiscal da Amoras Capital - NFC-e ${document?.series}/${document?.number}`,
+        files: [file],
+      };
+
+      if (!navigator.share || (navigator.canShare && !navigator.canShare({ files: [file] }))) {
+        downloadFile(file);
+        toast('O compartilhamento de arquivos nao e suportado neste navegador. O PDF foi baixado.');
+        return;
+      }
+      await navigator.share(shareData);
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') toast.error(error.message || 'Nao foi possivel compartilhar a nota');
+    } finally {
+      setSharing(null);
+    }
+  };
+
+  const openWhatsApp = async () => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    if (![12, 13].includes(fullPhone.length)) {
+      toast.error('Digite um numero valido com DDD');
+      return;
+    }
+
+    const popup = window.open('about:blank', '_blank');
+    try {
+      setSharing('whatsapp');
+      downloadFile(await createPdf());
+      const message = [
+        `Ola! Segue a NFC-e ${document?.series}/${document?.number} da Amoras Capital.`,
+        document?.qrCodeUrl ? `Consulta oficial: ${document.qrCodeUrl}` : '',
+        'O PDF foi baixado neste dispositivo para ser anexado na conversa.',
+      ].filter(Boolean).join('\n\n');
+      const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+      if (popup) popup.location.href = url;
+      else window.location.href = url;
+    } catch (error: any) {
+      popup?.close();
+      toast.error(error.message || 'Nao foi possivel abrir o WhatsApp');
+    } finally {
+      setSharing(null);
+    }
+  };
+
   if (query.isLoading) {
     return <div className="py-20 text-center text-gray-500">Carregando documento fiscal...</div>;
   }
@@ -114,6 +194,9 @@ export default function DanfeNfce() {
           <button onClick={downloadXml} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50">
             <ArrowDownTrayIcon className="h-5 w-5" /> Baixar XML
           </button>
+          <button onClick={() => setShareOpen((current) => !current)} className="inline-flex items-center gap-2 rounded-md border border-emerald-700 bg-white px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-50">
+            <Share2 className="h-5 w-5" /> Enviar / compartilhar
+          </button>
           <button onClick={() => print('a4')} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50">
             <PrinterIcon className="h-5 w-5" /> Imprimir A4
           </button>
@@ -123,7 +206,51 @@ export default function DanfeNfce() {
         </div>
       </div>
 
-      <main className="danfe-print-root mx-auto bg-white text-black">
+      {shareOpen && (
+        <section className="danfe-no-print mx-auto mb-5 max-w-3xl border border-emerald-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-gray-950">Enviar nota fiscal</h2>
+              <p className="mt-1 text-sm text-gray-600">Compartilhe o PDF pelo celular ou abra uma conversa pelo numero informado.</p>
+            </div>
+            <button type="button" title="Fechar" onClick={() => setShareOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center text-gray-500 hover:bg-gray-100">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+            <label>
+              <span className="mb-1 block text-sm font-semibold text-gray-700">WhatsApp com DDD</span>
+              <input
+                type="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="(61) 99999-9999"
+                className="h-11 w-full border border-gray-300 px-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+              />
+            </label>
+            <button type="button" disabled={Boolean(sharing)} onClick={openWhatsApp} className="mt-auto inline-flex h-11 items-center justify-center gap-2 bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+              {sharing === 'whatsapp' ? <Loader2 className="h-5 w-5 animate-spin" /> : <MessageCircle className="h-5 w-5" />}
+              Baixar PDF e abrir WhatsApp
+            </button>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button type="button" disabled={Boolean(sharing)} onClick={shareNative} className="inline-flex h-11 flex-1 items-center justify-center gap-2 border border-emerald-700 px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
+              {sharing === 'native' ? <Loader2 className="h-5 w-5 animate-spin" /> : <Share2 className="h-5 w-5" />}
+              Compartilhar arquivo
+            </button>
+            <button type="button" disabled={Boolean(sharing)} onClick={downloadPdf} className="inline-flex h-11 items-center justify-center gap-2 border border-gray-300 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {sharing === 'pdf' ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
+              Baixar PDF
+            </button>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-gray-500">No Android e iPhone, “Compartilhar arquivo” abre o menu do sistema com o PDF anexado. No computador, o PDF e baixado antes de abrir a conversa para voce anexa-lo.</p>
+        </section>
+      )}
+
+      <main id="danfe-document" className="danfe-print-root mx-auto bg-white text-black">
         <header className="border-b border-dashed border-black pb-2 text-center">
           <h1 className="text-base font-bold uppercase">{document.issuer.tradeName || document.issuer.companyName}</h1>
           <p className="text-[11px] font-medium">{document.issuer.companyName}</p>

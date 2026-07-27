@@ -70,7 +70,7 @@ export default function Scanner() {
             toast.error(document.statusMessage || `NFC-e nao autorizada: ${document.status}`);
           } else {
             toast.success(`NFC-e ${document.series}/${document.number} autorizada`);
-            navigate(`/erp/fiscal/${document.id}/danfe`, { state: { fromPdv: true } });
+            navigate(`/erp/fiscal/${document.id}/danfe`, { state: { fromPdv: true, shareFiscal: true } });
           }
         } catch (error: any) {
           toast.error(error.response?.data?.message || 'Venda salva, mas a NFC-e nao foi emitida');
