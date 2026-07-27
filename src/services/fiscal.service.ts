@@ -376,6 +376,7 @@ export const issueManualNfce = async (input: ManualNfceInput, adminUserId: strin
   }
 
   const items = input.items.map((rawItem, index) => {
+    const fallbackProductCode = `ITEM${String(index + 1).padStart(3, '0')}`;
     const description = String(rawItem.description || '').trim();
     const quantity = Number(rawItem.quantity);
     const unitPrice = Number(rawItem.unitPrice);
@@ -408,10 +409,10 @@ export const issueManualNfce = async (input: ManualNfceInput, adminUserId: strin
 
     const totalPrice = roundMoney(quantity * unitPrice);
     return {
-      productCode: String(rawItem.productCode || `AVULSO${index + 1}`)
+      productCode: String(rawItem.productCode || fallbackProductCode)
         .trim()
         .replace(/[^A-Za-z0-9._-]/g, '')
-        .slice(0, 60) || `AVULSO${index + 1}`,
+        .slice(0, 60) || fallbackProductCode,
       description,
       quantity,
       unitPrice: roundMoney(unitPrice),
@@ -450,7 +451,7 @@ export const issueManualNfce = async (input: ManualNfceInput, adminUserId: strin
         total,
         status: 'PAID',
         paymentMethod: input.paymentMethod,
-        notes: `[FISCAL_AVULSA]${notes ? ` ${notes}` : ''}`,
+        notes: `[FISCAL_MANUAL]${notes ? ` ${notes}` : ''}`,
         paidAt: new Date(),
       },
     });
