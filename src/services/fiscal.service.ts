@@ -30,6 +30,10 @@ const DF_NFCE_QRCODE_URL = 'http://www.fazenda.df.gov.br/nfce/qrcode';
 const HOMOLOGATION_RECIPIENT_NAME = 'NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL';
 
 const onlyDigits = (value?: string | null) => String(value || '').replace(/\D/g, '');
+const fiscalText = (value?: string | null, maxLength = 60) => String(value || '')
+  .trim()
+  .replace(/\s+/g, ' ')
+  .slice(0, maxLength);
 const moneyToCents = (value: number | Prisma.Decimal) => Math.round(Number(value) * 100);
 const roundMoney = (value: number) => Math.round(value * 100) / 100;
 
@@ -208,7 +212,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
       taxId: onlyDigits(document.recipientTaxId),
       name: settings.environment === 2
         ? HOMOLOGATION_RECIPIENT_NAME
-        : document.recipientName || 'CONSUMIDOR',
+        : fiscalText(document.recipientName || 'CONSUMIDOR'),
     } : undefined,
     items,
     payments,
@@ -327,7 +331,7 @@ export const issueNfceForSale = async (saleId: string) => {
         number,
         environment: config.environment,
         recipientTaxId: sale.customerTaxId,
-        recipientName: sale.leadName,
+        recipientName: fiscalText(sale.leadName) || null,
         totalAmount: new Prisma.Decimal(sale.total),
         paymentSnapshot: { method: sale.paymentMethod, total: sale.total },
         items: {
@@ -358,7 +362,7 @@ export const issueNfceForSale = async (saleId: string) => {
 
 export const issueManualNfce = async (input: ManualNfceInput, adminUserId: string) => {
   const settings = await loadFiscalSettings();
-  const recipientName = String(input.recipientName || '').trim();
+  const recipientName = fiscalText(input.recipientName);
   const recipientTaxId = onlyDigits(input.recipientTaxId);
   const notes = String(input.notes || '').trim();
 

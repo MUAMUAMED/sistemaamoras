@@ -367,7 +367,7 @@ const sanitizeDraft = (raw: any) => {
   if (!PAYMENT_METHODS.has(requestedPayment)) warnings.push('Forma de pagamento nao identificada; revise o campo.');
 
   const draft: FiscalAiDraft = {
-    recipientName: String(raw?.recipientName || '').trim().slice(0, 120),
+    recipientName: String(raw?.recipientName || '').trim().replace(/\s+/g, ' ').slice(0, 60),
     recipientTaxId: String(raw?.recipientTaxId || '').replace(/\D/g, '').slice(0, 14),
     paymentMethod,
     notes: String(raw?.notes || '').trim().slice(0, 500),
