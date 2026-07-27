@@ -6,7 +6,7 @@ import { Download, Loader2, MessageCircle, Share2, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import toast from 'react-hot-toast';
 import { fiscalApi } from '../services/api';
-import { getFiscalFileName } from '../utils/fiscalFileName';
+import { getFiscalFileName, getFiscalPdfFileName } from '../utils/fiscalFileName';
 import { createFiscalPdfFile, downloadFile } from '../utils/fiscalPdf';
 
 const money = (value: number | string) =>
@@ -95,7 +95,7 @@ export default function DanfeNfce() {
     if (!element) throw new Error('DANFE ainda nao esta pronta');
     return createFiscalPdfFile(
       element,
-      getFiscalFileName(document.recipientName || document.sale.leadName)
+      getFiscalPdfFileName(document.recipientName || document.sale.leadName)
     );
   };
 
@@ -116,8 +116,7 @@ export default function DanfeNfce() {
       setSharing('native');
       const file = await createPdf();
       const shareData = {
-        title: `NFC-e ${document?.series}/${document?.number}`,
-        text: `Nota fiscal da Amoras Capital - NFC-e ${document?.series}/${document?.number}`,
+        text: 'segue em anexo a nota fiscal emitida',
         files: [file],
       };
 
@@ -146,11 +145,7 @@ export default function DanfeNfce() {
     try {
       setSharing('whatsapp');
       downloadFile(await createPdf());
-      const message = [
-        `Ola! Segue a NFC-e ${document?.series}/${document?.number} da Amoras Capital.`,
-        document?.qrCodeUrl ? `Consulta oficial: ${document.qrCodeUrl}` : '',
-        'O PDF foi baixado neste dispositivo para ser anexado na conversa.',
-      ].filter(Boolean).join('\n\n');
+      const message = 'segue em anexo a nota fiscal emitida';
       const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
       if (popup) popup.location.href = url;
       else window.location.href = url;
