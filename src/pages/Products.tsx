@@ -2885,9 +2885,8 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
               <title>Etiqueta - ${codes.sku}</title>
               <style>
                 @page {
-                  size: 40mm 30mm;
-                  margin: 1.5mm;
-                  padding: 0mm;
+                  size: 30mm 40mm;
+                  margin: 1mm;
                 }
                 * {
                   margin: 0;
@@ -2895,8 +2894,8 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   box-sizing: border-box;
                 }
                 body {
-                  width: 37mm;
-                  height: 27mm;
+                  width: 28mm;
+                  height: 38mm;
                   font-family: 'Arial', 'Helvetica', sans-serif;
                   font-size: 10px;
                   line-height: 1.1;
@@ -2911,24 +2910,31 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   width: 100%;
                   height: 100%;
                   display: flex;
+                  flex-direction: column;
                   padding: 1mm;
-                  gap: 1mm;
+                  gap: 0.8mm;
                   align-items: center;
-                  justify-content: center;
+                  justify-content: flex-start;
+                }
+                .brand {
+                  font-size: 7px;
+                  font-weight: 700;
+                  letter-spacing: 0.2px;
+                  line-height: 1;
+                  text-align: center;
                 }
                 .qr-section {
-                  width: 15mm;
-                  height: 100%;
+                  width: 100%;
+                  height: auto;
                   display: flex;
                   flex-direction: column;
                   align-items: center;
                   justify-content: center;
-                  gap: 0.8mm;
-                  padding: 0.5mm;
+                  gap: 0.5mm;
                 }
                 .qr-code {
-                  width: 12mm;
-                  height: 12mm;
+                  width: 18mm;
+                  height: 18mm;
                   object-fit: contain;
                   image-rendering: -webkit-optimize-contrast;
                   image-rendering: pixelated;
@@ -2937,7 +2943,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   margin: 0 auto;
                 }
                 .sku-code {
-                  font-size: 7px;
+                  font-size: 7.5px;
                   font-weight: bold;
                   text-align: center;
                   word-break: break-all;
@@ -2946,25 +2952,25 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   margin: 0;
                 }
                 .info-section {
-                  flex: 1;
-                  height: 100%;
+                  width: 100%;
+                  height: auto;
                   display: flex;
                   flex-direction: column;
                   justify-content: center;
-                  min-width: 0;
+                  align-items: center;
                   overflow: hidden;
-                  padding: 0.5mm;
-                  gap: 0.5mm;
+                  padding: 0;
+                  gap: 0.7mm;
                 }
                 .product-name {
-                  font-size: 10px;
+                  font-size: 8.5px;
                   font-weight: bold;
                   line-height: 1.1;
                   margin-bottom: 0.5mm;
                   word-wrap: break-word;
                   overflow-wrap: break-word;
                   hyphens: auto;
-                  max-height: 5mm;
+                  max-height: 6.5mm;
                   overflow: hidden;
                   display: -webkit-box;
                   -webkit-line-clamp: 2;
@@ -2978,10 +2984,10 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   min-height: 0;
                   justify-content: center;
                   align-items: center;
-                  margin-bottom: 0.5mm;
+                  margin-bottom: 0;
                 }
                 .detail-line {
-                  font-size: 7px;
+                  font-size: 7.5px;
                   line-height: 1.0;
                   font-weight: 500;
                   word-wrap: break-word;
@@ -2992,7 +2998,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                 }
                 .price {
                   font-weight: bold;
-                  font-size: 14px;
+                  font-size: 12px;
                   text-align: center;
                   background: #f5f5f5;
                   padding: 0.5mm 1mm;
@@ -3011,6 +3017,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
             </head>
             <body>
               <div class="etiqueta">
+                <div class="brand">@amorascapital</div>
                 <div class="qr-section">
                   <img src="${codes.qrcodeUrl}" alt="QR Code" class="qr-code" />
                   <div class="sku-code">${codes.sku}</div>
@@ -3037,11 +3044,6 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
           </html>
         `);
         printWindow.document.close();
-        
-        setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
-        }, 100);
       }
     } catch (error: any) {
       console.error('Erro ao buscar detalhes do produto:', error);
