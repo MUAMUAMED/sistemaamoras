@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
+import sharp from "sharp";
 
 // Configurações
 import { logger } from "./config/logger";
@@ -358,6 +359,40 @@ app.get('/uploads/products/:filename', async (req: express.Request, res: express
       exists: fs.existsSync(path.join(uploadsPath, 'products')),
       uploadCandidatePaths,
     });
+  }
+});
+
+// Variantes menores para listas e PDV. A imagem original continua guardada no
+// banco; esta resposta e apenas uma representacao leve que o navegador pode
+// manter no cache por causa do nome unico do arquivo.
+app.get('/api/images/products/:filename', async (req: express.Request, res: express.Response) => {
+  try {
+    const filename = req.params.filename;
+    const resolvedFile = findUploadedProductFile(filename);
+    let source: Buffer | null = resolvedFile ? fs.readFileSync(resolvedFile.filePath) : null;
+
+    if (!source) {
+      const databaseImage = await findUploadedProductImageInDatabase(filename);
+      source = databaseImage?.data ? Buffer.from(databaseImage.data) : null;
+    }
+
+    if (!source) {
+      return res.status(404).json({ error: 'Imagem nao encontrada', filename });
+    }
+
+    const thumbnail = await sharp(source, { failOn: 'none' })
+      .rotate()
+      .resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 72, effort: 4 })
+      .toBuffer();
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.type('image/webp').send(thumbnail);
+  } catch (error: any) {
+    console.error('[IMAGE THUMBNAIL] Falha ao gerar miniatura:', error.message);
+    return res.status(500).json({ error: 'Nao foi possivel preparar a imagem' });
   }
 });
 
