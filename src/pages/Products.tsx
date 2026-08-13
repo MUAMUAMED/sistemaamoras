@@ -564,7 +564,7 @@ const Products: React.FC = () => {
       setForceDeleteId(null);
       // Atualiza lista de produtos
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Produto e vínculos excluídos com sucesso!');
+      toast.success('Produto removido ou desativado com sucesso!');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Erro ao excluir produto');
     } finally {
@@ -1394,8 +1394,8 @@ const Products: React.FC = () => {
               <h2 className="text-xl font-bold text-gray-900">Confirmar Exclusão</h2>
             </div>
             <p className="text-gray-600 mb-6">
-              Este produto possui vínculos com vendas ou movimentações de estoque. 
-              Deseja realmente excluir o produto e todos os seus vínculos?
+              Este produto possui histórico de vendas. Ao confirmar, ele será desativado e retirado da vitrine.
+              As vendas e notas fiscais permanecem preservadas.
             </p>
             <div className="flex justify-end gap-3">
               <button
@@ -1409,7 +1409,7 @@ const Products: React.FC = () => {
                 disabled={forceDeleteLoading}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {forceDeleteLoading ? 'Excluindo...' : 'Excluir Tudo'}
+                {forceDeleteLoading ? 'Processando...' : 'Desativar produto'}
               </button>
             </div>
           </div>
