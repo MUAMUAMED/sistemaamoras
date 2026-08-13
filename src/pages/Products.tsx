@@ -24,7 +24,7 @@ import {
 } from '../services/api';
 import api from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
-import { getImageUrl } from '../utils/imageUrl';
+import { getImageUrl, getProductCardImageUrl } from '../utils/imageUrl';
 
 const Products: React.FC = () => {
   const queryClient = useQueryClient();
@@ -59,6 +59,9 @@ const Products: React.FC = () => {
   const { data: productsData, isLoading: loadingProducts } = useQuery({
     queryKey: ['products', filters],
     queryFn: () => productsApi.list(filters),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Log produtos recebidos
@@ -965,25 +968,23 @@ const Products: React.FC = () => {
               <div className="p-6">
                 {productsData && Array.isArray(productsData.data) && productsData.data.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {productsData.data.map((product: Product) => {
+                    {productsData.data.map((product: Product, index: number) => {
                       const stockStatus = getStockStatus(product);
+                      const imageUrl = product.imageUrl || product.images?.[0]?.url;
+                      const isPriorityImage = index < 4;
                       return (
                         <div key={product.id} className="bg-white rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all duration-200 overflow-hidden group card-hover animate-fade-in-up">
                           {/* Imagem do Produto */}
                           <div className="relative h-48 bg-gray-100 overflow-hidden">
-                            {product.imageUrl ? (
+                            {imageUrl ? (
                               <img
-                                src={getImageUrl(product.imageUrl)}
+                                src={getProductCardImageUrl(imageUrl)}
                                 alt={product.name || 'Produto sem nome'}
-                                loading="eager"
+                                loading={isPriorityImage ? 'eager' : 'lazy'}
+                                fetchPriority={isPriorityImage ? 'high' : 'auto'}
                                 decoding="async"
-                                className="w-full h-full object-contain opacity-0 group-hover:scale-105 transition-[opacity,transform] duration-200"
-                                onLoad={(e) => {
-                                  e.currentTarget.classList.remove('opacity-0');
-                                }}
+                                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
-                                  const imageUrl = product.imageUrl;
-                                  const finalUrl = imageUrl ? getImageUrl(imageUrl) : '';
                                   const fallbackUrl = product.images?.[0]?.url ? getImageUrl(product.images[0].url) : '';
                                   if (fallbackUrl && fallbackUrl !== e.currentTarget.src) {
                                     e.currentTarget.src = fallbackUrl;
@@ -991,21 +992,6 @@ const Products: React.FC = () => {
                                     e.currentTarget.style.display = 'none';
                                     e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                   }
-                                }}
-                              />
-                            ) : product.images && product.images.length > 0 ? (
-                              <img
-                                src={getImageUrl(product.images[0]?.url)}
-                                alt={product.name || 'Produto sem nome'}
-                                loading="eager"
-                                decoding="async"
-                                className="w-full h-full object-contain opacity-0 group-hover:scale-105 transition-[opacity,transform] duration-200"
-                                onLoad={(e) => {
-                                  e.currentTarget.classList.remove('opacity-0');
-                                }}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                 }}
                               />
                             ) : null}

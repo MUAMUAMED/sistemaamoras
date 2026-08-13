@@ -30,7 +30,7 @@ import {
   saleService,
 } from '../services/api';
 import { Product } from '../types';
-import { getImageUrl } from '../utils/imageUrl';
+import { getProductCardImageUrl, getImageUrl } from '../utils/imageUrl';
 
 interface CartItem {
   product: Product;
@@ -46,7 +46,7 @@ const storeStock = (product: Product) =>
 
 const productImage = (product: Product) => {
   const image = [...(product.images || [])].sort((a, b) => a.position - b.position)[0]?.url;
-  return getImageUrl(image || product.imageUrl);
+  return getProductCardImageUrl(image || product.imageUrl);
 };
 
 export default function Pdv() {

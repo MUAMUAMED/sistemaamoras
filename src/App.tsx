@@ -26,7 +26,18 @@ import ManualFiscal from './pages/ManualFiscal';
 import AdminRoute from './components/AdminRoute';
 import { useAuthStore } from './stores/authStore';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Mantem os dados de navegacao no cache da aplicacao. As alteracoes de
+      // estoque e produto continuam invalidando esta chave explicitamente.
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: 1,
+    },
+  },
+});
 
 function ERPLayout() {
   return (
