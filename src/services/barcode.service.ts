@@ -125,8 +125,8 @@ export class BarcodeService {
     try {
       // QR Code contém apenas o código SKU - formato simples para escaneamento
       const qrCodeDataUrl = await QRCode.toDataURL(sku, {
-        errorCorrectionLevel: 'M' as const,
-        width: 256,
+        errorCorrectionLevel: 'H' as const,
+        width: 512,
         margin: 1,
         color: {
           dark: '#000000',

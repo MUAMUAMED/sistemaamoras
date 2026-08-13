@@ -48,7 +48,11 @@ function generateBarcode(sizeCode: string, categoryCode: string, subcategoryCode
 // Função para gerar QR Code
 async function generateQRCode(data: string): Promise<string> {
   try {
-    const qrCodeDataURL = await QRCode.toDataURL(data);
+    const qrCodeDataURL = await QRCode.toDataURL(data, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 512,
+    });
     return qrCodeDataURL;
   } catch (error) {
     throw new Error('Erro ao gerar QR Code');
