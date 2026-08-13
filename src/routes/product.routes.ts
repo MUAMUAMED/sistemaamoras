@@ -1364,7 +1364,13 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
     
     console.log(`🗑️ [DELETE PRODUCT] Iniciando exclusão do produto: ${id}, force: ${force}`);
     
-    const product = await prisma.product.findUnique({ where: { id } });
+    const product = await prisma.product.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { saleItems: true } },
+        commercialProduct: { select: { id: true } },
+      },
+    });
     if (!product) {
       console.log(`❌ [DELETE PRODUCT] Produto não encontrado: ${id}`);
       return res.status(404).json({
@@ -1375,54 +1381,50 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
     
     console.log(`✅ [DELETE PRODUCT] Produto encontrado: ${product.name || 'Sem nome'} (isDraft: ${product.isDraft})`);
     
-    try {
-      // Deletar imagens do produto primeiro (se existirem)
-      try {
-        const imageCount = await (prisma as any).productImage.deleteMany({ where: { productId: id } });
-        console.log(`🗑️ [DELETE PRODUCT] ${imageCount.count} imagem(ns) deletada(s)`);
-      } catch (imageError: any) {
-        console.warn('⚠️ [DELETE PRODUCT] Erro ao deletar imagens (pode não existir tabela):', imageError.message);
-        // Continuar mesmo se falhar (tabela pode não existir)
-      }
-      
-      // Deletar o produto
-      await prisma.product.delete({ where: { id } });
-      console.log(`✅ [DELETE PRODUCT] Produto deletado com sucesso: ${id}`);
-      return res.json({ message: 'Produto excluído com sucesso' });
-    } catch (error) {
-      const err = error as any;
-      console.error(`❌ [DELETE PRODUCT] Erro ao deletar produto:`, err.message);
-      console.error(`❌ [DELETE PRODUCT] Código do erro:`, err.code);
-      
-      // Se for erro de integridade e não for forçado, retorna mensagem de confirmação
-      if ((err.code === 'P2003' || err.message?.includes('Foreign key constraint failed')) && !force) {
+    if (product._count.saleItems > 0) {
+      if (!force) {
         return res.status(409).json({
-          error: 'Produto vinculado',
-          message: 'Este produto está vinculado a vendas ou movimentações. Deseja apagar mesmo assim?',
-          canForce: true
+          error: 'Produto possui histórico de vendas',
+          message: 'Este produto já possui vendas. Confirme para desativá-lo e removê-lo da vitrine, preservando vendas e notas fiscais.',
+          canForce: true,
         });
       }
-      // Se for forçado, apaga os vínculos e depois o produto
-      if (force) {
-        console.log(`🔄 [DELETE PRODUCT] Modo forçado ativado, deletando vínculos...`);
-        try {
-          // Deletar imagens
-          await (prisma as any).productImage.deleteMany({ where: { productId: id } });
-          // Apaga movimentações de estoque
-          await prisma.stockMovement.deleteMany({ where: { productId: id } });
-          // Apaga itens de venda
-          await prisma.saleItem.deleteMany({ where: { productId: id } });
-          // Agora apaga o produto
-          await prisma.product.delete({ where: { id } });
-          console.log(`✅ [DELETE PRODUCT] Produto e vínculos deletados com sucesso`);
-          return res.json({ message: 'Produto e vínculos excluídos com sucesso' });
-        } catch (forceError: any) {
-          console.error(`❌ [DELETE PRODUCT] Erro no modo forçado:`, forceError.message);
-          throw forceError;
+
+      await prisma.$transaction(async (tx) => {
+        await tx.product.update({
+          where: { id },
+          data: { active: false, stock: 0, stockLoja: 0, stockArmazem: 0 },
+        });
+        if (product.commercialProduct) {
+          await (tx as any).commercialProduct.update({
+            where: { id: product.commercialProduct.id },
+            data: { published: false, featured: false },
+          });
         }
-      }
-      throw error;
+      });
+
+      return res.json({
+        message: 'Produto desativado e retirado da vitrine. Histórico de vendas e notas fiscais preservado.',
+        archived: true,
+      });
     }
+
+    await prisma.$transaction(async (tx) => {
+      if (product.commercialProduct) {
+        await (tx as any).commercialProductImage.deleteMany({
+          where: { commercialProductId: product.commercialProduct.id },
+        });
+        await (tx as any).commercialProduct.delete({
+          where: { id: product.commercialProduct.id },
+        });
+      }
+      await (tx as any).productImage.deleteMany({ where: { productId: id } });
+      await tx.stockMovement.deleteMany({ where: { productId: id } });
+      await tx.product.delete({ where: { id } });
+    });
+
+    console.log(`✅ [DELETE PRODUCT] Produto excluído com sucesso: ${id}`);
+    return res.json({ message: 'Produto excluído com sucesso' });
   } catch (error) {
     const err = error as any;
     console.error(`💥 [DELETE PRODUCT] Erro geral:`, err.message);
