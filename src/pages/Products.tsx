@@ -2947,12 +2947,12 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   position: absolute;
                   top: 50%;
                   left: 50%;
-                  width: 5.2mm;
-                  height: 5.2mm;
+                  width: 3.8mm;
+                  height: 3.8mm;
                   transform: translate(-50%, -50%);
                   object-fit: contain;
                   background: white;
-                  border: 0.7mm solid white;
+                  border: 0.5mm solid white;
                   border-radius: 50%;
                 }
                 .sku-code {
@@ -3033,7 +3033,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                 <div class="brand">@amorascapital</div>
                 <div class="qr-section">
                   <img src="${codes.qrcodeUrl}" alt="QR Code" class="qr-code" />
-                  <img src="${window.location.origin}/amoras-logo.png" alt="Amoras Capital" class="qr-logo" />
+                  <img src="${window.location.origin}/amoras-logo-qr.png" alt="Amoras Capital" class="qr-logo" />
                   <div class="sku-code">${codes.sku}</div>
                 </div>
                 <div class="info-section">
