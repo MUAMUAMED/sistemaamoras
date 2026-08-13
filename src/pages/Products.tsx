@@ -2924,6 +2924,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   text-align: center;
                 }
                 .qr-section {
+                  position: relative;
                   width: 100%;
                   height: auto;
                   display: flex;
@@ -2941,6 +2942,18 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                   border: none;
                   display: block;
                   margin: 0 auto;
+                }
+                .qr-logo {
+                  position: absolute;
+                  top: 50%;
+                  left: 50%;
+                  width: 5.2mm;
+                  height: 5.2mm;
+                  transform: translate(-50%, -50%);
+                  object-fit: contain;
+                  background: white;
+                  border: 0.7mm solid white;
+                  border-radius: 50%;
                 }
                 .sku-code {
                   font-size: 7.5px;
@@ -3020,6 +3033,7 @@ const GeneratedCodesModal: React.FC<GeneratedCodesModalProps> = ({ codes, produc
                 <div class="brand">@amorascapital</div>
                 <div class="qr-section">
                   <img src="${codes.qrcodeUrl}" alt="QR Code" class="qr-code" />
+                  <img src="${window.location.origin}/amoras-logo.png" alt="Amoras Capital" class="qr-logo" />
                   <div class="sku-code">${codes.sku}</div>
                 </div>
                 <div class="info-section">
