@@ -48,19 +48,20 @@ function parseDraft(output: string): AiDraft {
 }
 
 async function createAiDraft(files: Express.Multer.File[]): Promise<AiDraft> {
-  if (!process.env.OPENAI_API_KEY) throw new Error('A IA não está configurada. Defina OPENAI_API_KEY no serviço Zeabur.');
-  const images = await Promise.all(files.map(async (file) => ({ type: 'input_image', image_url: `data:${file.mimetype};base64,${(await readFile(file.path)).toString('base64')}`, detail: 'high' })));
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: process.env.OPENAI_VISION_MODEL || 'gpt-4.1-mini', temperature: 0.2, input: [{ role: 'user', content: [
-      { type: 'input_text', text: 'Analise as fotos da mesma roupa. Responda somente JSON válido em português: {"name":"nome curto","categoryName":"categoria","subcategoryName":"subcategoria ou null","patternName":"nome da estampa ou identidade visual","description":"descrição objetiva","confidence":0.0,"notes":["observação"]}. Não invente marca, tecido ou tamanho. Se não houver estampa, crie uma identidade visual específica para a peça.' },
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('A IA não está configurada. Defina OPENROUTER_API_KEY no serviço Zeabur.');
+  const images = await Promise.all(files.map(async (file) => ({ type: 'image_url', image_url: { url: `data:${file.mimetype};base64,${(await readFile(file.path)).toString('base64')}` } })));
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
+    body: JSON.stringify({ model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash', temperature: 0.2, messages: [{ role: 'user', content: [
+      { type: 'text', text: 'Analise as fotos da mesma roupa. Responda somente JSON válido em português: {"name":"nome curto","categoryName":"categoria","subcategoryName":"subcategoria ou null","patternName":"nome da estampa ou identidade visual","description":"descrição objetiva","confidence":0.0,"notes":["observação"]}. Não invente marca, tecido ou tamanho. Se não houver estampa, crie uma identidade visual específica para a peça.' },
       ...images,
     ] }], }),
   });
   if (!response.ok) throw new Error(`Não foi possível gerar o rascunho com a IA (${response.status}).`);
-  const body = await response.json() as { output_text?: string };
-  if (!body.output_text) throw new Error('A IA retornou uma resposta vazia.');
-  return parseDraft(body.output_text);
+  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const output = body.choices?.[0]?.message?.content;
+  if (!output) throw new Error('A IA retornou uma resposta vazia.');
+  return parseDraft(output);
 }
 
 async function freeCode(tx: Prisma.TransactionClient, kind: 'category' | 'subcategory' | 'pattern', categoryId?: string): Promise<string> {
