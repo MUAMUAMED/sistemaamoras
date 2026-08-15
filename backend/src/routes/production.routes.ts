@@ -73,31 +73,31 @@ function extractJson(text: string): AiDraft {
 }
 
 async function analyzeImages(files: Express.Multer.File[]): Promise<AiDraft> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    throw new Error('A IA não está configurada. Defina OPENAI_API_KEY no servidor antes de gerar o rascunho.');
+    throw new Error('A IA não está configurada. Defina OPENROUTER_API_KEY no servidor antes de gerar o rascunho.');
   }
 
   const imageParts = await Promise.all(files.map(async (file) => ({
-    type: 'input_image',
-    image_url: `data:${file.mimetype};base64,${(await readFile(file.path)).toString('base64')}`,
-    detail: 'high',
+    type: 'image_url',
+    image_url: { url: `data:${file.mimetype};base64,${(await readFile(file.path)).toString('base64')}` },
   })));
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      'X-Title': 'Amoras Produção',
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_VISION_MODEL || 'gpt-4.1-mini',
+      model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash',
       temperature: 0.2,
-      input: [{
+      messages: [{
         role: 'user',
         content: [
           {
-            type: 'input_text',
+            type: 'text',
             text: `Você é assistente de cadastro de roupas da Amoras. Analise as fotos da mesma peça e responda SOMENTE JSON válido, sem markdown.\n\nFormato obrigatório:\n{"name":"nome curto da roupa","categoryName":"categoria ampla","subcategoryName":"subcategoria ou null","patternName":"nome da estampa, cor ou identidade visual","description":"descrição objetiva","confidence":0.0,"notes":["observação opcional"]}\n\nRegras: responda em português brasileiro; não invente marca, tecido ou tamanho; se a roupa não tiver uma estampa evidente, crie um nome de estampa/identidade visual que descreva a peça e seja específico (por exemplo, 'Liso Preto Elegante'); a pessoa confirmará os dados antes de publicar.`,
           },
           ...imageParts,
@@ -111,9 +111,10 @@ async function analyzeImages(files: Express.Multer.File[]): Promise<AiDraft> {
     throw new Error(`Não foi possível gerar o rascunho com a IA (${response.status}): ${detail.slice(0, 240)}`);
   }
 
-  const body = await response.json() as { output_text?: string };
-  if (!body.output_text) throw new Error('A IA retornou uma resposta vazia.');
-  return extractJson(body.output_text);
+  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const output = body.choices?.[0]?.message?.content;
+  if (!output) throw new Error('A IA retornou uma resposta vazia.');
+  return extractJson(output);
 }
 
 async function nextCode(tx: Prisma.TransactionClient, entity: 'category' | 'subcategory' | 'pattern', categoryId?: string): Promise<string> {
