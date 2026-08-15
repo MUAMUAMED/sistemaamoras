@@ -30,6 +30,7 @@ import stockMovementsRoutes from './routes/stock-movements';
 import interactionsRoutes from './routes/interactions';
 import barcodeRoutes from './routes/barcode';
 import automationRoutes from './routes/automation.routes';
+import productionRoutes from './routes/production.routes';
 
 // Importar middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -158,6 +159,7 @@ app.use('/api/stock-movements', stockMovementsRoutes);
 app.use('/api/interactions', interactionsRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/automation', automationRoutes);
+app.use('/api/production', productionRoutes);
 
 // Rota de pagamento Mercado Pago
 app.use('/api/payment-gateway', paymentGatewayRoutes);
