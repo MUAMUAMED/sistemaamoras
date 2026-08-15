@@ -12,6 +12,6 @@ Para gerar um APK de teste instalável, autentique-se na conta Expo e execute `n
 
 ## Backend necessário
 
-O backend Zeabur precisa estar com a rota `/api/production` publicada e possuir `OPENAI_API_KEY` configurada. A chave nunca é enviada ao aplicativo. Defina também `PRODUCTION_DRAFT_SECRET` com um valor longo e exclusivo em produção.
+O backend Zeabur precisa estar com a rota `/api/production` publicada e possuir `OPENROUTER_API_KEY` configurada. Opcionalmente defina `OPENROUTER_MODEL` (o padrão é `google/gemini-2.5-flash`). A chave nunca é enviada ao aplicativo. Defina também `PRODUCTION_DRAFT_SECRET` com um valor longo e exclusivo em produção.
 
 Ao publicar, o servidor cria somente os registros que ainda não existem. Códigos de categoria, subcategoria e estampa são alocados no servidor e verificados contra colisões; as fotos temporárias do rascunho expiram após 30 minutos.
