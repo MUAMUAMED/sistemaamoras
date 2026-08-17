@@ -22,10 +22,12 @@ export type ListedProduct = {
   id: string;
   name?: string | null;
   price?: number | null;
+  description?: string | null;
   stock: number;
   stockLoja: number;
   stockArmazem: number;
   barcode?: string | null;
+  status?: string;
   category?: { name: string } | null;
   subcategory?: { name: string } | null;
   pattern?: { name: string } | null;
