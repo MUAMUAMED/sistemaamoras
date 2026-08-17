@@ -2728,7 +2728,7 @@ const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ product, cate
               ) : null}
               {(!product.images || product.images.length === 0) && product.imageUrl && (
                 <img 
-                  src={product.imageUrl?.startsWith('http') ? product.imageUrl : `${(import.meta.env.REACT_APP_API_URL || import.meta.env.VITE_API_URL || (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : undefined) || '').replace('/api', '')}${product.imageUrl}`}
+                  src={product.imageUrl?.startsWith('http') ? product.imageUrl : `${(import.meta.env.REACT_APP_API_URL || import.meta.env.VITE_API_URL || (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : undefined) || 'https://amorasbackenddd.zeabur.app/api').replace('/api', '')}${product.imageUrl}`}
                   alt={product.name}
                   className="w-full h-48 object-contain rounded-lg"
                 />

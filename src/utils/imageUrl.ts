@@ -8,7 +8,8 @@ export const getImageUrl = (url: string | null | undefined): string => {
   const apiUrl =
     import.meta.env.REACT_APP_API_URL ||
     import.meta.env.VITE_API_URL ||
-    (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : undefined);
+    (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : undefined) ||
+    'https://amorasbackenddd.zeabur.app/api';
 
   if (apiUrl) {
     const baseUrl = apiUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
@@ -35,7 +36,8 @@ export const getProductCardImageUrl = (url: string | null | undefined): string =
   const apiUrl =
     import.meta.env.REACT_APP_API_URL ||
     import.meta.env.VITE_API_URL ||
-    (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : undefined);
+    (typeof process !== 'undefined' ? process.env.REACT_APP_API_URL : undefined) ||
+    'https://amorasbackenddd.zeabur.app/api';
   const apiBase = apiUrl
     ? apiUrl.replace(/\/$/, '').replace(/\/api$/, '')
     : '';

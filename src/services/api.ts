@@ -61,10 +61,9 @@ const getBaseURL = () => {
     return '/api';
   }
   
-  // Em produção SEM variável de ambiente definida, usar proxy relativo
-  // Isso assume que há um proxy reverso (nginx) configurado
-  console.warn('⚠️ REACT_APP_API_URL ou VITE_API_URL não definida! Usando proxy relativo.');
-  return '/api';
+  // Fallback explícito para o backend público atual. Assim o ERP não depende
+  // de um proxy do frontend que pode não existir no serviço da Zeabur.
+  return 'https://amorasbackenddd.zeabur.app/api';
 };
 
 const api = axios.create({
