@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressa
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ChoicePill, SelectModal } from './src/components';
-import { clearSession, generateDraft, getSession, listProducts, loadCatalog, login, publishDraft, saveSession } from './src/api';
+import { ApiError, clearSession, generateDraft, getSession, listProducts, loadCatalog, login, publishDraft, saveSession } from './src/api';
 import type { AuthUser, Catalog, CatalogItem, ClothingForm, DraftImage, ListedProduct } from './src/types';
 
 const emptyCatalog: Catalog = { categories: [], subcategories: [], patterns: [], sizes: [] };
@@ -100,17 +100,26 @@ function AppContent() {
 
   function resetDraft() { setPhotos([]); setDraftImages([]); setForm(blankForm()); setSuccess(null); }
 
-  async function handlePublish() {
+  async function handlePublish(mergeWithExisting = false) {
     if (!token) return;
     if (!form.sizeId) return Alert.alert('Tamanho obrigatório', 'Selecione o tamanho da peça antes de publicar.');
     if (!form.name.trim() || !form.categoryName.trim() || !form.patternName.trim() || !form.price || !form.stock) return Alert.alert('Revise o cadastro', 'Nome, categoria, estampa, preço e estoque são obrigatórios.');
     setPublishing(true);
     try {
-      const result = await publishDraft(token, form, draftImages);
+      const result = await publishDraft(token, form, draftImages, mergeWithExisting);
       setSuccess({ barcode: result.product.barcode, merged: result.mergedIntoExisting });
       setCatalog(await loadCatalog(token));
       await refreshProducts(token);
-    } catch (error) { Alert.alert('Não foi possível publicar', error instanceof Error ? error.message : 'Tente novamente.'); }
+    } catch (error) {
+      const existing = error instanceof ApiError ? error.payload.existingProduct as { name?: string; barcode?: string; stock?: number } | undefined : undefined;
+      if (error instanceof ApiError && error.status === 409 && existing) {
+        Alert.alert(
+          'Produto já cadastrado',
+          `${existing.name || 'Esta roupa'} (${existing.barcode || 'sem código'}) já possui ${existing.stock || 0} unidade(s). Deseja somar ${form.stock} unidade(s) ao estoque existente?`,
+          [{ text: 'Cancelar', style: 'cancel' }, { text: 'Somar ao estoque', onPress: () => { void handlePublish(true); } }],
+        );
+      } else Alert.alert('Não foi possível publicar', error instanceof Error ? error.message : 'Tente novamente.');
+    }
     finally { setPublishing(false); }
   }
 

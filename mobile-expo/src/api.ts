@@ -9,6 +9,13 @@ const USER_KEY = 'amoras_producao_user';
 
 type StoredSession = { token: string; user: AuthUser };
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number, public readonly payload: Record<string, unknown>) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 export async function getSession(): Promise<StoredSession | null> {
   const [token, rawUser] = await Promise.all([SecureStore.getItemAsync(TOKEN_KEY), SecureStore.getItemAsync(USER_KEY)]);
   if (!token || !rawUser) return null;
@@ -32,7 +39,7 @@ async function request<T>(path: string, token?: string, init: RequestInit = {}):
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers || {}) },
   });
   const json = await response.json().catch(() => ({})) as T & { error?: string; message?: string };
-  if (!response.ok) throw new Error(json.message || json.error || 'Não foi possível concluir a solicitação.');
+  if (!response.ok) throw new ApiError(json.message || json.error || 'Não foi possível concluir a solicitação.', response.status, json as Record<string, unknown>);
   return json;
 }
 
@@ -62,14 +69,14 @@ export async function generateDraft(token: string, photos: string[]): Promise<Dr
   return request<DraftResponse>('/production/draft', token, { method: 'POST', body: form });
 }
 
-export async function publishDraft(token: string, form: ClothingForm, images: DraftImage[]) {
+export async function publishDraft(token: string, form: ClothingForm, images: DraftImage[], mergeWithExisting = false) {
   return request<{ product: { id: string; barcode: string }; created: { category: boolean; subcategory: boolean; pattern: boolean }; mergedIntoExisting: boolean }>('/production/publish', token, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: form.name, description: form.description, category: { id: form.categoryId, name: form.categoryName },
       subcategory: form.subcategoryName ? { id: form.subcategoryId, name: form.subcategoryName } : null,
       pattern: { id: form.patternId, name: form.patternName }, sizeId: form.sizeId,
-      price: Number(form.price.replace(',', '.')), stock: Number(form.stock), initialLocation: form.initialLocation, images,
+      price: Number(form.price.replace(',', '.')), stock: Number(form.stock), initialLocation: form.initialLocation, images, mergeWithExisting,
     }),
   });
 }
