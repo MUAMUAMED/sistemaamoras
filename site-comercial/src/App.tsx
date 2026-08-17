@@ -6,6 +6,7 @@ import { Home } from './pages/Home';
 import { ProductDetail } from './pages/ProductDetail';
 import { ShopPage } from './pages/ShopPage';
 import { CommercialAdmin } from './pages/CommercialAdmin';
+import { InstitutionalPage } from './pages/InstitutionalPage';
 import './App.css';
 
 const queryClient = new QueryClient({
@@ -35,9 +36,9 @@ function AppFrame() {
           <Route path="/produto/:productSlug" element={<ProductDetail />} />
           <Route path="/admin" element={<CommercialAdmin />} />
           <Route path="/categorias" element={<ShopPage />} />
-          <Route path="/sobre" element={<div>Sobre em breve</div>} />
-          <Route path="/contato" element={<div>Contato em breve</div>} />
-          <Route path="/conta" element={<div>Minha conta em breve</div>} />
+          <Route path="/sobre" element={<InstitutionalPage kind="about" />} />
+          <Route path="/contato" element={<InstitutionalPage kind="contact" />} />
+          <Route path="/conta" element={<InstitutionalPage kind="account" />} />
         </Routes>
       </main>
     </div>

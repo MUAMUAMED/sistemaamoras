@@ -85,6 +85,14 @@ export const mapCommercialProduct = (item: any): CatalogProduct => {
 };
 
 export const commercialApi = {
+  settings: async (): Promise<{ brandName?: string; whatsappUrl?: string; instagramUrl?: string; announcement?: string }> => {
+    const response = await api.get('/commercial/settings', {
+      params: { t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    return response.data || {};
+  },
+
   catalog: async (): Promise<{ categories: CommercialCategory[]; products: CatalogProduct[] }> => {
     const response = await api.get('/commercial/catalog', {
       params: { t: Date.now() },
