@@ -10,9 +10,55 @@ import './ProductDetail.css';
 
 const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
 
+const stripInlineFormatting = (value: string) =>
+  value
+    .replace(/^#{1,3}\s*/, '')
+    .replace(/^\*\*(.*)\*\*$/, '$1')
+    .trim();
+
+const isDescriptionHeading = (block: string) => {
+  const clean = stripInlineFormatting(block);
+  if (!clean || clean.length > 90) return false;
+  if (/^#{1,3}\s+/.test(block.trim())) return true;
+  if (/^\*\*.*\*\*$/.test(block.trim())) return true;
+  return !/[.!?:;]$/.test(clean) && clean.split(/\s+/).length <= 8;
+};
+
+function ProductDescription({ description }: { description: string }) {
+  const blocks = description
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) return null;
+
+  return (
+    <div className="product-description">
+      {blocks.map((block, index) => {
+        const text = stripInlineFormatting(block);
+        if (isDescriptionHeading(block)) {
+          return <h3 key={`${text}-${index}`}>{text}</h3>;
+        }
+
+        return (
+          <p key={`${text}-${index}`}>
+            {block.split('\n').map((line, lineIndex) => (
+              <span key={`${line}-${lineIndex}`}>
+                {line}
+                {lineIndex < block.split('\n').length - 1 && <br />}
+              </span>
+            ))}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ProductDetail() {
   const { productSlug } = useParams();
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isLoading, isError } = useQuery({
     queryKey: ['commercial-product', productSlug],
     queryFn: () => commercialApi.productBySlug(productSlug || ''),
     enabled: Boolean(productSlug),
@@ -44,12 +90,29 @@ export function ProductDetail() {
     [catalog?.products, product]
   );
 
-  if (isLoading || !product) {
+  if (isLoading) {
     return (
       <div className="product-detail-page">
         <section className="product-detail">
           <div className="container">
             <p className="product-loading">Carregando peca comercial...</p>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (isError || !product) {
+    return (
+      <div className="product-detail-page">
+        <section className="product-detail">
+          <div className="container">
+            <Link className="product-back-link" to="/produtos/novidades">
+              <ArrowLeft size={18} />
+              Voltar para a loja
+            </Link>
+            <p className="product-loading">Esta peca nao esta publicada no site comercial.</p>
           </div>
         </section>
         <Footer />
@@ -89,7 +152,7 @@ export function ProductDetail() {
             <aside className="product-panel">
               <span className="product-category">Amoras Capital</span>
               <h1>{product.name}</h1>
-              <p className="product-description">{product.description}</p>
+              <ProductDescription description={product.description} />
 
               <div className="product-price-row">
                 <strong>{formatPrice(product.price)}</strong>

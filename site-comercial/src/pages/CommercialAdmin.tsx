@@ -1,13 +1,56 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ImagePlus, LogOut, Save, ToggleLeft, ToggleRight, Trash2, Upload } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  ImagePlus,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Save,
+  Settings,
+  Star,
+  Tags,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { commercialAdminApi } from '../lib/commercialAdminApi';
 import type { CommercialSiteSettings } from '../lib/commercialAdminApi';
+import { assetUrl } from '../lib/commercialApi';
 import type { CatalogProduct, CommercialCategory } from '../data/catalog';
 import './CommercialAdmin.css';
 
 const formatPrice = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
+
+type ProductVisibilityFilter = 'published' | 'hidden' | 'all';
+
+const productFilterLabels: Record<ProductVisibilityFilter, string> = {
+  published: 'Publicados',
+  hidden: 'Ocultos',
+  all: 'Todos',
+};
+
+type AdminGalleryItem = {
+  id: string;
+  url: string;
+  isCover: boolean;
+  source: 'commercial' | 'erp';
+};
+
+const uniqueGalleryItems = (items: AdminGalleryItem[]) => {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = item.url.split('?')[0];
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const slugify = (value: string) =>
   value
@@ -37,7 +80,23 @@ function ProductAdminRow({
   const [categoryId, setCategoryId] = useState(product.categoryId || '');
   const [featured, setFeatured] = useState(Boolean(product.featured));
   const [published, setPublished] = useState(product.published !== false);
+  const [expanded, setExpanded] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [uploadFeedback, setUploadFeedback] = useState('');
+  const commercialGallery = (product.commercialImages || []).map((image) => ({
+    id: image.id,
+    url: assetUrl(image.url),
+    isCover: Boolean(image.isCover),
+    source: 'commercial' as const,
+  }));
+  const erpGallery = (product.erpImages || []).map((image) => ({
+    id: image.id,
+    url: assetUrl(image.url),
+    isCover: false,
+    source: 'erp' as const,
+  }));
+  const galleryItems = uniqueGalleryItems([...commercialGallery, ...erpGallery]);
+  const primaryImage = galleryItems[0]?.url || product.image;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['commercial-admin-products'] });
@@ -64,45 +123,123 @@ function ProductAdminRow({
   });
 
   const uploadMutation = useMutation({
-    mutationFn: () => commercialAdminApi.uploadProductImages(product.id, files),
+    mutationFn: () => commercialAdminApi.addProductImages(product.id, files),
+    onMutate: () => setUploadFeedback(''),
     onSuccess: () => {
       setFiles([]);
+      setUploadFeedback('Fotos atualizadas com sucesso.');
       invalidate();
+    },
+    onError: (error: any) => {
+      const status = error.response?.status;
+      const message = status === 413
+        ? 'As fotos excedem o limite permitido. Use arquivos de ate 10 MB cada.'
+        : error.response?.data?.error || 'Nao foi possivel enviar as fotos.';
+      setUploadFeedback(message);
     },
   });
 
   const deleteImageMutation = useMutation({
     mutationFn: (imageId: string) => commercialAdminApi.deleteProductImage(product.id, imageId),
     onSuccess: invalidate,
+    onError: () => setUploadFeedback('Nao foi possivel remover a foto comercial.'),
+  });
+
+  const deleteErpImageMutation = useMutation({
+    mutationFn: (imageId: string) => commercialAdminApi.deleteErpProductImage(product.erpProductId, imageId),
+    onSuccess: invalidate,
+    onError: () => setUploadFeedback('Nao foi possivel remover a foto do ERP.'),
+  });
+
+  const coverImageMutation = useMutation({
+    mutationFn: (imageId: string) => commercialAdminApi.setProductCover(product.id, imageId),
+    onSuccess: invalidate,
+    onError: () => setUploadFeedback('Nao foi possivel definir a foto de capa.'),
   });
 
   return (
-    <article className="admin-product">
-      <div className="admin-product-gallery">
-        <img src={product.image} alt={product.name} />
+    <article className={`admin-product ${expanded ? 'is-expanded' : ''} ${published ? 'is-published' : 'is-hidden'}`}>
+      <button
+        type="button"
+        className="admin-product-summary"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((value) => !value)}
+      >
+        <img src={primaryImage} alt="" />
+        <span className="admin-product-summary-main">
+          <strong>{product.name}</strong>
+          <small>{product.erpProduct.name}</small>
+        </span>
+        <span className={`admin-status-pill ${published ? 'published' : 'hidden'}`}>
+          {published ? 'Publicado' : 'Oculto'}
+        </span>
+        <span className="admin-product-summary-action">
+          Editar
+          <ChevronDown size={18} />
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="admin-product-details">
+          <div className="admin-product-gallery">
+        <img src={primaryImage} alt={product.name} />
+        <div className="admin-gallery-summary">
+          <strong>{galleryItems.length}</strong>
+          <span>{galleryItems.length === 1 ? 'foto da roupa' : 'fotos da roupa'}</span>
+        </div>
         <div className="admin-thumbs">
-          {product.gallery.map((image, index) => {
-            const storedImage = product.commercialImages?.[index];
+          {galleryItems.length === 0 && (
+            <div className="admin-thumb admin-thumb-empty">
+              <ImagePlus size={22} />
+              <span>Sem fotos</span>
+            </div>
+          )}
+          {galleryItems.map((image, index) => {
+            const isCommercial = image.source === 'commercial';
             return (
-              <div className="admin-thumb" key={`${image}-${index}`}>
-                <img src={image} alt={`${product.name} ${index + 1}`} />
-                {storedImage && (
-                  <button
-                    type="button"
-                    aria-label="Remover foto"
-                    onClick={() => deleteImageMutation.mutate(storedImage.id)}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+              <div className="admin-thumb" key={`${image.source}-${image.id}`}>
+                <img src={image.url} alt={`${product.name} ${index + 1}`} />
+                <span className={`admin-image-source ${image.source}`}>
+                  {isCommercial ? 'Site' : 'ERP'}
+                </span>
+                {isCommercial && (
+                  <>
+                    <button
+                      type="button"
+                      className={`admin-cover-button ${image.isCover ? 'active' : ''}`}
+                      aria-label={image.isCover ? 'Foto de capa atual' : 'Definir como foto de capa'}
+                      title={image.isCover ? 'Foto de capa atual' : 'Definir como capa'}
+                      disabled={image.isCover || coverImageMutation.isPending}
+                      onClick={() => coverImageMutation.mutate(image.id)}
+                    >
+                      <Star size={14} fill={image.isCover ? 'currentColor' : 'none'} />
+                    </button>
+                  </>
                 )}
+                <button
+                  type="button"
+                  className="admin-delete-image"
+                  aria-label={isCommercial ? 'Remover foto comercial' : 'Remover foto do ERP'}
+                  title={isCommercial ? 'Remover foto comercial' : 'Remover foto do ERP'}
+                  disabled={deleteImageMutation.isPending || deleteErpImageMutation.isPending}
+                  onClick={() => {
+                    if (isCommercial) {
+                      deleteImageMutation.mutate(image.id);
+                      return;
+                    }
+                    deleteErpImageMutation.mutate(image.id);
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             );
           })}
         </div>
-      </div>
+          </div>
 
       <div className="admin-product-editor">
-        <div className="admin-product-topline">
+        <header className="admin-product-topline">
           <div>
             <span>{product.erpProduct.name}</span>
             <h2>{product.name}</h2>
@@ -115,7 +252,7 @@ function ProductAdminRow({
             {published ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
             {published ? 'Publicado' : 'Oculto'}
           </button>
-        </div>
+        </header>
 
         <div className="admin-erp-strip">
           <strong>{formatPrice(product.price)}</strong>
@@ -124,58 +261,84 @@ function ProductAdminRow({
           <span>{product.erpProduct.category?.name || 'Sem categoria ERP'}</span>
         </div>
 
-        <div className="admin-form-grid">
-          <label>
-            Titulo comercial
-            <input value={title} onChange={(event) => setTitle(event.target.value)} />
-          </label>
-          <label>
-            Slug
-            <input value={slug} onChange={(event) => setSlug(slugify(event.target.value))} />
-          </label>
-          <label>
-            Categoria do site
-            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-              <option value="">Novidades</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-check">
-            <input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} />
-            Destacar na vitrine
-          </label>
-          <label className="admin-wide">
-            Chamada curta
-            <input value={shortDescription} onChange={(event) => setShortDescription(event.target.value)} />
-          </label>
-          <label>
-            Material
-            <input value={material} onChange={(event) => setMaterial(event.target.value)} />
-          </label>
-          <label>
-            Cuidados
-            <input value={careInstructions} onChange={(event) => setCareInstructions(event.target.value)} />
-          </label>
-          <label>
-            Cor/observacao
-            <input value={colorNotes} onChange={(event) => setColorNotes(event.target.value)} />
-          </label>
-          <label>
-            SEO titulo
-            <input value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} />
-          </label>
-          <label className="admin-wide">
-            SEO descricao
-            <input value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} />
-          </label>
-          <label className="admin-wide">
-            Descricao comercial
-            <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
-          </label>
+        <div className="admin-editor-panels">
+          <section className="admin-editor-panel main">
+            <div className="admin-panel-title">
+              <strong>Conteudo da vitrine</strong>
+              <span>Nome, chamada e categoria</span>
+            </div>
+            <div className="admin-form-grid">
+              <label>
+                Titulo comercial
+                <input value={title} onChange={(event) => setTitle(event.target.value)} />
+              </label>
+              <label>
+                Slug
+                <input value={slug} onChange={(event) => setSlug(slugify(event.target.value))} />
+              </label>
+              <label>
+                Categoria do site
+                <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                  <option value="">Novidades</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="admin-check">
+                <input type="checkbox" checked={featured} onChange={(event) => setFeatured(event.target.checked)} />
+                Destacar na vitrine
+              </label>
+              <label className="admin-wide">
+                Chamada curta
+                <input value={shortDescription} onChange={(event) => setShortDescription(event.target.value)} />
+              </label>
+              <label className="admin-wide">
+                Descricao comercial
+                <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} />
+              </label>
+            </div>
+          </section>
+
+          <section className="admin-editor-panel">
+            <div className="admin-panel-title">
+              <strong>Detalhes</strong>
+              <span>Informacoes extras</span>
+            </div>
+            <div className="admin-form-grid compact">
+              <label>
+                Material
+                <input value={material} onChange={(event) => setMaterial(event.target.value)} />
+              </label>
+              <label>
+                Cuidados
+                <input value={careInstructions} onChange={(event) => setCareInstructions(event.target.value)} />
+              </label>
+              <label>
+                Cor/observacao
+                <input value={colorNotes} onChange={(event) => setColorNotes(event.target.value)} />
+              </label>
+            </div>
+          </section>
+
+          <section className="admin-editor-panel">
+            <div className="admin-panel-title">
+              <strong>SEO</strong>
+              <span>Texto para busca</span>
+            </div>
+            <div className="admin-form-grid compact">
+              <label>
+                SEO titulo
+                <input value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} />
+              </label>
+              <label className="admin-wide">
+                SEO descricao
+                <input value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} />
+              </label>
+            </div>
+          </section>
         </div>
 
         <div className="admin-actions">
@@ -186,7 +349,18 @@ function ProductAdminRow({
               type="file"
               accept="image/*"
               multiple
-              onChange={(event) => setFiles(Array.from(event.target.files || []))}
+              onChange={(event) => {
+                const selected = Array.from(event.target.files || []);
+                const oversized = selected.find((file) => file.size > 10 * 1024 * 1024);
+                if (oversized) {
+                  setFiles([]);
+                  setUploadFeedback(`A foto ${oversized.name} excede 10 MB.`);
+                  event.target.value = '';
+                  return;
+                }
+                setUploadFeedback('');
+                setFiles(selected);
+              }}
             />
           </label>
           <button
@@ -196,7 +370,7 @@ function ProductAdminRow({
             onClick={() => uploadMutation.mutate()}
           >
             <Upload size={18} />
-            Enviar fotos
+            {uploadMutation.isPending ? 'Enviando...' : 'Adicionar fotos'}
           </button>
           <button
             type="button"
@@ -207,8 +381,15 @@ function ProductAdminRow({
             <Save size={18} />
             Salvar vitrine
           </button>
+          {uploadFeedback && (
+            <p className={`admin-upload-feedback ${uploadMutation.isError ? 'error' : 'success'}`} role="status">
+              {uploadFeedback}
+            </p>
+          )}
         </div>
       </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -227,6 +408,7 @@ export function CommercialAdmin() {
   const [categorySlug, setCategorySlug] = useState('');
   const [categoryDescription, setCategoryDescription] = useState('');
   const [categoryImage, setCategoryImage] = useState('');
+  const [productFilter, setProductFilter] = useState<ProductVisibilityFilter>('published');
   const [settingsForm, setSettingsForm] = useState<CommercialSiteSettings>({
     brandName: 'Amoras Capital',
     announcement: '',
@@ -258,6 +440,27 @@ export function CommercialAdmin() {
 
   const categories = categoriesQuery.data || [];
   const products = productsQuery.data || [];
+
+  const productFilterCounts = useMemo(
+    () => ({
+      published: products.filter((product) => product.published !== false).length,
+      hidden: products.filter((product) => product.published === false).length,
+      all: products.length,
+    }),
+    [products]
+  );
+
+  const visibleProducts = useMemo(() => {
+    if (productFilter === 'hidden') {
+      return products.filter((product) => product.published === false);
+    }
+
+    if (productFilter === 'all') {
+      return products;
+    }
+
+    return products.filter((product) => product.published !== false);
+  }, [productFilter, products]);
 
   useEffect(() => {
     if (settingsQuery.data) {
@@ -390,175 +593,230 @@ export function CommercialAdmin() {
 
   return (
     <div className="commercial-admin">
-      <section className="admin-hero">
-        <div>
-          <span>Amoras Capital</span>
-          <h1>Admin do site comercial</h1>
-          <p>Vitrine, categorias e fotos comerciais. Preco, tamanho e estoque continuam sincronizados pelo ERP.</p>
-        </div>
-        <div className="admin-hero-side">
-          <div className="admin-user">
-            <span>{currentUser?.role || 'ADMIN'}</span>
-            <strong>{currentUser?.name || 'Usuario Amoras'}</strong>
-            <button type="button" onClick={logout}>
-              <LogOut size={16} />
-              Sair
-            </button>
-          </div>
-          <div className="admin-stats">
-            <strong>{stats.published}<small>publicados</small></strong>
-            <strong>{stats.withImages}<small>com fotos</small></strong>
-            <strong>{stats.categories}<small>categorias</small></strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="admin-section">
-        <div className="admin-section-heading">
+      <aside className="admin-sidebar" aria-label="Navegacao do admin comercial">
+        <div className="admin-brand">
+          <img src="/amoras-logo.png" alt="Amoras Capital" />
           <div>
-            <span>Configuracoes</span>
-            <h2>Identidade do site</h2>
+            <strong>Amoras Capital</strong>
+            <span>Site comercial</span>
           </div>
-          <button
-            type="button"
-            className="admin-button"
-            onClick={() => updateSettingsMutation.mutate()}
-            disabled={updateSettingsMutation.isPending}
-          >
-            <Save size={18} />
-            Salvar site
+        </div>
+        <nav className="admin-nav">
+          <a href="#overview" className="active">
+            <LayoutDashboard size={18} />
+            Visao geral
+          </a>
+          <a href="#catalog">
+            <Package size={18} />
+            Produtos
+          </a>
+          <a href="#categories">
+            <Tags size={18} />
+            Categorias
+          </a>
+          <a href="#settings">
+            <Settings size={18} />
+            Configuracoes
+          </a>
+        </nav>
+        <div className="admin-sidebar-user">
+          <span>{currentUser?.role || 'ADMIN'}</span>
+          <strong>{currentUser?.name || 'Usuario Amoras'}</strong>
+          <button type="button" onClick={logout}>
+            <LogOut size={16} />
+            Sair
           </button>
         </div>
+      </aside>
 
-        <div className="admin-form-grid">
-          <label>
-            Nome da marca
-            <input
-              value={settingsForm.brandName}
-              onChange={(event) => updateSettingsField('brandName', event.target.value)}
-            />
-          </label>
-          <label>
-            WhatsApp
-            <input
-              value={settingsForm.whatsappUrl}
-              onChange={(event) => updateSettingsField('whatsappUrl', event.target.value)}
-            />
-          </label>
-          <label>
-            Instagram
-            <input
-              value={settingsForm.instagramUrl}
-              onChange={(event) => updateSettingsField('instagramUrl', event.target.value)}
-            />
-          </label>
-          <label className="admin-wide">
-            Aviso do topo
-            <input
-              value={settingsForm.announcement}
-              onChange={(event) => updateSettingsField('announcement', event.target.value)}
-            />
-          </label>
-          <label>
-            Titulo principal
-            <input
-              value={settingsForm.heroTitle}
-              onChange={(event) => updateSettingsField('heroTitle', event.target.value)}
-            />
-          </label>
-          <label className="admin-wide">
-            Subtitulo principal
-            <input
-              value={settingsForm.heroSubtitle}
-              onChange={(event) => updateSettingsField('heroSubtitle', event.target.value)}
-            />
-          </label>
-          <label>
-            SEO titulo
-            <input
-              value={settingsForm.seoTitle}
-              onChange={(event) => updateSettingsField('seoTitle', event.target.value)}
-            />
-          </label>
-          <label className="admin-wide">
-            SEO descricao
-            <input
-              value={settingsForm.seoDescription}
-              onChange={(event) => updateSettingsField('seoDescription', event.target.value)}
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="admin-section">
-        <div className="admin-section-heading">
+      <div className="admin-workspace">
+        <section className="admin-topbar" id="overview">
           <div>
-            <span>Categorias</span>
-            <h2>Organizacao da vitrine</h2>
+            <span>Painel comercial</span>
+            <h1>Vitrine da loja</h1>
           </div>
-        </div>
+          <a className="admin-preview-link" href="/" target="_blank" rel="noreferrer">
+            <Eye size={17} />
+            Ver loja
+          </a>
+        </section>
 
-        <form className="admin-category-form" onSubmit={createCategory}>
-          <label>
-            Nome
-            <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} />
-          </label>
-          <label>
-            Slug
-            <input
-              value={categorySlug}
-              onChange={(event) => setCategorySlug(slugify(event.target.value))}
-              placeholder={categoryName ? slugify(categoryName) : 'vestidos'}
-            />
-          </label>
-          <label>
-            Imagem
-            <input value={categoryImage} onChange={(event) => setCategoryImage(event.target.value)} />
-          </label>
-          <label className="admin-wide">
-            Descricao
-            <input value={categoryDescription} onChange={(event) => setCategoryDescription(event.target.value)} />
-          </label>
-          <button type="submit" className="admin-button" disabled={createCategoryMutation.isPending}>
-            Criar categoria
-          </button>
-        </form>
+        <section className="admin-stats" aria-label="Resumo do catalogo">
+          <strong>{stats.published}<small>publicados</small></strong>
+          <strong>{productFilterCounts.hidden}<small>ocultos</small></strong>
+          <strong>{stats.withImages}<small>com fotos</small></strong>
+          <strong>{stats.categories}<small>categorias</small></strong>
+        </section>
 
-        <div className="admin-category-list">
-          {categories.map((category) => (
-            <button
-              type="button"
-              key={category.id}
-              className={category.active ? 'active' : ''}
-              onClick={() => toggleCategoryMutation.mutate(category)}
-            >
-              {category.name}
-              <span>{category.active ? 'Ativa' : 'Oculta'}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="admin-section">
-        <div className="admin-section-heading">
-          <div>
-            <span>Produtos publicados pelo ERP</span>
-            <h2>Fotos e textos do site</h2>
+        <section className="admin-section" id="catalog">
+          <div className="admin-section-heading">
+            <div>
+              <span>Catalogo comercial</span>
+              <h2>Produtos da vitrine</h2>
+            </div>
+            <div className="admin-filter-tabs" role="tablist" aria-label="Filtro de produtos">
+              {(Object.keys(productFilterLabels) as ProductVisibilityFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  className={productFilter === filter ? 'active' : ''}
+                  onClick={() => setProductFilter(filter)}
+                >
+                  {productFilterLabels[filter]}
+                  <span>{productFilterCounts[filter]}</span>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {(productsQuery.isLoading || categoriesQuery.isLoading) && (
-          <p className="admin-empty">Carregando vitrine comercial...</p>
-        )}
-        {!productsQuery.isLoading && products.length === 0 && (
-          <p className="admin-empty">Nenhuma roupa publicada pelo ERP ainda.</p>
-        )}
-        <div className="admin-products-list">
-          {products.map((product) => (
-            <ProductAdminRow key={product.id} product={product} categories={categories} />
-          ))}
+          {(productsQuery.isLoading || categoriesQuery.isLoading) && (
+            <p className="admin-empty">Carregando vitrine comercial...</p>
+          )}
+          {!productsQuery.isLoading && products.length === 0 && (
+            <p className="admin-empty">Nenhuma roupa publicada pelo ERP ainda.</p>
+          )}
+          {!productsQuery.isLoading && products.length > 0 && visibleProducts.length === 0 && (
+            <p className="admin-empty">
+              {productFilter === 'hidden'
+                ? 'Nenhuma roupa oculta no momento.'
+                : 'Nenhuma roupa neste filtro.'}
+            </p>
+          )}
+          <div className="admin-products-list">
+            {visibleProducts.map((product) => (
+              <ProductAdminRow key={product.id} product={product} categories={categories} />
+            ))}
+          </div>
+        </section>
+
+        <div className="admin-grid-two">
+          <section className="admin-section" id="categories">
+            <div className="admin-section-heading">
+              <div>
+                <span>Categorias</span>
+                <h2>Organizacao da vitrine</h2>
+              </div>
+            </div>
+
+            <form className="admin-category-form" onSubmit={createCategory}>
+              <label>
+                Nome
+                <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} />
+              </label>
+              <label>
+                Slug
+                <input
+                  value={categorySlug}
+                  onChange={(event) => setCategorySlug(slugify(event.target.value))}
+                  placeholder={categoryName ? slugify(categoryName) : 'vestidos'}
+                />
+              </label>
+              <label>
+                Imagem
+                <input value={categoryImage} onChange={(event) => setCategoryImage(event.target.value)} />
+              </label>
+              <label className="admin-wide">
+                Descricao
+                <input value={categoryDescription} onChange={(event) => setCategoryDescription(event.target.value)} />
+              </label>
+              <button type="submit" className="admin-button" disabled={createCategoryMutation.isPending}>
+                Criar categoria
+              </button>
+            </form>
+
+            <div className="admin-category-list">
+              {categories.map((category) => (
+                <button
+                  type="button"
+                  key={category.id}
+                  className={category.active ? 'active' : ''}
+                  onClick={() => toggleCategoryMutation.mutate(category)}
+                >
+                  {category.name}
+                  <span>{category.active ? 'Ativa' : 'Oculta'}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="admin-section" id="settings">
+            <div className="admin-section-heading">
+              <div>
+                <span>Configuracoes</span>
+                <h2>Identidade do site</h2>
+              </div>
+              <button
+                type="button"
+                className="admin-button"
+                onClick={() => updateSettingsMutation.mutate()}
+                disabled={updateSettingsMutation.isPending}
+              >
+                <Save size={18} />
+                Salvar site
+              </button>
+            </div>
+
+            <div className="admin-form-grid">
+              <label>
+                Nome da marca
+                <input
+                  value={settingsForm.brandName}
+                  onChange={(event) => updateSettingsField('brandName', event.target.value)}
+                />
+              </label>
+              <label>
+                WhatsApp
+                <input
+                  value={settingsForm.whatsappUrl}
+                  onChange={(event) => updateSettingsField('whatsappUrl', event.target.value)}
+                />
+              </label>
+              <label>
+                Instagram
+                <input
+                  value={settingsForm.instagramUrl}
+                  onChange={(event) => updateSettingsField('instagramUrl', event.target.value)}
+                />
+              </label>
+              <label className="admin-wide">
+                Aviso do topo
+                <input
+                  value={settingsForm.announcement}
+                  onChange={(event) => updateSettingsField('announcement', event.target.value)}
+                />
+              </label>
+              <label>
+                Titulo principal
+                <input
+                  value={settingsForm.heroTitle}
+                  onChange={(event) => updateSettingsField('heroTitle', event.target.value)}
+                />
+              </label>
+              <label className="admin-wide">
+                Subtitulo principal
+                <input
+                  value={settingsForm.heroSubtitle}
+                  onChange={(event) => updateSettingsField('heroSubtitle', event.target.value)}
+                />
+              </label>
+              <label>
+                SEO titulo
+                <input
+                  value={settingsForm.seoTitle}
+                  onChange={(event) => updateSettingsField('seoTitle', event.target.value)}
+                />
+              </label>
+              <label className="admin-wide">
+                SEO descricao
+                <input
+                  value={settingsForm.seoDescription}
+                  onChange={(event) => updateSettingsField('seoDescription', event.target.value)}
+                />
+              </label>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
   );
 }

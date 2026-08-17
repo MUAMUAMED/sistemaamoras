@@ -3,33 +3,51 @@
   min-height: 88vh;
   padding: 118px var(--space-5) var(--space-10);
   overflow: hidden;
-  background:
-    linear-gradient(120deg, rgba(255, 248, 246, 0.92), rgba(248, 207, 199, 0.82)),
-    url('https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=1800&q=80') center/cover;
+  isolation: isolate;
+  background: rgba(255, 248, 246, 0.9);
 }
 
 .hero::before {
   content: '';
   position: absolute;
   inset: 0;
+  z-index: 1;
   background:
-    linear-gradient(90deg, rgba(255, 253, 249, 0.96) 0%, rgba(255, 248, 246, 0.8) 48%, rgba(113, 60, 75, 0.18) 100%);
+    linear-gradient(90deg, rgba(255, 253, 249, 0.76) 0%, rgba(255, 248, 246, 0.66) 38%, rgba(248, 207, 199, 0.42) 68%, rgba(248, 207, 199, 0.26) 100%),
+    radial-gradient(circle at 28% 52%, rgba(255, 253, 249, 0.34), transparent 46%);
+  pointer-events: none;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: -72px;
+  z-index: 0;
+  background-image: var(--hero-bg-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  filter: blur(1px) saturate(1.02);
+  opacity: 0.38;
+  transform: scale(1.01);
   pointer-events: none;
 }
 
 .hero-shell {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.85fr);
-  align-items: center;
+  grid-template-columns: minmax(0, 0.88fr) minmax(460px, 0.98fr);
+  align-items: stretch;
   gap: var(--space-10);
   width: 100%;
-  max-width: 1240px;
+  max-width: 1320px;
+  min-height: calc(88vh - 118px - var(--space-10));
   margin: 0 auto;
 }
 
 .hero-content {
+  align-self: center;
   max-width: 650px;
 }
 
@@ -95,14 +113,17 @@
 
 .hero-media {
   position: relative;
-  min-height: 500px;
+  width: 100%;
+  min-height: 640px;
+  align-self: stretch;
+  justify-self: stretch;
   overflow: hidden;
-  border: 10px solid rgba(255, 253, 249, 0.58);
-  border-radius: 48% 48% 8px 8px;
-  box-shadow: var(--shadow-xl);
+  border: 8px solid rgba(255, 253, 249, 0.68);
+  border-radius: 28px;
+  box-shadow: 0 28px 80px rgba(57, 35, 45, 0.16);
   isolation: isolate;
   transform: translateZ(0);
-  clip-path: inset(0 round 48% 48% 8px 8px);
+  clip-path: inset(0 round 28px);
 }
 
 .hero-carousel-track {
@@ -111,16 +132,14 @@
   overflow: hidden;
   border-radius: inherit;
   clip-path: inherit;
-  background: var(--color-blush-100);
+  background:
+    radial-gradient(circle at 58% 46%, rgba(255, 253, 249, 0.6), transparent 42%),
+    linear-gradient(135deg, rgba(248, 207, 199, 0.42), rgba(255, 253, 249, 0.78));
 }
 
-.hero-carousel-track img {
+.hero-carousel-slide {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 500px;
-  object-fit: cover;
   opacity: 0;
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -128,8 +147,30 @@
   will-change: opacity;
 }
 
-.hero-carousel-track img.active {
+.hero-carousel-slide.active {
   opacity: 1;
+}
+
+.hero-carousel-slide img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 640px;
+}
+
+.hero-carousel-blur {
+  object-fit: cover;
+  object-position: center top;
+  filter: blur(24px) saturate(1.08);
+  transform: scale(1.08);
+  opacity: 0.28;
+}
+
+.hero-carousel-main {
+  z-index: 1;
+  object-fit: cover;
+  object-position: center top;
 }
 
 .hero-carousel-btn {
@@ -221,6 +262,38 @@
   background: var(--color-blush-50);
 }
 
+.hero-empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  background: var(--color-blush-100);
+  color: var(--color-berry-700);
+  text-align: center;
+}
+
+.hero-empty-state img {
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: var(--shadow-md);
+}
+
+.hero-empty-state strong {
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+}
+
+.hero-empty-state span {
+  max-width: 310px;
+  color: var(--color-muted);
+}
+
 .hero-media-badge {
   position: absolute;
   z-index: 2;
@@ -254,6 +327,8 @@
 
   .hero-shell {
     grid-template-columns: 1fr;
+    align-items: start;
+    min-height: auto;
   }
 
   .hero-content {
@@ -262,11 +337,12 @@
 
   .hero-media {
     min-height: 440px;
+    width: min(100%, 560px);
     border-radius: 28px 28px 8px 8px;
     clip-path: inset(0 round 28px 28px 8px 8px);
   }
 
-  .hero-carousel-track img {
+  .hero-carousel-slide img {
     min-height: 440px;
   }
 }
@@ -292,9 +368,10 @@
 
   .hero-media {
     min-height: 360px;
+    width: 100%;
   }
 
-  .hero-carousel-track img {
+  .hero-carousel-slide img {
     min-height: 360px;
   }
 

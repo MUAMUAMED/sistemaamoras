@@ -110,8 +110,23 @@
 }
 
 .product-description {
+  display: grid;
+  gap: var(--space-3);
   color: var(--color-muted);
-  font-size: var(--text-lg);
+  font-size: var(--text-base);
+  line-height: 1.72;
+}
+
+.product-description h3 {
+  margin-top: var(--space-2);
+  color: var(--color-plum-900);
+  font-family: var(--font-serif);
+  font-size: var(--text-2xl);
+  line-height: 1.15;
+}
+
+.product-description p {
+  margin: 0;
 }
 
 .product-price-row {

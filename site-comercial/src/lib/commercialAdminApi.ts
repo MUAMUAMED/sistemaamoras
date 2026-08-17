@@ -70,7 +70,7 @@ export const commercialAdminApi = {
     return mapCommercialProduct(response.data);
   },
 
-  uploadProductImages: async (id: string, files: File[]): Promise<void> => {
+  addProductImages: async (id: string, files: File[]): Promise<void> => {
     const formData = new FormData();
     files.forEach((file) => formData.append('images', file));
     await api.post(`/commercial/admin/products/${id}/images`, formData, {
@@ -80,6 +80,14 @@ export const commercialAdminApi = {
 
   deleteProductImage: async (productId: string, imageId: string): Promise<void> => {
     await api.delete(`/commercial/admin/products/${productId}/images/${imageId}`);
+  },
+
+  deleteErpProductImage: async (erpProductId: string, imageId: string): Promise<void> => {
+    await api.delete(`/products/${erpProductId}/images/${imageId}`);
+  },
+
+  setProductCover: async (productId: string, imageId: string): Promise<void> => {
+    await api.put(`/commercial/admin/products/${productId}/images/${imageId}/cover`);
   },
 
   settings: async (): Promise<CommercialSiteSettings | null> => {

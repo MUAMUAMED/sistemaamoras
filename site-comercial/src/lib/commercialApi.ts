@@ -1,21 +1,41 @@
 import { api } from './api';
 import type { CatalogProduct, CommercialCategory } from '../data/catalog';
 
-const UPLOAD_BASE_URL = import.meta.env.VITE_UPLOAD_URL || import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || 'http://localhost:3000';
+const configuredUploadUrl = import.meta.env.VITE_UPLOAD_URL;
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const UPLOAD_BASE_URL = configuredUploadUrl !== undefined
+  ? configuredUploadUrl.replace(/\/$/, '')
+  : configuredApiUrl?.startsWith('http')
+    ? configuredApiUrl.replace(/\/api\/?$/, '')
+    : '';
+const PLACEHOLDER_IMAGE = '/amoras-logo.png';
 
-const assetUrl = (url?: string) => {
-  if (!url) return 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=900&q=82';
+export const assetUrl = (url?: string) => {
+  if (!url) return PLACEHOLDER_IMAGE;
   if (/^https?:\/\//i.test(url)) return url;
   return `${UPLOAD_BASE_URL}${url}`;
 };
 
 const fallbackColor = '#bd727a';
 
+const uniqueImagesByUrl = (images: any[]) => {
+  const seen = new Set<string>();
+
+  return images.filter((image) => {
+    const key = assetUrl(image.url).split('?')[0];
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 export const mapCommercialProduct = (item: any): CatalogProduct => {
   const erp = item.erpProduct || {};
-  const images = Array.isArray(item.images) ? item.images : [];
-  const gallery = images.length
-    ? images.map((image: any) => assetUrl(image.url))
+  const commercialImages = uniqueImagesByUrl(Array.isArray(item.images) ? item.images : []);
+  const erpImages = uniqueImagesByUrl(Array.isArray(erp.images) ? erp.images : []);
+  const visibleImages = commercialImages.length ? commercialImages : erpImages;
+  const gallery = visibleImages.length
+    ? visibleImages.map((image: any) => assetUrl(image.url))
     : [assetUrl(undefined)];
 
   return {
@@ -36,7 +56,8 @@ export const mapCommercialProduct = (item: any): CatalogProduct => {
     colorNotes: item.colorNotes,
     image: gallery[0],
     gallery,
-    commercialImages: images,
+    commercialImages,
+    erpImages,
     colors: [fallbackColor, '#f8cfc7', '#713c4b'],
     sizes: erp.size?.name ? [erp.size.name] : ['Unico'],
     details: [
@@ -64,16 +85,41 @@ export const mapCommercialProduct = (item: any): CatalogProduct => {
 };
 
 export const commercialApi = {
+  settings: async (): Promise<{ brandName?: string; whatsappUrl?: string; instagramUrl?: string; announcement?: string }> => {
+    const response = await api.get('/commercial/settings', {
+      params: { t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    return response.data || {};
+  },
+
   catalog: async (): Promise<{ categories: CommercialCategory[]; products: CatalogProduct[] }> => {
-    const response = await api.get('/commercial/catalog');
+    const response = await api.get('/commercial/catalog', {
+      params: { t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
     return {
       categories: response.data.categories || [],
-      products: (response.data.products || []).map(mapCommercialProduct),
+      products: (response.data.products || [])
+        .map(mapCommercialProduct)
+        .filter((product: CatalogProduct) => product.published !== false),
     };
   },
 
   productBySlug: async (slug: string): Promise<CatalogProduct> => {
-    const response = await api.get(`/commercial/products/${slug}`);
-    return mapCommercialProduct(response.data);
+    const response = await api.get(`/commercial/products/${slug}`, {
+      params: { t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    const product = mapCommercialProduct(response.data);
+    if (product.published === false) {
+      throw new Error('Produto nao publicado');
+    }
+    return product;
+  },
+
+  checkout: async (items: Array<{ commercialProductId: string; quantity: number }>): Promise<{ checkoutUrl: string }> => {
+    const response = await api.post('/commercial/checkout', { items });
+    return response.data;
   },
 };

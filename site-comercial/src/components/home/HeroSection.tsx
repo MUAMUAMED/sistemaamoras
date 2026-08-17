@@ -1,52 +1,50 @@
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, ChevronLeft, ChevronRight, CreditCard, RefreshCw, Truck } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { commercialApi } from '../../lib/commercialApi';
 import './HeroSection.css';
-
-const heroLooks = [
-  {
-    title: 'Vestido Jardim',
-    subtitle: 'Midi leve para dias de sol',
-    image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=1100&q=85',
-  },
-  {
-    title: 'Conjunto Rosa Cha',
-    subtitle: 'Look pronto e delicado',
-    image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1100&q=85',
-  },
-  {
-    title: 'Blusa Bordado Flor',
-    subtitle: 'Detalhes inspirados na logo',
-    image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=1100&q=85',
-  },
-  {
-    title: 'Saia Midi Aurora',
-    subtitle: 'Movimento suave e feminino',
-    image: 'https://images.unsplash.com/photo-1502716119720-b23a93e5fe1b?w=1100&q=85',
-  },
-];
 
 export function HeroSection() {
   const [activeLook, setActiveLook] = useState(0);
+  const { data, isLoading } = useQuery({
+    queryKey: ['commercial-catalog'],
+    queryFn: commercialApi.catalog,
+  });
+  const heroLooks = data?.products.slice(0, 4) || [];
 
   useEffect(() => {
+    if (heroLooks.length <= 1) return;
     const timer = window.setInterval(() => {
       setActiveLook((current) => (current + 1) % heroLooks.length);
     }, 2600);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [heroLooks.length]);
+
+  useEffect(() => {
+    if (activeLook >= heroLooks.length) {
+      setActiveLook(0);
+    }
+  }, [activeLook, heroLooks.length]);
 
   const goToPrevious = () => {
+    if (!heroLooks.length) return;
     setActiveLook((current) => (current === 0 ? heroLooks.length - 1 : current - 1));
   };
 
   const goToNext = () => {
+    if (!heroLooks.length) return;
     setActiveLook((current) => (current + 1) % heroLooks.length);
   };
 
+  const heroStyle = {
+    '--hero-bg-image': heroLooks[activeLook]?.image ? `url("${heroLooks[activeLook].image}")` : 'none',
+  } as CSSProperties;
+
   return (
-    <section className="hero">
+    <section className="hero" style={heroStyle}>
       <div className="hero-shell">
         <motion.div
           className="hero-content"
@@ -55,10 +53,10 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.2 }}
         >
           <img className="hero-logo" src="/amoras-logo.png" alt="Amoras Capital" />
-          <span className="hero-kicker">Nova colecao autoral</span>
-          <h1 className="hero-title">Roupas leves, femininas e cheias de delicadeza</h1>
+          <span className="hero-kicker">Catalogo sincronizado</span>
+          <h1 className="hero-title">Pecas publicadas diretamente do sistema Amoras</h1>
           <p className="hero-subtitle">
-            Vestidos, conjuntos e pecas para dias de sol, encontros especiais e uma rotina com mais cor.
+            A vitrine mostra somente roupas cadastradas e publicadas no banco, com preco e estoque vindo do ERP.
           </p>
           <div className="hero-actions">
             <a className="btn btn-primary hero-cta" href="#produtos">
@@ -81,37 +79,48 @@ export function HeroSection() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.9, delay: 0.35 }}
         >
-          <div className="hero-carousel-track">
-            {heroLooks.map((look, index) => (
-              <img
-                key={look.title}
-                src={look.image}
-                alt={look.title}
-                className={index === activeLook ? 'active' : ''}
-              />
-            ))}
-          </div>
-          <button className="hero-carousel-btn previous" onClick={goToPrevious} aria-label="Look anterior">
-            <ChevronLeft size={22} />
-          </button>
-          <button className="hero-carousel-btn next" onClick={goToNext} aria-label="Proximo look">
-            <ChevronRight size={22} />
-          </button>
-          <div className="hero-carousel-caption">
-            <span>Look {activeLook + 1} de {heroLooks.length}</span>
-            <strong>{heroLooks[activeLook].title}</strong>
-            <small>{heroLooks[activeLook].subtitle}</small>
-          </div>
-          <div className="hero-carousel-dots" aria-label="Selecionar look do banner">
-            {heroLooks.map((look, index) => (
-              <button
-                key={look.title}
-                className={index === activeLook ? 'active' : ''}
-                onClick={() => setActiveLook(index)}
-                aria-label={`Ver ${look.title}`}
-              />
-            ))}
-          </div>
+          {heroLooks.length > 0 ? (
+            <>
+              <div className="hero-carousel-track">
+                {heroLooks.map((look, index) => (
+                  <div
+                    key={look.id}
+                    className={`hero-carousel-slide ${index === activeLook ? 'active' : ''}`}
+                  >
+                    <img className="hero-carousel-blur" src={look.image} alt="" aria-hidden="true" />
+                    <img className="hero-carousel-main" src={look.image} alt={look.name} />
+                  </div>
+                ))}
+              </div>
+              <button className="hero-carousel-btn previous" onClick={goToPrevious} aria-label="Look anterior">
+                <ChevronLeft size={22} />
+              </button>
+              <button className="hero-carousel-btn next" onClick={goToNext} aria-label="Proximo look">
+                <ChevronRight size={22} />
+              </button>
+              <div className="hero-carousel-caption">
+                <span>Produto {activeLook + 1} de {heroLooks.length}</span>
+                <strong>{heroLooks[activeLook]?.name}</strong>
+                <small>{heroLooks[activeLook]?.shortDescription || heroLooks[activeLook]?.categoryName}</small>
+              </div>
+              <div className="hero-carousel-dots" aria-label="Selecionar produto do banner">
+                {heroLooks.map((look, index) => (
+                  <button
+                    key={look.id}
+                    className={index === activeLook ? 'active' : ''}
+                    onClick={() => setActiveLook(index)}
+                    aria-label={`Ver ${look.name}`}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="hero-empty-state">
+              <img src="/amoras-logo.png" alt="Amoras Capital" />
+              <strong>{isLoading ? 'Carregando catalogo...' : 'Nenhuma roupa publicada ainda'}</strong>
+              <span>Quando um produto for publicado pelo ERP, ele aparece aqui automaticamente.</span>
+            </div>
+          )}
           <div className="hero-media-badge">
             <strong>AMORAS10</strong>
             <span>10% off na primeira compra</span>
