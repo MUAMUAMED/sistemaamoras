@@ -108,7 +108,7 @@ router.post('/draft', authenticateToken, uploadProductImage.array('images', IMAG
 
 router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
   try {
-    const { name, description, category, subcategory, pattern, sizeId, price, stock, initialLocation = 'ARMAZEM', images = [] } = req.body as any;
+    const { name, description, category, subcategory, pattern, sizeId, price, stock, initialLocation = 'ARMAZEM', images = [], mergeWithExisting = false } = req.body as any;
     const productName = clean(name); const numericPrice = Number(price); const numericStock = Number(stock);
     if (!productName || !category || !pattern || !sizeId || !Number.isFinite(numericPrice) || numericPrice <= 0 || !Number.isInteger(numericStock) || numericStock < 0) return res.status(400).json({ error: 'Preencha nome, categoria, estampa, tamanho, preço e estoque válidos.' });
     if (!['LOJA', 'ARMAZEM'].includes(initialLocation)) return res.status(400).json({ error: 'Local inicial inválido.' });
@@ -118,12 +118,26 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
       const size = await tx.size.findFirst({ where: { id: sizeId, active: true } }); if (!size) throw new Error('Tamanho inválido.');
       const categoryResult = await categoryFor(tx, category); const subcategoryResult = await subcategoryFor(tx, categoryResult.value.id, subcategory); const patternResult = await patternFor(tx, pattern);
       const barcode = `${size.code}${categoryResult.value.code}${subcategoryResult.value?.code || '00'}${patternResult.value.code}`;
-      const existing = await tx.product.findUnique({ where: { barcode } }); const qrcodeUrl = existing?.qrcodeUrl || await QRCode.toDataURL(barcode);
+      const existing = await tx.product.findUnique({ where: { barcode } });
+      if (existing && mergeWithExisting !== true) {
+        return {
+          conflict: true as const,
+          existingProduct: { id: existing.id, name: existing.name, barcode: existing.barcode, stock: existing.stock, stockLoja: existing.stockLoja, stockArmazem: existing.stockArmazem },
+        };
+      }
+      const qrcodeUrl = existing?.qrcodeUrl || await QRCode.toDataURL(barcode);
       const product = existing ? await tx.product.update({ where: { id: existing.id }, data: { price: numericPrice, description: clean(description) || existing.description, stock: { increment: numericStock }, stockLoja: initialLocation === 'LOJA' ? { increment: numericStock } : undefined, stockArmazem: initialLocation === 'ARMAZEM' ? { increment: numericStock } : undefined } }) : await tx.product.create({ data: { name: productName, categoryId: categoryResult.value.id, subcategoryId: subcategoryResult.value?.id, patternId: patternResult.value.id, sizeId, price: numericPrice, stock: numericStock, stockLoja: initialLocation === 'LOJA' ? numericStock : 0, stockArmazem: initialLocation === 'ARMAZEM' ? numericStock : 0, barcode, qrcodeUrl, description: clean(description) || null, status: 'ATIVO', inProduction: false, isDraft: false } });
       await tx.productImage.createMany({ data: images.map((image: DraftImage, position: number) => ({ productId: product.id, url: image.url, type: ProductImageType.ROUPA, position })) });
       if (numericStock > 0) await tx.stockMovement.create({ data: { productId: product.id, type: StockMovementType.ENTRY, quantity: numericStock, reason: existing ? 'Entrada via aplicativo de produção' : 'Cadastro via aplicativo de produção', location: initialLocation as StockLocation, userId: req.user!.id } });
       return { product: await tx.product.findUniqueOrThrow({ where: { id: product.id }, include: { category: true, subcategory: true, pattern: true, size: true, images: true } }), created: { category: categoryResult.created, subcategory: subcategoryResult.created, pattern: patternResult.created }, mergedIntoExisting: Boolean(existing) };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    if ('conflict' in result) {
+      return res.status(409).json({
+        error: 'Já existe uma roupa com este código.',
+        message: 'Confirme explicitamente se deseja somar as unidades ao produto existente.',
+        existingProduct: result.existingProduct,
+      });
+    }
     return res.status(201).json(result);
   } catch (error) { return next(error); }
 });
