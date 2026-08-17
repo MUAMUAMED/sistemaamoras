@@ -30,9 +30,9 @@
 
 ### **Backend - 100% Funcional ✅**
 - **Status:** Rodando sem erros
-- **URL:** http://localhost:3001
-- **Health Check:** http://localhost:3001/health ✅
-- **API Docs:** http://localhost:3001/api-docs ✅
+- **URL:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- **Health Check:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health ✅
+- **API Docs:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs ✅
 - **Banco PostgreSQL:** Conectado e populado ✅
 
 ### **Frontend - 100% Funcional ✅**
@@ -91,8 +91,8 @@
 
 ### **Acesso:**
 - **Frontend:** http://localhost:3000
-- **Backend:** http://localhost:3001
-- **API Docs:** http://localhost:3001/api-docs
+- **Backend:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- **API Docs:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ### **Login:**
 - **Admin:** admin@amorascapital.com / admin123

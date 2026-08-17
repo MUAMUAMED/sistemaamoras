@@ -85,7 +85,7 @@ const Categories: React.FC = () => {
       await categoriesApi.delete(forceDeleteId, true);
       setForceDeleteId(null);
       queryClient.invalidateQueries({ queryKey: ['categories'] });
-      toast.success('Categoria e produtos relacionados excluídos com sucesso!');
+      toast.success('Categoria e dependências excluídas com sucesso!');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Erro ao excluir categoria');
     } finally {

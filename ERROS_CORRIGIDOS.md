@@ -34,7 +34,7 @@ export const dashboardService = dashboardApi;
 ✅ **URL base corrigida:**
 ```typescript
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api',
   timeout: 10000,
 });
 ```
@@ -110,9 +110,9 @@ export interface DashboardMetrics {
 ## 🚀 **Status Final do Sistema:**
 
 ### **✅ Backend (100% Funcional)**
-- Servidor rodando: `http://localhost:3001`
-- API Docs: `http://localhost:3001/api-docs`
-- Health check: `http://localhost:3001/health`
+- Servidor rodando: `http://https://amoras-sistema-gew1.gbl2yq.easypanel.host`
+- API Docs: `http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs`
+- Health check: `http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health`
 
 ### **✅ Frontend (100% Funcional)**
 - Aplicação rodando: `http://localhost:3000`
@@ -136,7 +136,7 @@ export interface DashboardMetrics {
 
 2. **Acessar:**
    - Frontend: http://localhost:3000
-   - Backend: http://localhost:3001
+   - Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 
 3. **Credenciais de teste:**
    - Admin: admin@amorascapital.com / admin123

@@ -42,7 +42,7 @@ data: { imageUrl },
 #### **🌐 Servidor de Arquivos Estáticos:**
 - ✅ Configurado em `backend/src/index.ts` linha 95
 - ✅ `app.use('/uploads', express.static('uploads'));`
-- ✅ URLs funcionando: `http://localhost:3001/uploads/products/arquivo.jpg`
+- ✅ URLs funcionando: `http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/uploads/products/arquivo.jpg`
 
 #### **📋 Schema do Banco:**
 - ✅ Campo `imageUrl` existe no modelo `Product`
@@ -57,7 +57,7 @@ data: { imageUrl },
 // Em frontend/src/pages/Products.tsx (linha 520-530)
 {product.imageUrl ? (
   <img 
-    src={`http://localhost:3001${product.imageUrl}`}
+    src={`http://https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`}
     alt={product.name}
     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
     onError={(e) => {
@@ -105,7 +105,7 @@ await prisma.product.update({
 ### **3. Exibição:**
 ```typescript
 // Frontend exibe a imagem
-<img src={`http://localhost:3001${product.imageUrl}`} />
+<img src={`http://https://amoras-sistema-gew1.gbl2yq.easypanel.host${product.imageUrl}`} />
 ```
 
 ---
@@ -138,7 +138,7 @@ await prisma.product.update({
 - ✅ **Banco de dados:** Campo `imageUrl` preenchido
 - ✅ **Servidor:** Arquivo salvo em `uploads/products/`
 - ✅ **Frontend:** Imagem exibida corretamente
-- ✅ **URL:** Acessível via `http://localhost:3001/uploads/products/`
+- ✅ **URL:** Acessível via `http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/uploads/products/`
 
 ---
 

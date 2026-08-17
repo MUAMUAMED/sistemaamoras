@@ -10,7 +10,7 @@ async function testarValidacoes() {
     // Teste 1: Validar códigos existentes
     console.log('1️⃣ Testando API de validação de códigos...');
     try {
-      const response = await axios.get('http://localhost:3001/api/barcode/validate-codes', {
+      const response = await axios.get('http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/barcode/validate-codes', {
         headers: { Authorization: `Bearer ${token}` }
       });
       console.log('✅ API de validação funcionando!');
@@ -25,7 +25,7 @@ async function testarValidacoes() {
     // Teste 2: Tentar criar categoria com código inválido
     console.log('\n2️⃣ Testando validação de categoria com código inválido...');
     try {
-      await axios.post('http://localhost:3001/api/categories', {
+      await axios.post('http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/categories', {
         name: 'Teste Categoria Inválida',
         code: 'ABC123', // Código inválido (letras)
         description: 'Teste de validação'
@@ -44,7 +44,7 @@ async function testarValidacoes() {
     // Teste 3: Tentar criar estampa com código muito longo
     console.log('\n3️⃣ Testando validação de estampa com código muito longo...');
     try {
-      await axios.post('http://localhost:3001/api/patterns', {
+      await axios.post('http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/patterns', {
         name: 'Teste Estampa Longa',
         code: '12345', // Código muito longo (5 dígitos)
         description: 'Teste de validação'
@@ -63,7 +63,7 @@ async function testarValidacoes() {
     // Teste 4: Tentar criar tamanho com código inválido
     console.log('\n4️⃣ Testando validação de tamanho com código inválido...');
     try {
-      await axios.post('http://localhost:3001/api/sizes', {
+      await axios.post('http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/sizes', {
         name: 'Teste Tamanho Inválido',
         code: '999', // Código muito longo (3 dígitos)
         active: true

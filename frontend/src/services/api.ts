@@ -10,6 +10,7 @@ import {
   Sale,
   SaleItem,
   StockMovement,
+  StockLocation,
   Interaction,
   SystemConfig,
   DashboardMetrics,
@@ -35,8 +36,8 @@ import {
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || (
     process.env.NODE_ENV === 'production' 
-      ? 'https://api.exemplo.com/api'
-      : 'http://localhost:3001/api'
+      ? 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
+      : 'https://amoras-sistema-gew1.gbl2yq.easypanel.host/api'
   ),
   timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
 });
@@ -279,6 +280,20 @@ export const productsApi = {
     });
     return response.data;
   },
+
+  uploadImages: async (id: string, images: File[], type: 'ROUPA' | 'IA'): Promise<{ message: string }> => {
+    const formData = new FormData();
+    images.forEach((file) => formData.append('images', file));
+    const response = await api.post(`/products/${id}/images?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  
+  finishProduction: async (id: string): Promise<Product> => {
+    const response = await api.put(`/products/${id}/finish-production`);
+    return response.data;
+  },
   
   addStock: async (id: string, quantity: number, reason?: string): Promise<{
     message: string;
@@ -314,6 +329,70 @@ export const productsApi = {
     totalMovements: number;
   }> => {
     const response = await api.get(`/products/${id}/stock/history`);
+    return response.data;
+  },
+  
+  addStockLocation: async (id: string, quantity: number, location: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/add-location`, {
+      quantity,
+      location,
+      reason: reason || `Adição manual de estoque - ${location}`
+    });
+    return response.data;
+  },
+  
+  removeStockLocation: async (id: string, quantity: number, location: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/remove-location`, {
+      quantity,
+      location,
+      reason: reason || `Retirada manual de estoque - ${location}`
+    });
+    return response.data;
+  },
+  
+  transferStock: async (id: string, quantity: number, fromLocation: StockLocation, toLocation: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+    transferDetails: {
+      quantity: number;
+      fromLocation: StockLocation;
+      toLocation: StockLocation;
+      previousFromStock: number;
+      newFromStock: number;
+      previousToStock: number;
+      newToStock: number;
+    };
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/transfer`, {
+      quantity,
+      fromLocation,
+      toLocation,
+      reason: reason || `Transferência de estoque: ${fromLocation} → ${toLocation}`
+    });
+    return response.data;
+  },
+
+  publishToCommercialSite: async (id: string, data?: {
+    title?: string;
+    slug?: string;
+    description?: string;
+    shortDescription?: string;
+    categoryId?: string | null;
+    featured?: boolean;
+    position?: number;
+  }): Promise<Product['commercialProduct']> => {
+    const response = await api.post(`/commercial/admin/products/publish/${id}`, data || {});
+    return response.data;
+  },
+
+  unpublishFromCommercialSite: async (commercialProductId: string): Promise<Product['commercialProduct']> => {
+    const response = await api.put(`/commercial/admin/products/${commercialProductId}/unpublish`);
     return response.data;
   },
 };

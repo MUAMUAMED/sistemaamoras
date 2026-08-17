@@ -67,8 +67,8 @@ npm run dev
 
 3. **Acessar o sistema:**
 - Frontend: http://localhost:3000
-- Backend API: http://localhost:3001
-- Documentação API: http://localhost:3001/api-docs
+- Backend API: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- Documentação API: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ## Usuários de Teste
 

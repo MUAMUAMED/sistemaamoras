@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Amoras Produção",
+    "slug": "amoras-producao",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.amoras.producao",
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"]
+    },
+    "plugins": ["expo-image-picker", "expo-secure-store"]
+  }
+}

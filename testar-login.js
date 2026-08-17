@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = 'http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api';
 
 const contas = [
   { email: 'admin@amorascapital.com', senha: 'admin123', nome: 'Administrador' },

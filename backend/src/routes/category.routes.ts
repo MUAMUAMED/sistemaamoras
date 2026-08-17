@@ -71,6 +71,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
 router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { force } = req.query;
 
     // Verificar se a categoria existe
     const category = await prisma.category.findUnique({
@@ -78,7 +79,8 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
       include: {
         _count: {
           select: {
-            products: true
+            products: true,
+            subcategories: true
           }
         }
       }
@@ -91,16 +93,68 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
       });
     }
 
-    // Verificar se há produtos usando esta categoria
-    if (category._count.products > 0) {
+    // Verificar se há dependências (produtos ou subcategorias)
+    const hasProducts = category._count.products > 0;
+    const hasSubcategories = category._count.subcategories > 0;
+
+    if ((hasProducts || hasSubcategories) && force !== 'true') {
+      let message = 'Esta categoria não pode ser excluída porque possui:';
+      const dependencies = [];
+      
+      if (hasProducts) {
+        dependencies.push(`${category._count.products} produto(s)`);
+      }
+      if (hasSubcategories) {
+        dependencies.push(`${category._count.subcategories} subcategoria(s)`);
+      }
+      
+      message += ` ${dependencies.join(' e ')}.`;
+
       return res.status(409).json({
         error: 'Categoria em uso',
-        message: `Esta categoria está sendo usada por ${category._count.products} produto(s). Remova os produtos primeiro.`,
-        canForce: true
+        message: message,
+        canForce: true,
+        details: {
+          products: category._count.products,
+          subcategories: category._count.subcategories
+        }
       });
     }
 
-    // Excluir a categoria
+    // Se for exclusão forçada, deletar dependências primeiro
+    if (force === 'true') {
+      await prisma.$transaction(async (tx) => {
+        // 1. Deletar todos os produtos da categoria
+        if (hasProducts) {
+          await tx.product.deleteMany({
+            where: { categoryId: id }
+          });
+        }
+
+        // 2. Deletar todas as subcategorias da categoria
+        if (hasSubcategories) {
+          await tx.subcategory.deleteMany({
+            where: { categoryId: id }
+          });
+        }
+
+        // 3. Deletar a categoria
+        await tx.category.delete({
+          where: { id }
+        });
+      });
+
+      return res.status(200).json({
+        message: 'Categoria e dependências excluídas com sucesso',
+        categoryName: category.name,
+        deletedItems: {
+          products: category._count.products,
+          subcategories: category._count.subcategories
+        }
+      });
+    }
+
+    // Exclusão normal (sem dependências)
     await prisma.category.delete({
       where: { id }
     });

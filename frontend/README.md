@@ -33,7 +33,7 @@ npm start
 
 ### Variáveis de Ambiente (.env)
 ```env
-REACT_APP_API_URL=http://localhost:3001/api
+REACT_APP_API_URL=http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api
 REACT_APP_API_TIMEOUT=30000
 ```
 

@@ -85,17 +85,22 @@ export interface Product {
   description?: string;
   price: number;
   cost?: number;
-  stock: number;
+  stock: number; // Estoque total (para compatibilidade)
+  stockLoja: number; // Estoque na Loja
+  stockArmazem: number; // Estoque no Armazém
   minStock: number;
   barcode: string;
   qrcodeUrl?: string;
   imageUrl?: string;
+  images?: ProductImage[]; // Galeria de imagens
   categoryId: string;
   subcategoryId?: string; // Opcional
+  sizeId: string; // ID do tamanho
   patternId: string;
-  size: string; // Campo string para compatibilidade com SQLite
-  sizeCode: string; // Campo string para compatibilidade com SQLite
   active: boolean;
+  inProduction: boolean; // Status de produção (mantido para compatibilidade)
+  status: ProductStatus; // Status do produto
+  commercialProduct?: CommercialProductSummary | null;
   createdAt: string;
   updatedAt: string;
   
@@ -103,7 +108,35 @@ export interface Product {
   category?: Category;
   subcategory?: Subcategory;
   pattern?: Pattern;
+  size?: Size; // Relação completa do tamanho
 }
+
+export interface CommercialProductSummary {
+  id: string;
+  erpProductId: string;
+  title: string;
+  slug: string;
+  published: boolean;
+  featured: boolean;
+  categoryId?: string;
+}
+
+export type ProductImageType = 'ROUPA' | 'IA';
+
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  type: ProductImageType;
+  position: number;
+  createdAt: string;
+}
+
+// Enums de localização de estoque
+export type StockLocation = 'LOJA' | 'ARMAZEM';
+
+// Enums de status de produto
+export type ProductStatus = 'PROCESSANDO' | 'ATIVO' | 'INATIVO';
 
 // Tipos de movimentação de estoque
 export interface StockMovement {
@@ -113,7 +146,10 @@ export interface StockMovement {
   quantity: number;
   reason: string;
   reference?: string;
-  userId: string;
+  userId?: string;
+  location?: StockLocation; // Para ENTRY/EXIT/ADJUSTMENT
+  fromLocation?: StockLocation; // Para TRANSFER
+  toLocation?: StockLocation; // Para TRANSFER
   createdAt: string;
   
   // Relações
@@ -319,6 +355,9 @@ export interface ProductFormData {
   sizeId: string; // ID do tamanho para buscar dados
   active?: boolean;
   imageFile?: File;
+  imageFilesRoupa?: File[]; // novas imagens tipo roupa
+  imageFilesIA?: File[];    // novas imagens tipo IA
+  initialLocation?: 'LOJA' | 'ARMAZEM'; // Localização inicial do estoque
 }
 
 export interface SubcategoryFormData {

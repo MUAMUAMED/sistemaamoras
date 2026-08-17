@@ -107,7 +107,7 @@ tasklist | findstr node
 ### Testar Conexões
 ```bash
 # Testar backend
-curl http://localhost:3001/health
+curl http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
 
 # Testar frontend
 curl http://localhost:3000
