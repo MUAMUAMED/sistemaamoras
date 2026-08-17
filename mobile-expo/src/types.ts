@@ -32,6 +32,11 @@ export type ListedProduct = {
   size?: { name: string } | null;
 };
 
+export type ProductListResponse = {
+  data: ListedProduct[];
+  pagination: { page: number; limit: number; total: number; pages: number };
+};
+
 export type ClothingForm = ClothingDraft & {
   categoryId?: string;
   subcategoryId?: string;

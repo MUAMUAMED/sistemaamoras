@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import type { AuthUser, Catalog, DraftImage, DraftResponse, ClothingForm, ListedProduct } from './types';
+import type { AuthUser, Catalog, DraftImage, DraftResponse, ClothingForm, ProductListResponse } from './types';
 
 // A URL é definida no .env para apontar sempre ao serviço público atual da Zeabur.
 // Não há fallback: usar uma URL antiga poderia gravar dados no backend errado.
@@ -50,9 +50,10 @@ export async function loadCatalog(token: string): Promise<Catalog> {
   return { categories, subcategories, patterns, sizes };
 }
 
-export async function listProducts(token: string): Promise<ListedProduct[]> {
-  const response = await request<{ data: ListedProduct[] }>('/products?limit=100&isDraft=false', token);
-  return response.data;
+export async function listProducts(token: string, options: { page?: number; search?: string } = {}): Promise<ProductListResponse> {
+  const params = new URLSearchParams({ limit: '30', page: String(options.page || 1), isDraft: 'false' });
+  if (options.search?.trim()) params.set('search', options.search.trim());
+  return request<ProductListResponse>(`/products?${params.toString()}`, token);
 }
 
 export async function generateDraft(token: string, photos: string[]): Promise<DraftResponse> {
