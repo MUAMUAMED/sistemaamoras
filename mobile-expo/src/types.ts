@@ -27,6 +27,8 @@ export type ListedProduct = {
   stockLoja: number;
   stockArmazem: number;
   barcode?: string | null;
+  imageUrl?: string | null;
+  images?: Array<{ id?: string; url: string; isCover?: boolean; position?: number }>;
   status?: string;
   category?: { name: string } | null;
   subcategory?: { name: string } | null;

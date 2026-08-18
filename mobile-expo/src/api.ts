@@ -9,6 +9,14 @@ const USER_KEY = 'amoras_producao_user';
 
 type StoredSession = { token: string; user: AuthUser };
 
+/** Converte caminhos gravados pelo backend (/uploads/...) em URLs públicas. */
+export function resolveAssetUrl(path?: string | null) {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  const publicBase = API_URL.replace(/\/api$/, '');
+  return `${publicBase}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number, public readonly payload: Record<string, unknown>) {
     super(message);
