@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ChoicePill, SelectModal } from './src/components';
 import { ApiError, clearSession, generateDraft, getSession, listProducts, loadCatalog, login, publishDraft, resolveAssetUrl, saveSession } from './src/api';
-import type { AuthUser, Catalog, CatalogItem, ClothingForm, DraftImage, ListedProduct } from './src/types';
+import type { AuthUser, Catalog, CatalogItem, ClothingDraft, ClothingForm, DraftImage, ListedProduct } from './src/types';
 
 const emptyCatalog: Catalog = { categories: [], subcategories: [], patterns: [], sizes: [] };
 const blankForm = (): ClothingForm => ({ name: '', categoryName: '', subcategoryName: '', patternName: '', description: '', confidence: 0, notes: [], sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
@@ -16,6 +16,26 @@ function ProductCover({ product, size = 'card' }: { product: ListedProduct; size
   const uri = resolveAssetUrl(cover);
   if (!uri) return <View style={size === 'detail' ? styles.detailImagePlaceholder : styles.productImagePlaceholder}><Text style={styles.imagePlaceholderText}>Sem foto</Text></View>;
   return <Image source={{ uri }} style={size === 'detail' ? styles.detailImage : styles.productImage} resizeMode="cover" />;
+}
+
+const comparableCatalogName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
+const sameCatalogName = (first: string, second: string) => {
+  const a = comparableCatalogName(first); const b = comparableCatalogName(second);
+  if (a === b) return true;
+  const singular = (value: string) => value.endsWith('s') ? value.slice(0, -1) : value;
+  return singular(a) === singular(b);
+};
+
+function selectDraftCatalog(draft: ClothingDraft, catalog: Catalog): ClothingDraft {
+  const category = catalog.categories.find((item) => sameCatalogName(item.name, draft.categoryName));
+  const subcategory = category && catalog.subcategories.find((item) => item.categoryId === category.id && sameCatalogName(item.name, draft.subcategoryName));
+  return {
+    ...draft,
+    categoryName: category?.name || draft.categoryName,
+    categoryId: category?.id || draft.categoryId,
+    subcategoryName: subcategory?.name || draft.subcategoryName,
+    subcategoryId: subcategory?.id || draft.subcategoryId,
+  };
 }
 
 function CatalogSection({ title, items }: { title: string; items: CatalogItem[] }) {
@@ -104,7 +124,7 @@ function AppContent() {
     try {
       const response = await generateDraft(token, photos);
       setDraftImages(response.images);
-      setForm({ ...response.draft, sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
+      setForm({ ...selectDraftCatalog(response.draft, catalog), sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
       setSuccess(null);
       try { setCatalog(await loadCatalog(token)); } catch { /* cadastro ainda pode ser concluído com o catálogo já carregado */ }
     } catch (error) { Alert.alert('Rascunho não gerado', error instanceof Error ? error.message : 'Tente novamente.'); }
