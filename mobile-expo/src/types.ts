@@ -7,7 +7,9 @@ export type DraftImage = { url: string; token: string };
 export type ClothingDraft = {
   name: string;
   categoryName: string;
-  subcategoryName: string | null;
+  categoryId?: string;
+  subcategoryName: string;
+  subcategoryId?: string;
   patternName: string;
   description: string;
   confidence: number;
@@ -42,8 +44,6 @@ export type ProductListResponse = {
 };
 
 export type ClothingForm = ClothingDraft & {
-  categoryId?: string;
-  subcategoryId?: string;
   patternId?: string;
   sizeId: string;
   price: string;

@@ -7,7 +7,7 @@ import { ApiError, clearSession, generateDraft, getSession, listProducts, loadCa
 import type { AuthUser, Catalog, CatalogItem, ClothingForm, DraftImage, ListedProduct } from './src/types';
 
 const emptyCatalog: Catalog = { categories: [], subcategories: [], patterns: [], sizes: [] };
-const blankForm = (): ClothingForm => ({ name: '', categoryName: '', subcategoryName: null, patternName: '', description: '', confidence: 0, notes: [], sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
+const blankForm = (): ClothingForm => ({ name: '', categoryName: '', subcategoryName: '', patternName: '', description: '', confidence: 0, notes: [], sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
 type Selection = 'category' | 'subcategory' | 'pattern' | 'size' | null;
 type Screen = 'list' | 'create' | 'detail' | 'catalog';
 
@@ -104,7 +104,7 @@ function AppContent() {
     try {
       const response = await generateDraft(token, photos);
       setDraftImages(response.images);
-      setForm({ ...response.draft, subcategoryName: response.draft.subcategoryName || null, sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
+      setForm({ ...response.draft, sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
       setSuccess(null);
       try { setCatalog(await loadCatalog(token)); } catch { /* cadastro ainda pode ser concluído com o catálogo já carregado */ }
     } catch (error) { Alert.alert('Rascunho não gerado', error instanceof Error ? error.message : 'Tente novamente.'); }
@@ -122,7 +122,7 @@ function AppContent() {
   async function handlePublish(mergeWithExisting = false) {
     if (!token) return;
     if (!form.sizeId) return Alert.alert('Tamanho obrigatório', 'Selecione o tamanho da peça antes de publicar.');
-    if (!form.name.trim() || !form.categoryName.trim() || !form.patternName.trim() || !form.price || !form.stock) return Alert.alert('Revise o cadastro', 'Nome, categoria, estampa, preço e estoque são obrigatórios.');
+    if (!form.name.trim() || !form.categoryName.trim() || !form.subcategoryName.trim() || !form.patternName.trim() || !form.price || !form.stock) return Alert.alert('Revise o cadastro', 'Nome, categoria, subcategoria, estampa, preço e estoque são obrigatórios.');
     setPublishing(true);
     try {
       const result = await publishDraft(token, form, draftImages, mergeWithExisting);
@@ -143,7 +143,7 @@ function AppContent() {
   }
 
   function selectItem(item: CatalogItem) {
-    if (selection === 'category') setForm((value) => ({ ...value, categoryId: item.id, categoryName: item.name, subcategoryId: undefined, subcategoryName: null }));
+    if (selection === 'category') setForm((value) => ({ ...value, categoryId: item.id, categoryName: item.name, subcategoryId: undefined, subcategoryName: '' }));
     if (selection === 'subcategory') setForm((value) => ({ ...value, subcategoryId: item.id, subcategoryName: item.name }));
     if (selection === 'pattern') setForm((value) => ({ ...value, patternId: item.id, patternName: item.name }));
     if (selection === 'size') setForm((value) => ({ ...value, sizeId: item.id }));
@@ -172,9 +172,9 @@ function AppContent() {
         <View style={styles.reviewHead}><Text style={styles.heading}>Revise o rascunho</Text><Pressable onPress={resetDraft}><Text style={styles.redo}>Refazer fotos</Text></Pressable></View><Text style={styles.helper}>A IA sugere; a decisão final é sua. Os cadastros novos só são criados ao publicar.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbs}>{photos.map((uri) => <Image key={uri} source={{ uri }} style={styles.thumb} />)}</ScrollView>
         <Field label="Nome da roupa" value={form.name} onChangeText={(name) => setForm((value) => ({ ...value, name }))} placeholder="Ex.: Vestido midi floral" />
-        <Field label="Categoria" value={form.categoryName} onChangeText={(categoryName) => setForm((value) => ({ ...value, categoryName, categoryId: undefined, subcategoryName: null, subcategoryId: undefined }))} placeholder="Digite ou selecione abaixo" />
+        <Field label="Categoria" value={form.categoryName} onChangeText={(categoryName) => setForm((value) => ({ ...value, categoryName, categoryId: undefined, subcategoryName: '', subcategoryId: undefined }))} placeholder="Digite ou selecione abaixo" />
         <Pressable style={styles.selectButton} onPress={() => setSelection('category')}><Text style={styles.selectText}>Selecionar categoria existente</Text></Pressable>
-        <Field label="Subcategoria (opcional)" value={form.subcategoryName || ''} onChangeText={(subcategoryName) => setForm((value) => ({ ...value, subcategoryName: subcategoryName || null, subcategoryId: undefined }))} placeholder="Digite ou selecione abaixo" />
+        <Field label="Subcategoria" value={form.subcategoryName} onChangeText={(subcategoryName) => setForm((value) => ({ ...value, subcategoryName, subcategoryId: undefined }))} placeholder="Obrigatória: digite ou selecione abaixo" />
         <Pressable style={[styles.selectButton, !form.categoryId && styles.disabled]} disabled={!form.categoryId} onPress={() => setSelection('subcategory')}><Text style={styles.selectText}>Selecionar subcategoria existente</Text></Pressable>
         <Field label="Estampa / identidade visual" value={form.patternName} onChangeText={(patternName) => setForm((value) => ({ ...value, patternName, patternId: undefined }))} placeholder="Ex.: Liso Preto Elegante" />
         <Pressable style={styles.selectButton} onPress={() => setSelection('pattern')}><Text style={styles.selectText}>Selecionar estampa existente</Text></Pressable>

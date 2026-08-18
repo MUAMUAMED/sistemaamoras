@@ -82,7 +82,7 @@ export async function publishDraft(token: string, form: ClothingForm, images: Dr
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: form.name, description: form.description, category: { id: form.categoryId, name: form.categoryName },
-      subcategory: form.subcategoryName ? { id: form.subcategoryId, name: form.subcategoryName } : null,
+      subcategory: { id: form.subcategoryId, name: form.subcategoryName },
       pattern: { id: form.patternId, name: form.patternName }, sizeId: form.sizeId,
       price: Number(form.price.replace(',', '.')), stock: Number(form.stock), initialLocation: form.initialLocation, images, mergeWithExisting,
     }),
