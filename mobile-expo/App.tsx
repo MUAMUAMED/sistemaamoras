@@ -82,6 +82,8 @@ function AppContent() {
   })(); }, []);
 
   const subcategories = useMemo(() => form.categoryId ? catalog.subcategories.filter((item) => item.categoryId === form.categoryId) : [], [catalog.subcategories, form.categoryId]);
+  const selectedCategory = catalog.categories.find((item) => item.id === form.categoryId);
+  const selectedSubcategory = subcategories.find((item) => item.id === form.subcategoryId);
   const selectedSize = catalog.sizes.find((item) => item.id === form.sizeId);
 
   async function refreshProducts(currentToken = token, page = 1, query = search, append = false) {
@@ -192,10 +194,8 @@ function AppContent() {
         <View style={styles.reviewHead}><Text style={styles.heading}>Revise o rascunho</Text><Pressable onPress={resetDraft}><Text style={styles.redo}>Refazer fotos</Text></Pressable></View><Text style={styles.helper}>A IA sugere; a decisão final é sua. Os cadastros novos só são criados ao publicar.</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbs}>{photos.map((uri) => <Image key={uri} source={{ uri }} style={styles.thumb} />)}</ScrollView>
         <Field label="Nome da roupa" value={form.name} onChangeText={(name) => setForm((value) => ({ ...value, name }))} placeholder="Ex.: Vestido midi floral" />
-        <Field label="Categoria" value={form.categoryName} onChangeText={(categoryName) => setForm((value) => ({ ...value, categoryName, categoryId: undefined, subcategoryName: '', subcategoryId: undefined }))} placeholder="Digite ou selecione abaixo" />
-        <Pressable style={styles.selectButton} onPress={() => setSelection('category')}><Text style={styles.selectText}>Selecionar categoria existente</Text></Pressable>
-        <Field label="Subcategoria" value={form.subcategoryName} onChangeText={(subcategoryName) => setForm((value) => ({ ...value, subcategoryName, subcategoryId: undefined }))} placeholder="Obrigatória: digite ou selecione abaixo" />
-        <Pressable style={[styles.selectButton, !form.categoryId && styles.disabled]} disabled={!form.categoryId} onPress={() => setSelection('subcategory')}><Text style={styles.selectText}>Selecionar subcategoria existente</Text></Pressable>
+        <Pressable style={styles.sizeButton} onPress={() => setSelection('category')}><Text style={styles.label}>Categoria</Text><Text style={selectedCategory ? styles.sizeValue : styles.sizePlaceholder}>{selectedCategory ? `${selectedCategory.name} · cód. ${selectedCategory.code}` : 'Toque para selecionar'}</Text></Pressable>
+        <Pressable style={[styles.sizeButton, !form.categoryId && styles.disabled]} disabled={!form.categoryId} onPress={() => setSelection('subcategory')}><Text style={styles.label}>Subcategoria</Text><Text style={selectedSubcategory ? styles.sizeValue : styles.sizePlaceholder}>{selectedSubcategory ? `${selectedSubcategory.name} · cód. ${selectedSubcategory.code}` : 'Toque para selecionar'}</Text></Pressable>
         <Field label="Estampa / identidade visual" value={form.patternName} onChangeText={(patternName) => setForm((value) => ({ ...value, patternName, patternId: undefined }))} placeholder="Ex.: Liso Preto Elegante" />
         <Pressable style={styles.selectButton} onPress={() => setSelection('pattern')}><Text style={styles.selectText}>Selecionar estampa existente</Text></Pressable>
         <Pressable style={styles.sizeButton} onPress={() => setSelection('size')}><Text style={styles.label}>Tamanho</Text><Text style={selectedSize ? styles.sizeValue : styles.sizePlaceholder}>{selectedSize ? selectedSize.name : 'Toque para selecionar'}</Text></Pressable>
