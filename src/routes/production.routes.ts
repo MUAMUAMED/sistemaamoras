@@ -17,6 +17,12 @@ type AiDraft = { name: string; categoryName: string; categoryId?: string; subcat
 
 const clean = (value: unknown) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
 const comparable = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+const sameCatalogName = (first: string, second: string) => {
+  const a = comparable(first); const b = comparable(second);
+  if (a === b) return true;
+  const singular = (value: string) => value.endsWith('s') ? value.slice(0, -1) : value;
+  return singular(a) === singular(b);
+};
 const secret = () => process.env.PRODUCTION_DRAFT_SECRET || process.env.JWT_SECRET || 'development-production-draft-secret';
 const signature = (url: string, expiresAt: number) => createHmac('sha256', secret()).update(`${url}:${expiresAt}`).digest('hex');
 
@@ -70,9 +76,15 @@ async function createAiDraft(files: Express.Multer.File[]): Promise<AiDraft> {
   const output = body.choices?.[0]?.message?.content;
   if (!output) throw new Error('A IA retornou uma resposta vazia.');
   const draft = parseDraft(output);
-  const category = categories.find((item) => comparable(item.name) === comparable(draft.categoryName));
-  const subcategory = category?.subcategories.find((item) => comparable(item.name) === comparable(draft.subcategoryName));
-  return { ...draft, categoryId: category?.id, subcategoryId: subcategory?.id };
+  const category = categories.find((item) => sameCatalogName(item.name, draft.categoryName));
+  const subcategory = category?.subcategories.find((item) => sameCatalogName(item.name, draft.subcategoryName));
+  return {
+    ...draft,
+    categoryName: category?.name || draft.categoryName,
+    categoryId: category?.id,
+    subcategoryName: subcategory?.name || draft.subcategoryName,
+    subcategoryId: subcategory?.id,
+  };
 }
 
 async function freeCode(tx: Prisma.TransactionClient, kind: 'category' | 'subcategory' | 'pattern', categoryId?: string): Promise<string> {
