@@ -153,7 +153,14 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
       const product = existing ? await tx.product.update({ where: { id: existing.id }, data: { price: numericPrice, description: clean(description) || existing.description, stock: { increment: numericStock }, stockLoja: initialLocation === 'LOJA' ? { increment: numericStock } : undefined, stockArmazem: initialLocation === 'ARMAZEM' ? { increment: numericStock } : undefined } }) : await tx.product.create({ data: { name: productName, categoryId: categoryResult.value.id, subcategoryId: subcategoryResult.value.id, patternId: patternResult.value.id, sizeId, price: numericPrice, stock: numericStock, stockLoja: initialLocation === 'LOJA' ? numericStock : 0, stockArmazem: initialLocation === 'ARMAZEM' ? numericStock : 0, barcode, qrcodeUrl, description: clean(description) || null, status: 'ATIVO', inProduction: false, isDraft: false } });
       await tx.productImage.createMany({ data: images.map((image: DraftImage, position: number) => ({ productId: product.id, url: image.url, type: ProductImageType.ROUPA, position })) });
       if (numericStock > 0) await tx.stockMovement.create({ data: { productId: product.id, type: StockMovementType.ENTRY, quantity: numericStock, reason: existing ? 'Entrada via aplicativo de produção' : 'Cadastro via aplicativo de produção', location: initialLocation as StockLocation, userId: req.user!.id } });
-      return { product: await tx.product.findUniqueOrThrow({ where: { id: product.id }, include: { category: true, subcategory: true, pattern: true, size: true, images: true } }), created: { category: categoryResult.created, subcategory: subcategoryResult.created, pattern: patternResult.created }, mergedIntoExisting: Boolean(existing) };
+      // A tela de produção só precisa do identificador e do código para mostrar
+      // o resultado e imprimir a etiqueta. Evitar devolver o grafo completo do
+      // Prisma (incluindo imagens) mantém a resposta estritamente serializável.
+      return {
+        product: { id: product.id, barcode: product.barcode },
+        created: { category: categoryResult.created, subcategory: subcategoryResult.created, pattern: patternResult.created },
+        mergedIntoExisting: Boolean(existing),
+      };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     if ('conflict' in result) {
       return res.status(409).json({
