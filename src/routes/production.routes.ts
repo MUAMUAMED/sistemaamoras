@@ -13,7 +13,7 @@ const IMAGE_LIMIT = 2;
 const DRAFT_TTL = 30 * 60 * 1000;
 
 type DraftImage = { url: string; token: string };
-type AiDraft = { name: string; categoryName: string; categoryId?: string; subcategoryName: string; subcategoryId?: string; patternName: string; description: string; confidence: number; notes: string[] };
+type AiDraft = { name: string; categoryName: string; categoryCode: string; categoryId?: string; subcategoryName: string; subcategoryCode: string; subcategoryId?: string; patternName: string; description: string; confidence: number; notes: string[] };
 
 const clean = (value: unknown) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
 const comparable = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
@@ -45,11 +45,11 @@ function parseDraft(output: string): AiDraft {
   if (!json) throw new Error('A IA não retornou um rascunho válido.');
   const result = JSON.parse(json) as Partial<AiDraft>;
   const draft: AiDraft = {
-    name: clean(result.name), categoryName: clean(result.categoryName), subcategoryName: clean(result.subcategoryName),
+    name: clean(result.name), categoryName: clean(result.categoryName), categoryCode: clean(result.categoryCode), subcategoryName: clean(result.subcategoryName), subcategoryCode: clean(result.subcategoryCode),
     patternName: clean(result.patternName), description: clean(result.description), confidence: Number(result.confidence),
     notes: Array.isArray(result.notes) ? result.notes.map(clean).filter(Boolean).slice(0, 4) : [],
   };
-  if (!draft.name || !draft.categoryName || !draft.subcategoryName || !draft.patternName) throw new Error('A IA não retornou nome, categoria, subcategoria e estampa completos.');
+  if (!draft.name || !draft.categoryName || !draft.categoryCode || !draft.subcategoryName || !draft.subcategoryCode || !draft.patternName) throw new Error('A IA não retornou nome, categoria, subcategoria e estampa completos.');
   if (comparable(draft.categoryName) === comparable(draft.subcategoryName)) throw new Error('A IA repetiu a categoria como subcategoria. Gere o rascunho novamente.');
   draft.confidence = Number.isFinite(draft.confidence) ? Math.max(0, Math.min(1, draft.confidence)) : 0;
   return draft;
@@ -59,15 +59,15 @@ async function createAiDraft(files: Express.Multer.File[]): Promise<AiDraft> {
   if (!process.env.OPENROUTER_API_KEY) throw new Error('A IA não está configurada. Defina OPENROUTER_API_KEY no serviço Zeabur.');
   const categories = await prisma.category.findMany({
     where: { active: true },
-    select: { id: true, name: true, subcategories: { where: { active: true }, select: { id: true, name: true } } },
+    select: { id: true, name: true, code: true, subcategories: { where: { active: true }, select: { id: true, name: true, code: true } } },
     orderBy: { name: 'asc' },
   });
-  const catalogForPrompt = categories.map((category) => ({ category: category.name, subcategories: category.subcategories.map((subcategory) => subcategory.name) }));
+  const catalogForPrompt = categories.map((category) => ({ categoryCode: category.code, categoryName: category.name, subcategories: category.subcategories.map((subcategory) => ({ subcategoryCode: subcategory.code, subcategoryName: subcategory.name })) }));
   const images = await Promise.all(files.map(async (file) => ({ type: 'image_url', image_url: { url: `data:${file.mimetype};base64,${(await readFile(file.path)).toString('base64')}` } })));
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
     body: JSON.stringify({ model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash', temperature: 0.2, messages: [{ role: 'user', content: [
-      { type: 'text', text: `Analise as fotos da mesma roupa. Responda somente JSON válido em português: {"name":"nome curto","categoryName":"categoria","subcategoryName":"subcategoria","patternName":"rascunho do nome da estampa ou identidade visual","description":"descrição objetiva","confidence":0.0,"notes":["observação"]}. Categoria e subcategoria são obrigatórias e diferentes: categoryName identifica o grupo principal (por exemplo, Vestidos) e subcategoryName identifica o tipo dentro desse grupo (por exemplo, Midi). Nunca escreva a categoria novamente como subcategoria. Escolha exatamente uma combinação da lista de cadastros abaixo sempre que ela servir; só sugira uma categoria/subcategoria nova se não existir combinação adequada. Não invente marca, tecido ou tamanho. patternName é apenas uma sugestão de rascunho: a estampa só será criada no banco se o usuário publicar o cadastro. Se não houver estampa, crie uma identidade visual específica para a peça.\nCadastros existentes: ${JSON.stringify(catalogForPrompt)}` },
+      { type: 'text', text: `Analise as fotos da mesma roupa. Responda somente JSON válido em português: {"name":"nome curto","categoryName":"nome exibido","categoryCode":"código da categoria existente","subcategoryName":"nome exibido","subcategoryCode":"código da subcategoria existente","patternName":"rascunho do nome da estampa ou identidade visual","description":"descrição objetiva","confidence":0.0,"notes":["observação"]}. Você DEVE selecionar uma combinação existente abaixo, copiando categoryCode e subcategoryCode exatamente como estão na lista. Categoria e subcategoria são obrigatórias e diferentes; categoryName identifica o grupo principal e subcategoryName o tipo dentro desse grupo. Não crie categoria ou subcategoria, nem use texto livre no lugar dos códigos. patternName é apenas uma sugestão de rascunho: a estampa só será criada no banco se o usuário publicar o cadastro. Não invente marca, tecido ou tamanho.\nCadastros disponíveis para seleção: ${JSON.stringify(catalogForPrompt)}` },
       ...images,
     ] }], }),
   });
@@ -76,14 +76,15 @@ async function createAiDraft(files: Express.Multer.File[]): Promise<AiDraft> {
   const output = body.choices?.[0]?.message?.content;
   if (!output) throw new Error('A IA retornou uma resposta vazia.');
   const draft = parseDraft(output);
-  const category = categories.find((item) => sameCatalogName(item.name, draft.categoryName));
-  const subcategory = category?.subcategories.find((item) => sameCatalogName(item.name, draft.subcategoryName));
+  const category = categories.find((item) => item.code === draft.categoryCode);
+  const subcategory = category?.subcategories.find((item) => item.code === draft.subcategoryCode);
+  if (!category || !subcategory) throw new Error('A IA não selecionou uma categoria e subcategoria válidas. Gere o rascunho novamente.');
   return {
     ...draft,
-    categoryName: category?.name || draft.categoryName,
-    categoryId: category?.id,
-    subcategoryName: subcategory?.name || draft.subcategoryName,
-    subcategoryId: subcategory?.id,
+    categoryName: category.name,
+    categoryId: category.id,
+    subcategoryName: subcategory.name,
+    subcategoryId: subcategory.id,
   };
 }
 
@@ -133,7 +134,7 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
   try {
     const { name, description, category, subcategory, pattern, sizeId, price, stock, initialLocation = 'ARMAZEM', images = [], mergeWithExisting = false } = req.body as any;
     const productName = clean(name); const numericPrice = Number(price); const numericStock = Number(stock);
-    if (!productName || !category || !subcategory || !pattern || !sizeId || !Number.isFinite(numericPrice) || numericPrice <= 0 || !Number.isInteger(numericStock) || numericStock < 0) return res.status(400).json({ error: 'Preencha nome, categoria, subcategoria, estampa, tamanho, preço e estoque válidos.' });
+    if (!productName || !category?.id || !subcategory?.id || !pattern || !sizeId || !Number.isFinite(numericPrice) || numericPrice <= 0 || !Number.isInteger(numericStock) || numericStock < 0) return res.status(400).json({ error: 'Selecione uma categoria e subcategoria válidas, e preencha estampa, tamanho, preço e estoque.' });
     if (!['LOJA', 'ARMAZEM'].includes(initialLocation)) return res.status(400).json({ error: 'Local inicial inválido.' });
     if (!Array.isArray(images) || !images.length || images.length > IMAGE_LIMIT || !images.every(validImage)) return res.status(400).json({ error: 'As fotos expiraram ou são inválidas. Gere o rascunho novamente.' });
     for (const image of images) { if (!/^\/uploads\/products\/product-[\w-]+\.[a-zA-Z0-9]+$/.test(image.url)) throw new Error('Caminho de imagem inválido.'); await access(path.resolve(process.cwd(), `.${image.url}`)); }
