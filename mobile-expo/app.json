@@ -7,7 +7,7 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.amoras.producao",
-      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"],
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES", "android.permission.BLUETOOTH_CONNECT", "android.permission.BLUETOOTH_SCAN"],
       "blockedPermissions": ["android.permission.RECORD_AUDIO"]
     },
     "plugins": ["expo-image-picker", "expo-secure-store"]

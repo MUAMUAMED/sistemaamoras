@@ -4,12 +4,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ChoicePill, SelectModal } from './src/components';
 import { ApiError, clearSession, generateDraft, getSession, listProducts, loadCatalog, login, publishDraft, resolveAssetUrl, saveSession } from './src/api';
+import { getSavedPrinter, listPairedPrinters, printAmorasLabel, savePrinter, type LabelData } from './src/labelPrinter';
 import type { AuthUser, Catalog, CatalogItem, ClothingDraft, ClothingForm, DraftImage, ListedProduct } from './src/types';
 
 const emptyCatalog: Catalog = { categories: [], subcategories: [], patterns: [], sizes: [] };
 const blankForm = (): ClothingForm => ({ name: '', categoryName: '', subcategoryName: '', patternName: '', description: '', confidence: 0, notes: [], sizeId: '', price: '', stock: '1', initialLocation: 'ARMAZEM' });
-type Selection = 'category' | 'subcategory' | 'pattern' | 'size' | null;
+type Selection = 'category' | 'subcategory' | 'pattern' | 'size' | 'printer' | null;
 type Screen = 'list' | 'create' | 'detail' | 'catalog';
+type PublishSuccess = { barcode: string; merged: boolean; label: LabelData };
 
 function ProductCover({ product, size = 'card' }: { product: ListedProduct; size?: 'card' | 'detail' }) {
   const cover = product.images?.find((image) => image.isCover)?.url || product.images?.[0]?.url || product.imageUrl;
@@ -73,7 +75,10 @@ function AppContent() {
   const [generating, setGenerating] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
-  const [success, setSuccess] = useState<{ barcode: string; merged: boolean } | null>(null);
+  const [success, setSuccess] = useState<PublishSuccess | null>(null);
+  const [printerOptions, setPrinterOptions] = useState<CatalogItem[]>([]);
+  const [printProduct, setPrintProduct] = useState<LabelData | null>(null);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => { (async () => {
     const session = await getSession();
@@ -141,6 +146,24 @@ function AppContent() {
     setScreen(nextScreen);
   }
 
+  async function printLabel(label: LabelData, choosePrinter = false) {
+    setPrinting(true);
+    try {
+      const savedPrinter = choosePrinter ? null : await getSavedPrinter();
+      if (savedPrinter) {
+        await printAmorasLabel(savedPrinter, label);
+        Alert.alert('Etiqueta enviada', `A etiqueta ${label.barcode} foi enviada para ${savedPrinter.name}.`);
+        return;
+      }
+      const printers = await listPairedPrinters();
+      if (!printers.length) throw new Error('Nenhuma impressora pareada foi encontrada. Pareie a WKDY-80D nas configurações Bluetooth do Android.');
+      setPrintProduct(label);
+      setPrinterOptions(printers.map((printer) => ({ id: printer.address, name: printer.name, code: 'Bluetooth' })));
+      setSelection('printer');
+    } catch (error) { Alert.alert('Não foi possível imprimir', error instanceof Error ? error.message : 'Tente novamente.'); }
+    finally { setPrinting(false); }
+  }
+
   async function handlePublish(mergeWithExisting = false) {
     if (!token) return;
     if (!form.sizeId) return Alert.alert('Tamanho obrigatório', 'Selecione o tamanho da peça antes de publicar.');
@@ -148,7 +171,7 @@ function AppContent() {
     setPublishing(true);
     try {
       const result = await publishDraft(token, form, draftImages, mergeWithExisting);
-      setSuccess({ barcode: result.product.barcode, merged: result.mergedIntoExisting });
+      setSuccess({ barcode: result.product.barcode, merged: result.mergedIntoExisting, label: { barcode: result.product.barcode, name: form.name, sizeName: selectedSize?.name || 'N/A', price: Number(form.price.replace(',', '.')) } });
       setCatalog(await loadCatalog(token));
       await refreshProducts(token);
     } catch (error) {
@@ -164,7 +187,21 @@ function AppContent() {
     finally { setPublishing(false); }
   }
 
-  function selectItem(item: CatalogItem) {
+  async function selectItem(item: CatalogItem) {
+    if (selection === 'printer') {
+      const label = printProduct;
+      setSelection(null);
+      if (!label) return;
+      setPrinting(true);
+      try {
+        const printer = { id: item.id, address: item.id, name: item.name };
+        await savePrinter(printer);
+        await printAmorasLabel(printer, label);
+        Alert.alert('Etiqueta enviada', `A etiqueta ${label.barcode} foi enviada para ${item.name}.`);
+      } catch (error) { Alert.alert('Não foi possível imprimir', error instanceof Error ? error.message : 'Tente novamente.'); }
+      finally { setPrinting(false); }
+      return;
+    }
     if (selection === 'category') setForm((value) => ({ ...value, categoryId: item.id, categoryName: item.name, subcategoryId: undefined, subcategoryName: '' }));
     if (selection === 'subcategory') setForm((value) => ({ ...value, subcategoryId: item.id, subcategoryName: item.name }));
     if (selection === 'pattern') setForm((value) => ({ ...value, patternId: item.id, patternName: item.name }));
@@ -172,8 +209,8 @@ function AppContent() {
     setSelection(null);
   }
 
-  const selectionOptions = selection === 'category' ? catalog.categories : selection === 'subcategory' ? subcategories : selection === 'pattern' ? catalog.patterns : catalog.sizes;
-  const selectionTitle = selection === 'category' ? 'Escolha a categoria' : selection === 'subcategory' ? 'Escolha a subcategoria' : selection === 'pattern' ? 'Escolha a estampa' : 'Escolha o tamanho';
+  const selectionOptions = selection === 'category' ? catalog.categories : selection === 'subcategory' ? subcategories : selection === 'pattern' ? catalog.patterns : selection === 'printer' ? printerOptions : catalog.sizes;
+  const selectionTitle = selection === 'category' ? 'Escolha a categoria' : selection === 'subcategory' ? 'Escolha a subcategoria' : selection === 'pattern' ? 'Escolha a estampa' : selection === 'printer' ? 'Escolha a impressora Bluetooth' : 'Escolha o tamanho';
 
   if (!ready) return <View style={styles.loadingScreen}><ActivityIndicator size="large" color="#7c174f" /></View>;
   if (!token || !user) return <SafeAreaView style={styles.screen}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.loginWrap}><View style={styles.brand}><Text style={styles.brandMark}>A</Text><Text style={styles.brandName}>AMORAS</Text><Text style={styles.brandSub}>PRODUÇÃO</Text></View><Text style={styles.loginTitle}>Cadastro de roupas</Text><Text style={styles.loginText}>Entre com o mesmo acesso do sistema Amoras.</Text><Field label="E-mail" value={email} onChangeText={setEmail} placeholder="voce@amoras.com" keyboardType="default" /><Field label="Senha" value={password} onChangeText={setPassword} placeholder="••••••••" /><PrimaryButton title="Entrar" onPress={handleLogin} loading={loggingIn} /></KeyboardAvoidingView></SafeAreaView>;
@@ -186,7 +223,7 @@ function AppContent() {
         <PrimaryButton title="+ Cadastrar roupa" onPress={() => navigate('create')} />
         <View style={styles.searchRow}><TextInput value={search} onChangeText={setSearch} onSubmitEditing={() => refreshProducts(token, 1, search)} placeholder="Buscar nome, código ou estampa" placeholderTextColor="#a593a1" style={styles.searchInput} returnKeyType="search" /><Pressable style={styles.searchAction} onPress={() => refreshProducts(token, 1, search)}><Text style={styles.searchActionText}>Buscar</Text></Pressable></View>
         {loadingProducts && !products.length ? <ActivityIndicator color="#7c174f" style={styles.listLoader} /> : products.length ? <View style={styles.productList}>{products.map((product) => <Pressable key={product.id} style={styles.productCard} onPress={() => { setSelectedProduct(product); setScreen('detail'); }}><View style={styles.productCardRow}><ProductCover product={product} /><View style={styles.productCardInfo}><View style={styles.productTop}><Text style={styles.productName}>{product.name || 'Roupa sem nome'}</Text><Text style={styles.productStock}>{product.stock} un.</Text></View><Text style={styles.productMeta}>{[product.category?.name, product.subcategory?.name, product.pattern?.name, product.size?.name].filter(Boolean).join(' • ') || 'Sem classificação'}</Text><View style={styles.productBottom}><Text style={styles.productPrice}>{typeof product.price === 'number' ? product.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Preço não informado'}</Text><Text style={styles.productCode}>{product.barcode || 'Sem código'}</Text></View><Text style={styles.productOpen}>Ver detalhes</Text></View></View></Pressable>)}{productPage < productPages && <Pressable style={styles.moreButton} onPress={() => refreshProducts(token, productPage + 1, search, true)} disabled={loadingProducts}><Text style={styles.moreButtonText}>{loadingProducts ? 'Carregando…' : 'Carregar mais roupas'}</Text></Pressable>}</View> : <View style={styles.empty}><Text style={styles.emptyTitle}>{search ? 'Nenhuma roupa encontrada' : 'Ainda não há roupas cadastradas'}</Text><Text style={styles.emptyText}>{search ? 'Tente outro termo de busca.' : 'Toque em “Cadastrar roupa” para criar a primeira peça com ajuda da IA.'}</Text></View>}
-      </> : screen === 'catalog' ? <View><Text style={styles.welcome}>Dados do sistema</Text><Text style={styles.heading}>Categorias e cadastros</Text><Text style={styles.helper}>Consulta rápida dos cadastros usados na criação de roupas.</Text><CatalogSection title="Categorias" items={catalog.categories} /><CatalogSection title="Subcategorias" items={catalog.subcategories} /><CatalogSection title="Estampas" items={catalog.patterns} /><CatalogSection title="Tamanhos" items={catalog.sizes} /></View> : screen === 'detail' && selectedProduct ? <View style={styles.detailCard}><Pressable onPress={() => navigate('list')}><Text style={styles.backLink}>← Voltar para roupas</Text></Pressable><ProductCover product={selectedProduct} size="detail" /><Text style={styles.detailName}>{selectedProduct.name || 'Roupa sem nome'}</Text><Text style={styles.detailCode}>Código: {selectedProduct.barcode || 'sem código'}</Text><View style={styles.detailDivider} /><Text style={styles.detailLabel}>Classificação</Text><Text style={styles.detailValue}>{[selectedProduct.category?.name, selectedProduct.subcategory?.name, selectedProduct.pattern?.name, selectedProduct.size?.name].filter(Boolean).join(' • ') || 'Sem classificação'}</Text><View style={styles.stockGrid}><View style={styles.stockBox}><Text style={styles.stockNumber}>{selectedProduct.stock}</Text><Text style={styles.stockLabel}>Total</Text></View><View style={styles.stockBox}><Text style={styles.stockNumber}>{selectedProduct.stockLoja}</Text><Text style={styles.stockLabel}>Loja</Text></View><View style={styles.stockBox}><Text style={styles.stockNumber}>{selectedProduct.stockArmazem}</Text><Text style={styles.stockLabel}>Armazém</Text></View></View><Text style={styles.detailLabel}>Preço</Text><Text style={styles.detailPrice}>{typeof selectedProduct.price === 'number' ? selectedProduct.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Não informado'}</Text>{selectedProduct.description ? <><Text style={styles.detailLabel}>Descrição</Text><Text style={styles.detailValue}>{selectedProduct.description}</Text></> : null}<PrimaryButton title="Cadastrar nova roupa" onPress={() => navigate('create')} /></View> : success ? <View style={styles.successCard}><Text style={styles.successTitle}>{success.merged ? 'Estoque atualizado' : 'Roupa publicada'}</Text><Text style={styles.successText}>{success.merged ? 'A peça já existia e as unidades foram adicionadas.' : 'O produto, suas fotos e o estoque já estão no sistema.'}</Text><Text style={styles.barcode}>Código: {success.barcode}</Text><PrimaryButton title="Voltar para roupas" onPress={() => { resetDraft(); navigate('list'); }} /><Pressable style={styles.secondaryAction} onPress={resetDraft}><Text style={styles.secondaryActionText}>Cadastrar outra roupa</Text></Pressable></View> : !draftImages.length ? <>
+      </> : screen === 'catalog' ? <View><Text style={styles.welcome}>Dados do sistema</Text><Text style={styles.heading}>Categorias e cadastros</Text><Text style={styles.helper}>Consulta rápida dos cadastros usados na criação de roupas.</Text><CatalogSection title="Categorias" items={catalog.categories} /><CatalogSection title="Subcategorias" items={catalog.subcategories} /><CatalogSection title="Estampas" items={catalog.patterns} /><CatalogSection title="Tamanhos" items={catalog.sizes} /></View> : screen === 'detail' && selectedProduct ? <View style={styles.detailCard}><Pressable onPress={() => navigate('list')}><Text style={styles.backLink}>← Voltar para roupas</Text></Pressable><ProductCover product={selectedProduct} size="detail" /><Text style={styles.detailName}>{selectedProduct.name || 'Roupa sem nome'}</Text><Text style={styles.detailCode}>Código: {selectedProduct.barcode || 'sem código'}</Text><View style={styles.detailDivider} /><Text style={styles.detailLabel}>Classificação</Text><Text style={styles.detailValue}>{[selectedProduct.category?.name, selectedProduct.subcategory?.name, selectedProduct.pattern?.name, selectedProduct.size?.name].filter(Boolean).join(' • ') || 'Sem classificação'}</Text><View style={styles.stockGrid}><View style={styles.stockBox}><Text style={styles.stockNumber}>{selectedProduct.stock}</Text><Text style={styles.stockLabel}>Total</Text></View><View style={styles.stockBox}><Text style={styles.stockNumber}>{selectedProduct.stockLoja}</Text><Text style={styles.stockLabel}>Loja</Text></View><View style={styles.stockBox}><Text style={styles.stockNumber}>{selectedProduct.stockArmazem}</Text><Text style={styles.stockLabel}>Armazém</Text></View></View><Text style={styles.detailLabel}>Preço</Text><Text style={styles.detailPrice}>{typeof selectedProduct.price === 'number' ? selectedProduct.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Não informado'}</Text>{selectedProduct.description ? <><Text style={styles.detailLabel}>Descrição</Text><Text style={styles.detailValue}>{selectedProduct.description}</Text></> : null}<PrimaryButton title="Cadastrar nova roupa" onPress={() => navigate('create')} /></View> : success ? <View style={styles.successCard}><Text style={styles.successTitle}>{success.merged ? 'Estoque atualizado' : 'Roupa publicada'}</Text><Text style={styles.successText}>{success.merged ? 'A peça já existia e as unidades foram adicionadas.' : 'O produto, suas fotos e o estoque já estão no sistema.'}</Text><Text style={styles.barcode}>Código: {success.barcode}</Text><PrimaryButton title="Imprimir etiqueta" onPress={() => { void printLabel(success.label); }} loading={printing} /><Pressable style={styles.secondaryAction} onPress={() => { void printLabel(success.label, true); }}><Text style={styles.secondaryActionText}>Escolher outra impressora</Text></Pressable><PrimaryButton title="Voltar para roupas" onPress={() => { resetDraft(); navigate('list'); }} /><Pressable style={styles.secondaryAction} onPress={resetDraft}><Text style={styles.secondaryActionText}>Cadastrar outra roupa</Text></Pressable></View> : !draftImages.length ? <>
         <Text style={styles.welcome}>Olá, {user.name.split(' ')[0]}.</Text><Text style={styles.heading}>Vamos cadastrar uma roupa</Text><Text style={styles.helper}>Fotografe a peça em boa luz. A IA prepara o rascunho e você confirma os dados.</Text>
         <View style={styles.photoGrid}>{[0, 1].map((slot) => photos[slot] ? <View key={slot} style={styles.photoWrap}><Image source={{ uri: photos[slot] }} style={styles.photo} /><Pressable style={styles.removePhoto} onPress={() => setPhotos((items) => items.filter((_, index) => index !== slot))}><Text style={styles.removeText}>×</Text></Pressable></View> : <Pressable key={slot} style={styles.photoEmpty} onPress={() => Alert.alert('Adicionar foto', 'Escolha como deseja incluir a foto.', [{ text: 'Câmera', onPress: () => choosePhoto('camera') }, { text: 'Galeria', onPress: () => choosePhoto('library') }, { text: 'Cancelar', style: 'cancel' }])}><Text style={styles.plus}>+</Text><Text style={styles.photoLabel}>{slot === 0 ? 'Foto principal' : 'Outra foto (opcional)'}</Text></Pressable>)}</View>
         <PrimaryButton title="Gerar rascunho com IA" onPress={createDraft} loading={generating} disabled={!photos.length} />
