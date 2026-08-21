@@ -7,10 +7,19 @@ import path from 'path';
 import { prisma } from '../config/database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
+import { modelReferences } from '../data/modelReference';
 
 const router = Router();
 const IMAGE_LIMIT = 2;
 const DRAFT_TTL = 30 * 60 * 1000;
+// A base é uma referência de modelagem, não uma fonte de IDs do catálogo.
+// Os IDs/códigos válidos continuam sendo buscados no banco da Zeabur abaixo.
+const modelsForPrompt = modelReferences.map((reference) => ({
+  categoriaDeReferencia: reference.categoria,
+  modelo: reference.modelo,
+  descricaoTecnica: reference.descricaoTecnica,
+  fotosValidadas: reference.quantidadeFotosAnalisadas,
+}));
 
 type DraftImage = { url: string; token: string };
 type AiDraft = { name: string; categoryName: string; categoryCode: string; categoryId?: string; subcategoryName: string; subcategoryCode: string; subcategoryId?: string; patternName: string; description: string; confidence: number; notes: string[] };
@@ -67,7 +76,7 @@ async function createAiDraft(files: Express.Multer.File[]): Promise<AiDraft> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
     body: JSON.stringify({ model: process.env.OPENROUTER_MODEL || 'google/gemini-2.5-flash', temperature: 0.2, messages: [{ role: 'user', content: [
-      { type: 'text', text: `Analise as fotos da mesma roupa. Responda somente JSON válido em português: {"name":"nome curto","categoryName":"nome exibido","categoryCode":"código da categoria existente","subcategoryName":"nome exibido","subcategoryCode":"código da subcategoria existente","patternName":"rascunho do nome da estampa ou identidade visual","description":"descrição objetiva","confidence":0.0,"notes":["observação"]}. Você DEVE selecionar uma combinação existente abaixo, copiando categoryCode e subcategoryCode exatamente como estão na lista. Categoria e subcategoria são obrigatórias e diferentes; categoryName identifica o grupo principal e subcategoryName o tipo dentro desse grupo. Não crie categoria ou subcategoria, nem use texto livre no lugar dos códigos. patternName é apenas uma sugestão de rascunho: a estampa só será criada no banco se o usuário publicar o cadastro. Não invente marca, tecido ou tamanho.\nCadastros disponíveis para seleção: ${JSON.stringify(catalogForPrompt)}` },
+      { type: 'text', text: `Analise as fotos da mesma roupa. Responda somente JSON válido em português: {"name":"nome curto","categoryName":"nome exibido","categoryCode":"código da categoria existente","subcategoryName":"nome exibido","subcategoryCode":"código da subcategoria existente","patternName":"rascunho do nome da estampa ou identidade visual","description":"descrição objetiva","confidence":0.0,"notes":["observação"]}.\n\nUse as referências de modelos validados abaixo para reconhecer a modelagem, silhueta, decote, mangas, comprimento, barra, fechamento e caimento. Escolha mentalmente a referência mais próxima e use esse entendimento para compor name e description. As categorias dessas referências são apenas rótulos de modelagem: NUNCA as trate como códigos, IDs ou categorias oficiais do sistema.\n\nVocê DEVE selecionar uma combinação existente no catálogo abaixo, copiando categoryCode e subcategoryCode exatamente como estão na lista. Categoria e subcategoria são obrigatórias e diferentes; categoryName identifica o grupo principal e subcategoryName o tipo dentro desse grupo. Não crie categoria ou subcategoria, nem use texto livre no lugar dos códigos. patternName é apenas uma sugestão de rascunho: a estampa só será criada no banco se o usuário publicar o cadastro. Não invente marca, tecido ou tamanho.\n\nReferências de modelos validados: ${JSON.stringify(modelsForPrompt)}\n\nCadastros disponíveis para seleção: ${JSON.stringify(catalogForPrompt)}` },
       ...images,
     ] }], }),
   });
