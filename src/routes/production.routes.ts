@@ -130,6 +130,21 @@ router.post('/draft', authenticateToken, uploadProductImage.array('images', IMAG
   } catch (error) { return next(error); }
 });
 
+// O cadastro manual pode guardar as fotos sem passar pelo provedor de IA. As
+// imagens ainda recebem o mesmo token temporário exigido pelo /publish, para
+// que não seja possível apontar o produto para um arquivo arbitrário.
+router.post('/manual-images', authenticateToken, uploadProductImage.array('images', IMAGE_LIMIT), async (req, res, next) => {
+  try {
+    const files = (req.files || []) as Express.Multer.File[];
+    if (!files.length || files.length > IMAGE_LIMIT) return res.status(400).json({ error: 'Envie uma ou duas fotos da roupa.' });
+    const images = files.map((file) => {
+      const url = `/uploads/products/${file.filename}`;
+      return { url, token: imageToken(url) };
+    });
+    return res.status(201).json({ images });
+  } catch (error) { return next(error); }
+});
+
 router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res, next) => {
   try {
     const { name, description, category, subcategory, pattern, sizeId, price, stock, initialLocation = 'ARMAZEM', images = [], mergeWithExisting = false } = req.body as any;
