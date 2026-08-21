@@ -136,7 +136,9 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
     const productName = clean(name); const numericPrice = Number(price); const numericStock = Number(stock);
     if (!productName || !category?.id || !subcategory?.id || !pattern || !sizeId || !Number.isFinite(numericPrice) || numericPrice <= 0 || !Number.isInteger(numericStock) || numericStock < 0) return res.status(400).json({ error: 'Selecione uma categoria e subcategoria válidas, e preencha estampa, tamanho, preço e estoque.' });
     if (!['LOJA', 'ARMAZEM'].includes(initialLocation)) return res.status(400).json({ error: 'Local inicial inválido.' });
-    if (!Array.isArray(images) || !images.length || images.length > IMAGE_LIMIT || !images.every(validImage)) return res.status(400).json({ error: 'As fotos expiraram ou são inválidas. Gere o rascunho novamente.' });
+    // No cadastro manual não há rascunho de IA nem fotos temporárias. Fotos,
+    // quando enviadas, continuam passando pela mesma validação assinada.
+    if (!Array.isArray(images) || images.length > IMAGE_LIMIT || !images.every(validImage)) return res.status(400).json({ error: 'As fotos do rascunho expiraram ou são inválidas.' });
     for (const image of images) { if (!/^\/uploads\/products\/product-[\w-]+\.[a-zA-Z0-9]+$/.test(image.url)) throw new Error('Caminho de imagem inválido.'); await access(path.resolve(process.cwd(), `.${image.url}`)); }
     const result = await prisma.$transaction(async (tx) => {
       const size = await tx.size.findFirst({ where: { id: sizeId, active: true } }); if (!size) throw new Error('Tamanho inválido.');
@@ -151,7 +153,7 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
       }
       const qrcodeUrl = existing?.qrcodeUrl || await QRCode.toDataURL(barcode);
       const product = existing ? await tx.product.update({ where: { id: existing.id }, data: { price: numericPrice, description: clean(description) || existing.description, stock: { increment: numericStock }, stockLoja: initialLocation === 'LOJA' ? { increment: numericStock } : undefined, stockArmazem: initialLocation === 'ARMAZEM' ? { increment: numericStock } : undefined } }) : await tx.product.create({ data: { name: productName, categoryId: categoryResult.value.id, subcategoryId: subcategoryResult.value.id, patternId: patternResult.value.id, sizeId, price: numericPrice, stock: numericStock, stockLoja: initialLocation === 'LOJA' ? numericStock : 0, stockArmazem: initialLocation === 'ARMAZEM' ? numericStock : 0, barcode, qrcodeUrl, description: clean(description) || null, status: 'ATIVO', inProduction: false, isDraft: false } });
-      await tx.productImage.createMany({ data: images.map((image: DraftImage, position: number) => ({ productId: product.id, url: image.url, type: ProductImageType.ROUPA, position })) });
+      if (images.length) await tx.productImage.createMany({ data: images.map((image: DraftImage, position: number) => ({ productId: product.id, url: image.url, type: ProductImageType.ROUPA, position })) });
       if (numericStock > 0) await tx.stockMovement.create({ data: { productId: product.id, type: StockMovementType.ENTRY, quantity: numericStock, reason: existing ? 'Entrada via aplicativo de produção' : 'Cadastro via aplicativo de produção', location: initialLocation as StockLocation, userId: req.user!.id } });
       // A tela de produção só precisa do identificador e do código para mostrar
       // o resultado e imprimir a etiqueta. Evitar devolver o grafo completo do
