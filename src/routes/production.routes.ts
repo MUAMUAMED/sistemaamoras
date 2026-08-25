@@ -120,14 +120,19 @@ async function createPatternSuggestion(files: Express.Multer.File[]): Promise<Pa
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
-    // Alguns modelos de raciocínio da OpenAI rejeitam temperature; os modelos
-    // compatíveis continuam recebendo baixa variação para manter nomes estáveis.
-    body: JSON.stringify({ model, max_tokens: 700, ...(model.startsWith('openai/gpt-5') ? {} : { temperature: 0.2 }), messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images] }] }),
+    // Forçamos JSON para não depender de markdown ou de texto explicativo do
+    // provedor. O limite também deixa espaço para a resposta final do modelo.
+    body: JSON.stringify({ model, max_tokens: 1200, response_format: { type: 'json_object' }, ...(model.startsWith('openai/gpt-5') ? {} : { temperature: 0.2 }), messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images] }] }),
   });
   if (!response.ok) throw new Error(`Não foi possível sugerir a estampa com a IA (${response.status}).`);
-  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  const output = body.choices?.[0]?.message?.content;
-  const json = output?.match(/\{[\s\S]*\}/)?.[0];
+  const body = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
+  const content = body.choices?.[0]?.message?.content;
+  const output = typeof content === 'string'
+    ? content
+    : Array.isArray(content)
+      ? content.map((part) => typeof part === 'string' ? part : typeof part?.text === 'string' ? part.text : '').join('')
+      : '';
+  const json = output.match(/\{[\s\S]*\}/)?.[0];
   if (!json) throw new Error('A IA não retornou um nome de estampa válido.');
   const parsed = JSON.parse(json) as { patternName?: unknown; existingPatternId?: unknown; reason?: unknown };
   const requestedId = clean(parsed.existingPatternId);
