@@ -23,6 +23,7 @@ const modelsForPrompt = modelReferences.map((reference) => ({
 
 type DraftImage = { url: string; token: string };
 type AiDraft = { name: string; categoryName: string; categoryCode: string; categoryId?: string; subcategoryName: string; subcategoryCode: string; subcategoryId?: string; patternName: string; description: string; confidence: number; notes: string[] };
+type PatternSuggestion = { patternName: string; patternId?: string; reusedExisting: boolean; reason: string };
 
 const clean = (value: unknown) => typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
 const comparable = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
@@ -97,6 +98,46 @@ async function createAiDraft(files: Express.Multer.File[]): Promise<AiDraft> {
   };
 }
 
+/**
+ * Fluxo híbrido: a IA só olha a identidade visual da roupa. Todos os campos
+ * de produto continuam sendo escolhidos pela pessoa no aplicativo.
+ */
+async function createPatternSuggestion(files: Express.Multer.File[]): Promise<PatternSuggestion> {
+  if (!process.env.OPENROUTER_API_KEY) throw new Error('A IA não está configurada. Defina OPENROUTER_API_KEY no serviço Zeabur.');
+
+  const patterns = await prisma.pattern.findMany({
+    where: { active: true },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+  const images = await Promise.all(files.map(async (file) => ({
+    type: 'image_url', image_url: { url: `data:${file.mimetype};base64,${(await readFile(file.path)).toString('base64')}` },
+  })));
+  const model = process.env.OPENROUTER_MODEL || 'qwen/qwen3-vl-30b-a3b-thinking';
+  const prompt = `Analise somente a ESTAMPA ou identidade visual das fotos da mesma roupa. Não classifique a roupa, não escolha categoria, subcategoria, tamanho, preço, nome da roupa nem descrição do produto.\n\nResponda SOMENTE JSON válido: {"patternName":"nome curto da estampa","existingPatternId":"id existente ou string vazia","reason":"justificativa curta"}.\n\nRegras obrigatórias:\n1. Primeiro compare a estampa com os nomes já usados abaixo. Se representar a mesma identidade visual, informe exatamente o id correspondente em existingPatternId e repita exatamente o nome existente em patternName.\n2. Se não houver nome correspondente, crie um nome curto, descritivo e distinto. Não repita nem faça variação superficial dos nomes existentes.\n3. Se a roupa for lisa, descreva a identidade visual de modo objetivo, sem inventar detalhes que não apareçam na foto.\n4. existingPatternId só pode ser um dos IDs fornecidos.\n\nEstampas já cadastradas: ${JSON.stringify(patterns)}`;
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
+    // Alguns modelos de raciocínio da OpenAI rejeitam temperature; os modelos
+    // compatíveis continuam recebendo baixa variação para manter nomes estáveis.
+    body: JSON.stringify({ model, max_tokens: 700, ...(model.startsWith('openai/gpt-5') ? {} : { temperature: 0.2 }), messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images] }] }),
+  });
+  if (!response.ok) throw new Error(`Não foi possível sugerir a estampa com a IA (${response.status}).`);
+  const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const output = body.choices?.[0]?.message?.content;
+  const json = output?.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) throw new Error('A IA não retornou um nome de estampa válido.');
+  const parsed = JSON.parse(json) as { patternName?: unknown; existingPatternId?: unknown; reason?: unknown };
+  const requestedId = clean(parsed.existingPatternId);
+  const matchedById = patterns.find((pattern) => pattern.id === requestedId);
+  const suggestedName = clean(parsed.patternName);
+  const matchedByName = suggestedName ? patterns.find((pattern) => sameCatalogName(pattern.name, suggestedName)) : undefined;
+  const existing = matchedById || matchedByName;
+  if (existing) return { patternName: existing.name, patternId: existing.id, reusedExisting: true, reason: 'A sugestão corresponde a uma estampa já cadastrada.' };
+  if (!suggestedName) throw new Error('A IA não informou um nome de estampa.');
+  return { patternName: suggestedName, reusedExisting: false, reason: clean(parsed.reason) || 'Sugestão criada a partir das fotos.' };
+}
+
 async function freeCode(tx: Prisma.TransactionClient, kind: 'category' | 'subcategory' | 'pattern', categoryId?: string): Promise<string> {
   const width = kind === 'pattern' ? 4 : 2;
   const rows = kind === 'category' ? await tx.category.findMany({ select: { code: true } }) : kind === 'subcategory' ? await tx.subcategory.findMany({ where: { categoryId }, select: { code: true } }) : await tx.pattern.findMany({ select: { code: true } });
@@ -136,6 +177,19 @@ router.post('/draft', authenticateToken, uploadProductImage.array('images', IMAG
     const draft = await createAiDraft(files);
     const images = files.map((file) => { const url = `/uploads/products/${file.filename}`; return { url, token: imageToken(url) }; });
     return res.status(201).json({ draft, images });
+  } catch (error) { return next(error); }
+});
+
+router.post('/pattern-suggestion', authenticateToken, uploadProductImage.array('images', IMAGE_LIMIT), async (req, res, next) => {
+  try {
+    const files = (req.files || []) as Express.Multer.File[];
+    if (!files.length || files.length > IMAGE_LIMIT) return res.status(400).json({ error: 'Envie uma ou duas fotos da roupa.' });
+    const suggestion = await createPatternSuggestion(files);
+    const images = files.map((file) => {
+      const url = `/uploads/products/${file.filename}`;
+      return { url, token: imageToken(url) };
+    });
+    return res.status(201).json({ suggestion, images });
   } catch (error) { return next(error); }
 });
 
