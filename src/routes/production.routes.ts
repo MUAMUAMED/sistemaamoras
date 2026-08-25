@@ -116,7 +116,7 @@ async function createPatternSuggestion(files: Express.Multer.File[]): Promise<Pa
   // GPT-5 Nano aceita imagens e saída estruturada, mantendo este passo curto
   // (somente a sugestão da estampa) com baixo custo e boa aderência ao JSON.
   const model = 'openai/gpt-5-nano';
-  const prompt = `Analise somente a ESTAMPA ou identidade visual das fotos da mesma roupa. Não classifique a roupa, não escolha categoria, subcategoria, tamanho, preço, nome da roupa nem descrição do produto.\n\nResponda SOMENTE JSON válido: {"patternName":"nome curto da estampa","existingPatternId":"id existente ou string vazia","reason":"justificativa curta"}.\n\nRegras obrigatórias:\n1. Primeiro compare a estampa com os nomes já usados abaixo. Se representar a mesma identidade visual, informe exatamente o id correspondente em existingPatternId e repita exatamente o nome existente em patternName.\n2. Se não houver nome correspondente, crie um nome curto, descritivo e distinto. Não repita nem faça variação superficial dos nomes existentes.\n3. Se a roupa for lisa, descreva a identidade visual de modo objetivo, sem inventar detalhes que não apareçam na foto.\n4. existingPatternId só pode ser um dos IDs fornecidos.\n\nEstampas já cadastradas: ${JSON.stringify(patterns)}`;
+  const prompt = `Analise somente a ESTAMPA ou identidade visual das fotos da mesma roupa. Não classifique a roupa, não escolha categoria, subcategoria, tamanho, preço, nome da roupa nem descrição do produto.\n\nResponda SOMENTE JSON válido: {"patternName":"nome curto da estampa","existingPatternId":"id existente ou string vazia","reason":"justificativa curta"}.\n\nRegras obrigatórias:\n1. Primeiro compare a estampa com os nomes já usados abaixo. Se representar a mesma identidade visual, informe exatamente o id correspondente em existingPatternId e repita exatamente o nome existente em patternName.\n2. Se não houver nome correspondente, crie um nome BONITO, POÉTICO e SIMPLES com no máximo 3 palavras. Exemplos: "Jardim Lunar", "Brisa Rubra", "Sol de Âmbar". Nunca use descrição técnica, frases, cores isoladas, "logomarca", "estampa", "floral" ou explicações no nome.\n3. Se a roupa for lisa, ainda crie uma identidade visual curta e poética, sem inventar detalhes específicos.\n4. existingPatternId só pode ser um dos IDs fornecidos.\n\nEstampas já cadastradas: ${JSON.stringify(patterns)}`;
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
@@ -148,7 +148,8 @@ async function createPatternSuggestion(files: Express.Multer.File[]): Promise<Pa
   const existing = matchedById || matchedByName;
   if (existing) return { patternName: existing.name, patternId: existing.id, reusedExisting: true, reason: 'A sugestão corresponde a uma estampa já cadastrada.' };
   if (!suggestedName) throw new Error('A IA não informou um nome de estampa.');
-  return { patternName: suggestedName, reusedExisting: false, reason: clean(parsed.reason) || 'Sugestão criada a partir das fotos.' };
+  const shortName = suggestedName.split(' ').filter(Boolean).slice(0, 3).join(' ');
+  return { patternName: shortName, reusedExisting: false, reason: clean(parsed.reason) || 'Sugestão criada a partir das fotos.' };
 }
 
 async function freeCode(tx: Prisma.TransactionClient, kind: 'category' | 'subcategory' | 'pattern', categoryId?: string): Promise<string> {
