@@ -122,18 +122,24 @@ async function createPatternSuggestion(files: Express.Multer.File[]): Promise<Pa
     headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
     // Forçamos JSON para não depender de markdown ou de texto explicativo do
     // provedor. O limite também deixa espaço para a resposta final do modelo.
-    body: JSON.stringify({ model, max_tokens: 1200, response_format: { type: 'json_object' }, ...(model.startsWith('openai/gpt-5') ? {} : { temperature: 0.2 }), messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images] }] }),
+    body: JSON.stringify({ model, max_tokens: 2048, response_format: { type: 'json_object' }, reasoning: { effort: 'minimal' }, ...(model.startsWith('openai/gpt-5') ? {} : { temperature: 0.2 }), messages: [{ role: 'user', content: [{ type: 'text', text: prompt }, ...images] }] }),
   });
   if (!response.ok) throw new Error(`Não foi possível sugerir a estampa com a IA (${response.status}).`);
-  const body = await response.json() as { choices?: Array<{ message?: { content?: unknown } }> };
-  const content = body.choices?.[0]?.message?.content;
-  const output = typeof content === 'string'
-    ? content
-    : Array.isArray(content)
-      ? content.map((part) => typeof part === 'string' ? part : typeof part?.text === 'string' ? part.text : '').join('')
+  const body = await response.json() as { choices?: Array<{ finish_reason?: string; message?: { content?: unknown; reasoning?: unknown; reasoning_content?: unknown } }> };
+  const message = body.choices?.[0]?.message;
+  const textFrom = (value: unknown): string => typeof value === 'string'
+    ? value
+    : Array.isArray(value)
+      ? value.map((part) => typeof part === 'string' ? part : typeof part?.text === 'string' ? part.text : '').join('')
       : '';
+  // Alguns provedores OpenAI-compatíveis devolvem a resposta final em
+  // reasoning_content; aceitamos os três formatos, priorizando content.
+  const output = [textFrom(message?.content), textFrom(message?.reasoning_content), textFrom(message?.reasoning)].find(Boolean) || '';
   const json = output.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) throw new Error('A IA não retornou um nome de estampa válido.');
+  if (!json) {
+    console.error('Resposta de IA sem JSON', { finishReason: body.choices?.[0]?.finish_reason, contentLength: textFrom(message?.content).length, reasoningLength: textFrom(message?.reasoning_content || message?.reasoning).length });
+    throw new Error('A IA não retornou um nome de estampa válido.');
+  }
   const parsed = JSON.parse(json) as { patternName?: unknown; existingPatternId?: unknown; reason?: unknown };
   const requestedId = clean(parsed.existingPatternId);
   const matchedById = patterns.find((pattern) => pattern.id === requestedId);
