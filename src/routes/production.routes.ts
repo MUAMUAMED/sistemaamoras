@@ -244,9 +244,11 @@ router.post('/visual-search', authenticateToken, uploadProductImage.array('image
   try {
     const files = (req.files || []) as Express.Multer.File[];
     if (!files.length || files.length > IMAGE_LIMIT) return res.status(400).json({ error: 'Envie uma ou duas fotos da roupa.' });
-    const [draft, matches] = await Promise.all([createAiDraft(files), findVisualMatches(files)]);
+    // Esta etapa é só a comparação visual. A análise/sugestão de IA é feita
+    // apenas se a operadora decidir cadastrar uma estampa nova.
+    const matches = await findVisualMatches(files);
     const images = files.map((file) => { const url = `/uploads/products/${file.filename}`; return { url, token: imageToken(url) }; });
-    return res.status(201).json({ draft, images, matches });
+    return res.status(201).json({ images, matches });
   } catch (error) { return next(error); }
 });
 
