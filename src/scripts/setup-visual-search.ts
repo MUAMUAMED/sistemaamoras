@@ -1,6 +1,7 @@
-import { prisma } from '../config/database';
+import { disconnectVectorDatabase, vectorDatabase } from '../config/vector-database';
 
 async function run() {
+  const prisma = vectorDatabase();
   await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector');
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS "product_image_embeddings" (
@@ -10,8 +11,6 @@ async function run() {
       "dimensions" INTEGER NOT NULL DEFAULT 768,
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      CONSTRAINT "product_image_embeddings_productImageId_fkey"
-        FOREIGN KEY ("productImageId") REFERENCES "product_images"("id") ON DELETE CASCADE ON UPDATE CASCADE,
       CONSTRAINT "product_image_embeddings_dimensions_check" CHECK ("dimensions" = 768)
     )
   `);
@@ -19,4 +18,4 @@ async function run() {
   console.log('Busca visual preparada: pgvector, tabela e índice HNSW estão prontos.');
 }
 
-run().catch((error) => { console.error('Não foi possível preparar a busca visual:', error instanceof Error ? error.message : error); process.exitCode = 1; }).finally(async () => prisma.$disconnect());
+run().catch((error) => { console.error('Não foi possível preparar a busca visual:', error instanceof Error ? error.message : error); process.exitCode = 1; }).finally(disconnectVectorDatabase);

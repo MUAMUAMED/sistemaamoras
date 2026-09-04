@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { access, readFile } from 'fs/promises';
 import path from 'path';
 import { prisma } from '../config/database';
+import { vectorDatabase } from '../config/vector-database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { modelReferences } from '../data/modelReference';
@@ -157,22 +158,27 @@ type VisualMatch = { productId: string; productName: string; patternId: string; 
 
 async function findVisualMatches(files: Express.Multer.File[]): Promise<VisualMatch[]> {
   const vector = await embedImages(await Promise.all(files.map(async (file) => ({ path: file.path, mimeType: file.mimetype }))));
-  const rows = await prisma.$queryRawUnsafe<Array<{ productId: string; productName: string | null; patternId: string; patternName: string; imageUrl: string; score: number | string }>>(`
-    SELECT DISTINCT ON (p."patternId")
-      p.id AS "productId", p.name AS "productName", pat.id AS "patternId", pat.name AS "patternName", pi.url AS "imageUrl",
-      1 - (pie.embedding <=> $1::vector) AS score
-    FROM product_image_embeddings pie
-    INNER JOIN product_images pi ON pi.id = pie."productImageId"
-    INNER JOIN products p ON p.id = pi."productId"
-    INNER JOIN patterns pat ON pat.id = p."patternId"
-    WHERE p.active = true AND pat.active = true AND pi.type = 'ROUPA'
-    ORDER BY p."patternId", score DESC
-  `, vectorLiteral(vector));
-  return rows
-    .map((row) => ({ ...row, productName: row.productName || 'Roupa sem nome', score: Number(row.score) }))
-    .filter((row) => Number.isFinite(row.score))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+  const rows = await vectorDatabase().$queryRawUnsafe<Array<{ productImageId: string; score: number | string }>>(
+    'SELECT "productImageId", 1 - (embedding <=> $1::vector) AS score FROM product_image_embeddings ORDER BY embedding <=> $1::vector LIMIT 80',
+    vectorLiteral(vector),
+  );
+  const scores = new Map<string, number>(rows
+    .map((row): [string, number] => [row.productImageId, Number(row.score)])
+    .filter((entry) => Number.isFinite(entry[1])));
+  if (!scores.size) return [];
+  const images = await (prisma as any).productImage.findMany({
+    where: { id: { in: [...scores.keys()] }, type: ProductImageType.ROUPA, product: { active: true, pattern: { active: true } } },
+    select: { id: true, url: true, product: { select: { id: true, name: true, pattern: { select: { id: true, name: true } } } } },
+  });
+  const byPattern = new Map<string, VisualMatch>();
+  for (const image of images as Array<any>) {
+    const pattern = image.product.pattern;
+    const score = scores.get(image.id);
+    if (!pattern || score === undefined) continue;
+    const match = { productId: image.product.id, productName: image.product.name || 'Roupa sem nome', patternId: pattern.id, patternName: pattern.name, imageUrl: image.url, score };
+    if (!byPattern.has(pattern.id) || byPattern.get(pattern.id)!.score < score) byPattern.set(pattern.id, match);
+  }
+  return [...byPattern.values()].sort((a, b) => b.score - a.score).slice(0, 12);
 }
 
 async function indexPublishedImages(productId: string, images: DraftImage[]): Promise<void> {
@@ -183,7 +189,7 @@ async function indexPublishedImages(productId: string, images: DraftImage[]): Pr
       if (!record) continue;
       const localPath = path.resolve(process.cwd(), `.${image.url}`);
       const vector = await embedImages([{ path: localPath, mimeType: record.mimeType || image.url }]);
-      await prisma.$executeRawUnsafe(
+      await vectorDatabase().$executeRawUnsafe(
         'INSERT INTO product_image_embeddings ("productImageId", embedding, model, dimensions) VALUES ($1, $2::vector, $3, 768) ON CONFLICT ("productImageId") DO UPDATE SET embedding = EXCLUDED.embedding, model = EXCLUDED.model, dimensions = EXCLUDED.dimensions, "updatedAt" = CURRENT_TIMESTAMP',
         record.id, vectorLiteral(vector), process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2',
       );
