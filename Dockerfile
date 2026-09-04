@@ -19,7 +19,9 @@ ENV NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/icp-brasil-v10.crt
 ENV SEFAZ_CA_CERT_PATH=/usr/local/share/ca-certificates/icp-brasil-v10.crt
 
 COPY package*.json ./
-RUN npm install
+# O build TypeScript precisa de typescript e demais dependências de desenvolvimento,
+# mesmo quando NODE_ENV=production está definido no serviço.
+RUN npm install --include=dev
 
 COPY . ./
 
@@ -31,4 +33,7 @@ RUN npm run build
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# O banco de produção possui dados e evolui por migrações aditivas revisadas.
+# A aplicação não tenta sincronizar schema no boot: esse passo pode bloquear
+# a inicialização ou aplicar uma mudança fora da revisão explicitamente aprovada.
+CMD ["node", "dist/index.js"]
