@@ -8,6 +8,7 @@ import { prisma } from '../config/database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { modelReferences } from '../data/modelReference';
+import { embedImages, vectorLiteral } from '../services/image-embedding.service';
 
 const router = Router();
 const IMAGE_LIMIT = 2;
@@ -152,6 +153,47 @@ async function createPatternSuggestion(files: Express.Multer.File[]): Promise<Pa
   return { patternName: shortName, reusedExisting: false, reason: clean(parsed.reason) || 'Sugestão criada a partir das fotos.' };
 }
 
+type VisualMatch = { productId: string; productName: string; patternId: string; patternName: string; imageUrl: string; score: number };
+
+async function findVisualMatches(files: Express.Multer.File[]): Promise<VisualMatch[]> {
+  const vector = await embedImages(await Promise.all(files.map(async (file) => ({ path: file.path, mimeType: file.mimetype }))));
+  const rows = await prisma.$queryRawUnsafe<Array<{ productId: string; productName: string | null; patternId: string; patternName: string; imageUrl: string; score: number | string }>>(`
+    SELECT DISTINCT ON (p."patternId")
+      p.id AS "productId", p.name AS "productName", pat.id AS "patternId", pat.name AS "patternName", pi.url AS "imageUrl",
+      1 - (pie.embedding <=> $1::vector) AS score
+    FROM product_image_embeddings pie
+    INNER JOIN product_images pi ON pi.id = pie."productImageId"
+    INNER JOIN products p ON p.id = pi."productId"
+    INNER JOIN patterns pat ON pat.id = p."patternId"
+    WHERE p.active = true AND pat.active = true AND pi.type = 'ROUPA'
+    ORDER BY p."patternId", score DESC
+  `, vectorLiteral(vector));
+  return rows
+    .map((row) => ({ ...row, productName: row.productName || 'Roupa sem nome', score: Number(row.score) }))
+    .filter((row) => Number.isFinite(row.score))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 12);
+}
+
+async function indexPublishedImages(productId: string, images: DraftImage[]): Promise<void> {
+  if (!images.length || !process.env.OPENROUTER_API_KEY) return;
+  for (const image of images) {
+    try {
+      const record = await prisma.productImage.findFirst({ where: { productId, url: image.url }, select: { id: true, mimeType: true } });
+      if (!record) continue;
+      const localPath = path.resolve(process.cwd(), `.${image.url}`);
+      const vector = await embedImages([{ path: localPath, mimeType: record.mimeType || image.url }]);
+      await prisma.$executeRawUnsafe(
+        'INSERT INTO product_image_embeddings ("productImageId", embedding, model, dimensions) VALUES ($1, $2::vector, $3, 768) ON CONFLICT ("productImageId") DO UPDATE SET embedding = EXCLUDED.embedding, model = EXCLUDED.model, dimensions = EXCLUDED.dimensions, "updatedAt" = CURRENT_TIMESTAMP',
+        record.id, vectorLiteral(vector), process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2',
+      );
+    } catch (error) {
+      // A publicação não pode falhar por indisponibilidade temporária do índice.
+      console.warn('Não foi possível indexar a foto para busca visual:', error instanceof Error ? error.message : error);
+    }
+  }
+}
+
 async function freeCode(tx: Prisma.TransactionClient, kind: 'category' | 'subcategory' | 'pattern', categoryId?: string): Promise<string> {
   const width = kind === 'pattern' ? 4 : 2;
   const rows = kind === 'category' ? await tx.category.findMany({ select: { code: true } }) : kind === 'subcategory' ? await tx.subcategory.findMany({ where: { categoryId }, select: { code: true } }) : await tx.pattern.findMany({ select: { code: true } });
@@ -191,6 +233,18 @@ router.post('/draft', authenticateToken, uploadProductImage.array('images', IMAG
     const draft = await createAiDraft(files);
     const images = files.map((file) => { const url = `/uploads/products/${file.filename}`; return { url, token: imageToken(url) }; });
     return res.status(201).json({ draft, images });
+  } catch (error) { return next(error); }
+});
+
+// Busca no catálogo por proximidade visual antes de a pessoa decidir se
+// reaproveita uma estampa. A escolha continua sempre manual no aplicativo.
+router.post('/visual-search', authenticateToken, uploadProductImage.array('images', IMAGE_LIMIT), async (req, res, next) => {
+  try {
+    const files = (req.files || []) as Express.Multer.File[];
+    if (!files.length || files.length > IMAGE_LIMIT) return res.status(400).json({ error: 'Envie uma ou duas fotos da roupa.' });
+    const [draft, matches] = await Promise.all([createAiDraft(files), findVisualMatches(files)]);
+    const images = files.map((file) => { const url = `/uploads/products/${file.filename}`; return { url, token: imageToken(url) }; });
+    return res.status(201).json({ draft, images, matches });
   } catch (error) { return next(error); }
 });
 
@@ -263,6 +317,7 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
         existingProduct: result.existingProduct,
       });
     }
+    await indexPublishedImages(result.product.id, images);
     return res.status(201).json(result);
   } catch (error) { return next(error); }
 });

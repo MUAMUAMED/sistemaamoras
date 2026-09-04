@@ -11,6 +11,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "visual:setup": "ts-node src/scripts/setup-visual-search.ts",
+    "visual:index": "ts-node src/scripts/backfill-image-embeddings.ts",
     "test:smoke": "node scripts/smoke-check.mjs"
   },
   "prisma": {
