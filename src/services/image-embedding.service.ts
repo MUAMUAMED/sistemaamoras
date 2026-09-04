@@ -4,7 +4,7 @@ import path from 'path';
 const MODEL = process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2';
 export const IMAGE_EMBEDDING_DIMENSIONS = 768;
 
-type ImageInput = { path: string; mimeType: string };
+type ImageInput = { path?: string; data?: Buffer; mimeType: string };
 
 function configuredError(message: string): Error {
   return new Error(`Busca visual não configurada: ${message}`);
@@ -21,10 +21,11 @@ export async function embedImages(inputs: ImageInput[]): Promise<number[]> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw configuredError('defina OPENROUTER_API_KEY no backend.');
   if (!inputs.length || inputs.length > 6) throw new Error('Envie entre uma e seis imagens para a busca visual.');
-  const content = await Promise.all(inputs.map(async (input) => ({
-    type: 'image_url',
-    image_url: { url: `data:${normalizeMimeType(input.mimeType)};base64,${(await readFile(input.path)).toString('base64')}` },
-  })));
+  const content = await Promise.all(inputs.map(async (input) => {
+    const data = input.data || (input.path ? await readFile(input.path) : null);
+    if (!data) throw new Error('Não foi possível ler a foto para a busca visual.');
+    return { type: 'image_url', image_url: { url: `data:${normalizeMimeType(input.mimeType)};base64,${data.toString('base64')}` } };
+  }));
   const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },

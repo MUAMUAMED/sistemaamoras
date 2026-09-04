@@ -5,6 +5,7 @@ import path from 'path';
 import { prisma } from '../config/database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
+import { indexProductImage } from '../services/product-image-embedding.service';
 
 const router = Router();
 
@@ -1563,6 +1564,11 @@ router.post('/:id/image', authenticateToken, uploadProductImage.single('image'),
       console.warn('⚠️ ProductImage table not found, returning empty images array:', error.message);
     }
 
+    if (createdImage?.type === 'ROUPA') {
+      try { await indexProductImage(createdImage); }
+      catch (error) { console.warn('⚠️ Foto salva, mas não pôde ser indexada para busca visual:', error instanceof Error ? error.message : error); }
+    }
+
     return res.json({
       message: 'Imagem carregada com sucesso',
       product: { ...(updatedProduct as any), images },
@@ -1854,6 +1860,14 @@ router.post('/:id/images', authenticateToken, (req, res, next) => {
       images = await (prisma as any).productImage.findMany({ where: { productId: id }, orderBy: { position: 'asc' },         select: productImageSelect,       });
     } catch (error: any) {
       console.warn('⚠️ ProductImage table not found, returning empty images array:', error.message);
+    }
+
+    // Só fotos reais de roupa entram no buscador; imagens geradas por IA ficam fora.
+    if (imageType === 'ROUPA') {
+      for (const image of created) {
+        try { await indexProductImage(image); }
+        catch (error) { console.warn('⚠️ Foto salva, mas não pôde ser indexada para busca visual:', error instanceof Error ? error.message : error); }
+      }
     }
 
     // Retornar sucesso mesmo se algumas imagens falharam (arquivos já foram salvos)

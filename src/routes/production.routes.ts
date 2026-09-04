@@ -10,6 +10,7 @@ import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { modelReferences } from '../data/modelReference';
 import { embedImages, vectorLiteral } from '../services/image-embedding.service';
+import { indexProductImage } from '../services/product-image-embedding.service';
 
 const router = Router();
 const IMAGE_LIMIT = 2;
@@ -185,14 +186,9 @@ async function indexPublishedImages(productId: string, images: DraftImage[]): Pr
   if (!images.length || !process.env.OPENROUTER_API_KEY) return;
   for (const image of images) {
     try {
-      const record = await prisma.productImage.findFirst({ where: { productId, url: image.url }, select: { id: true, mimeType: true } });
+      const record = await prisma.productImage.findFirst({ where: { productId, url: image.url }, select: { id: true, url: true, mimeType: true } });
       if (!record) continue;
-      const localPath = path.resolve(process.cwd(), `.${image.url}`);
-      const vector = await embedImages([{ path: localPath, mimeType: record.mimeType || image.url }]);
-      await vectorDatabase().$executeRawUnsafe(
-        'INSERT INTO product_image_embeddings ("productImageId", embedding, model, dimensions) VALUES ($1, $2::vector, $3, 768) ON CONFLICT ("productImageId") DO UPDATE SET embedding = EXCLUDED.embedding, model = EXCLUDED.model, dimensions = EXCLUDED.dimensions, "updatedAt" = CURRENT_TIMESTAMP',
-        record.id, vectorLiteral(vector), process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2',
-      );
+      await indexProductImage(record);
     } catch (error) {
       // A publicação não pode falhar por indisponibilidade temporária do índice.
       console.warn('Não foi possível indexar a foto para busca visual:', error instanceof Error ? error.message : error);
