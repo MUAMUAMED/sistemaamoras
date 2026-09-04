@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, EyeIcon, CreditCardIcon, QrCodeIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, EyeIcon, CreditCardIcon, QrCodeIcon, TrashIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { saleService, productService } from '../services/api';
 import { Sale, Product } from '../types';
 import toast from 'react-hot-toast';
@@ -69,6 +69,18 @@ export default function Sales() {
       console.error('🗑️ [FRONTEND] Erro ao excluir venda:', error);
       console.error('🗑️ [FRONTEND] Detalhes do erro:', error.response?.data);
       toast.error(error.response?.data?.message || 'Erro ao excluir venda');
+    },
+  });
+
+  const issueNfceMutation = useMutation({
+    mutationFn: (sale: Sale) => saleService.issueNfce(sale.id),
+    onSuccess: (document, sale) => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      const state = document.status === 'AUTHORIZED' ? 'emitida' : 'enviada para processamento';
+      toast.success(`NFC-e da venda #${sale.saleNumber} ${state} (nº ${document.number}).`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Não foi possível emitir a nota fiscal desta venda.');
     },
   });
 
@@ -185,6 +197,16 @@ export default function Sales() {
   const confirmDeleteSale = () => {
     if (saleToDelete) {
       deleteSaleMutation.mutate(saleToDelete.id);
+    }
+  };
+
+  const handleIssueNfce = (sale: Sale) => {
+    if (sale.status !== 'PAID') {
+      toast.error('A nota fiscal só pode ser emitida após o pagamento da venda.');
+      return;
+    }
+    if (window.confirm(`Emitir a NFC-e da venda #${sale.saleNumber}? A nota será vinculada a esta venda e não criará uma nova cobrança.`)) {
+      issueNfceMutation.mutate(sale);
     }
   };
 
@@ -365,6 +387,16 @@ export default function Sales() {
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
+                      {sale.status === 'PAID' && (
+                        <button
+                          onClick={() => handleIssueNfce(sale)}
+                          disabled={issueNfceMutation.isPending}
+                          className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50"
+                          title="Emitir nota fiscal (NFC-e)"
+                        >
+                          <DocumentTextIcon className="h-4 w-4" />
+                        </button>
+                      )}
                       {(sale.status === 'PAID' || sale.status === 'PENDING') && (
                         <button
                           onClick={() => handleDeleteSale(sale)}
@@ -637,6 +669,16 @@ export default function Sales() {
               </div>
               
               <div className="flex justify-end space-x-3 mt-6">
+                {selectedSale.status === 'PAID' && (
+                  <button
+                    onClick={() => handleIssueNfce(selectedSale)}
+                    disabled={issueNfceMutation.isPending}
+                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <DocumentTextIcon className="h-4 w-4" />
+                    {issueNfceMutation.isPending ? 'Emitindo nota…' : 'Emitir nota fiscal'}
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setShowModal(false);

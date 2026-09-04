@@ -30,6 +30,9 @@ import {
   SaleFilters,
   PaginatedResponse,
   ApiResponse,
+  FiscalConfig,
+  FiscalDocument,
+  FiscalDanfe,
 } from '../types';
 
 // Configuração base do Axios
@@ -590,6 +593,108 @@ export const salesApi = {
     const response = await api.delete(`/sales/${id}`);
     return response.data;
   },
+
+  /** Emite (ou consulta, se já existir) a NFC-e da venda já concluída. */
+  issueNfce: async (id: string): Promise<{ id: string; number: number; series: number; status: string; statusMessage?: string | null }> => {
+    const response = await api.post(`/fiscal/sales/${id}/issue-nfce`);
+    return response.data;
+  },
+};
+
+export const fiscalApi = {
+  getConfig: async (): Promise<FiscalConfig | null> => (await api.get('/fiscal/config')).data,
+  updateConfig: async (data: Partial<FiscalConfig> & { cscToken?: string; certificatePfxBase64?: string; certificatePassword?: string }): Promise<FiscalConfig> =>
+    (await api.put('/fiscal/config', data)).data,
+  listDocuments: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    environment?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<PaginatedResponse<FiscalDocument>> =>
+    (await api.get('/fiscal/documents', { params })).data,
+  issueNfce: async (saleId: string): Promise<FiscalDocument> => (await api.post(`/fiscal/sales/${saleId}/issue-nfce`)).data,
+  issueManualNfce: async (data: {
+    recipientName?: string;
+    recipientTaxId?: string;
+    paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+    notes?: string;
+    items: Array<{
+      productCode?: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      ncm?: string;
+      cfop?: string;
+    }>;
+  }): Promise<FiscalDocument> => (await api.post('/fiscal/manual/issue-nfce', data)).data,
+    getAiProviders: async (): Promise<{
+      providers: Array<{
+        id: 'gemini' | 'groq' | 'openrouter';
+        label: string;
+        model: string;
+        configured: boolean;
+        enabled: boolean;
+        isDefault: boolean;
+        source: 'database' | 'environment' | null;
+      }>;
+      defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
+    }> => (await api.get('/fiscal/ai/providers')).data,
+    saveAiProvider: async (
+      provider: 'gemini' | 'groq' | 'openrouter',
+      data: {
+        apiKey?: string;
+        model: string;
+        enabled: boolean;
+        isDefault: boolean;
+        clearKey?: boolean;
+      }
+    ): Promise<{
+      providers: Array<{
+        id: 'gemini' | 'groq' | 'openrouter';
+        label: string;
+        model: string;
+        configured: boolean;
+        enabled: boolean;
+        isDefault: boolean;
+        source: 'database' | 'environment' | null;
+      }>;
+      defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
+    }> => (await api.put(`/fiscal/ai/providers/${provider}`, data)).data,
+    testAiProvider: async (
+      provider: 'gemini' | 'groq' | 'openrouter'
+    ): Promise<{ success: boolean; provider: string; model: string; message: string }> =>
+      (await api.post(`/fiscal/ai/providers/${provider}/test`)).data,
+    parseManualDraft: async (data: {
+    provider: 'gemini' | 'groq' | 'openrouter';
+    prompt: string;
+  }): Promise<{
+    provider: 'gemini' | 'groq' | 'openrouter';
+    model: string;
+    warnings: string[];
+    draft: {
+      recipientName: string;
+      recipientTaxId: string;
+      paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+      notes: string;
+      items: Array<{
+        productCode: string;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        ncm: string;
+        cfop: string;
+      }>;
+    };
+  }> => (await api.post('/fiscal/ai/parse-draft', data)).data,
+  retry: async (id: string): Promise<FiscalDocument> => (await api.post(`/fiscal/documents/${id}/retry`)).data,
+  cancel: async (id: string, reason: string) => (await api.post(`/fiscal/documents/${id}/cancel`, { reason })).data,
+  checkStatus: async () => (await api.get('/fiscal/status')).data,
+  getDanfe: async (id: string): Promise<FiscalDanfe> => (await api.get(`/fiscal/documents/${id}/danfe`)).data,
+  downloadXml: async (id: string): Promise<Blob> =>
+    (await api.get(`/fiscal/documents/${id}/xml`, { responseType: 'blob' })).data,
 };
 
 // Serviços de códigos de barras
@@ -741,6 +846,7 @@ export const saleService = {
   cancel: salesApi.cancel,
   generatePayment: salesApi.generatePayment,
   processPayment: salesApi.processPayment,
+  issueNfce: salesApi.issueNfce,
 };
 
 export const categoryService = categoriesApi;

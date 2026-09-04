@@ -91,6 +91,8 @@ export interface Product {
   minStock: number;
   barcode: string;
   qrcodeUrl?: string;
+  ncm?: string;
+  cfop?: string;
   imageUrl?: string;
   images?: ProductImage[]; // Galeria de imagens
   categoryId: string;
@@ -423,6 +425,7 @@ export interface ProductFilters {
   minStock?: number;
   maxStock?: number;
   active?: boolean;
+  isDraft?: boolean;
   page?: number;
   limit?: number;
 }
@@ -482,6 +485,111 @@ export interface LeadsReport {
     count: number;
     percentage: number;
   }>;
+}
+
+export type FiscalDocumentStatus = 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'REJECTED' | 'DENIED' | 'CONTINGENCY' | 'CANCELLED' | 'VOIDED' | 'ERROR';
+
+export interface FiscalDocument {
+  id: string;
+  saleId: string;
+  model: number;
+  series: number;
+  number: number;
+  accessKey?: string;
+  status: FiscalDocumentStatus;
+  statusCode?: number;
+  statusMessage?: string;
+  totalAmount: number;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  issuedAt: string;
+  authorizedAt?: string;
+  cancelledAt?: string;
+  sale?: Pick<Sale, 'saleNumber' | 'leadName' | 'paymentMethod'>;
+}
+
+export interface FiscalDanfe {
+  id: string;
+  model: number;
+  series: number;
+  number: number;
+  accessKey: string;
+  protocolNumber?: string;
+  status: FiscalDocumentStatus;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  operationNature: string;
+  issuedAt: string;
+  authorizedAt?: string;
+  recipientName?: string;
+  recipientTaxId?: string;
+  totalAmount: number;
+  qrCodeUrl?: string;
+  consultationUrl?: string;
+  issuer: {
+    companyName: string;
+    tradeName?: string;
+    taxId: string;
+    stateTaxId: string;
+    stateCode: string;
+    cityName: string;
+    street: string;
+    streetNumber: string;
+    district: string;
+    zipCode: string;
+    addressComplement?: string;
+  };
+  sale: {
+    saleNumber: string;
+    leadName?: string;
+    customerTaxId?: string;
+    paymentMethod: string;
+    subtotal: number;
+    discount: number;
+    total: number;
+  };
+  items: Array<{
+    id: string;
+    itemNumber: number;
+    productCode: string;
+    description: string;
+    ncm: string;
+    cfop: string;
+    unitOfMeasure: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+}
+
+export interface FiscalConfig {
+  id?: string;
+  active: boolean;
+  companyName: string;
+  tradeName?: string;
+  taxId: string;
+  stateTaxId: string;
+  taxRegime: number;
+  stateCode: string;
+  cityCode: string;
+  cityName: string;
+  street: string;
+  streetNumber: string;
+  district: string;
+  zipCode: string;
+  addressComplement?: string;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  nfeSeries: number;
+  nfceSeries: number;
+  nextNfeNumber: number;
+  nextNfceNumber: number;
+  cscId?: string;
+  certificateValidUntil?: string;
+  defaultNcm?: string;
+  defaultCfop?: string;
+  defaultIcmsCst?: string;
+  defaultPisCst?: string;
+  defaultCofinsCst?: string;
+  hasCscToken?: boolean;
+  hasCertificate?: boolean;
 }
 
 export interface StockReport {
