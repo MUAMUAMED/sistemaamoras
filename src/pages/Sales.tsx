@@ -315,104 +315,26 @@ export default function Sales() {
         </div>
       </div>
 
-      {/* Lista de vendas */}
-      <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Número
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pagamento
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sales?.map((sale: Sale) => (
-                <tr key={sale.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                    #{sale.saleNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {sale.leadName || sale.lead?.name || 'Cliente não informado'}
-                    </div>
-                    {(sale.leadPhone || sale.lead?.phone) && (
-                      <div className="text-xs text-gray-500">
-                        {sale.leadPhone || sale.lead?.phone}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(sale.createdAt).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                    {sale.paymentMethod || 'Não informado'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 text-xs font-semibold rounded-full ${getStatusColor(sale.status)}`}>
-                      {getStatusLabel(sale.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedSale(sale);
-                          setShowModal(true);
-                        }}
-                        className="inline-flex min-h-9 min-w-9 items-center justify-center rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                        title="Ver detalhes"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      {sale.status === 'PAID' && (
-                        <button onClick={() => beginInvoice(sale)} className="inline-flex min-h-9 items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 text-emerald-700 hover:bg-emerald-100" title="Emitir nota fiscal">
-                          <DocumentTextIcon className="h-4 w-4" /><span className="hidden lg:inline">Nota</span>
-                        </button>
-                      )}
-                      {(sale.status === 'PAID' || sale.status === 'PENDING') && (
-                        <button
-                          onClick={() => handleDeleteSale(sale)}
-                          className="inline-flex min-h-9 min-w-9 items-center justify-center rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                          title="Excluir venda"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {(!sales || sales.length === 0) && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Nenhuma venda encontrada</p>
-          </div>
-        )}
+      {/* Lista de vendas — cartões evitam rolagem horizontal e deixam as ações acessíveis. */}
+      <div className="grid gap-3">
+        {sales.map((sale: Sale) => (
+          <article key={sale.id} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-semibold text-gray-900">#{sale.saleNumber}</span><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStatusColor(sale.status)}`}>{getStatusLabel(sale.status)}</span></div>
+                <p className="mt-2 truncate font-medium text-gray-900">{sale.leadName || sale.lead?.name || 'Cliente não informado'}</p>
+                {(sale.leadPhone || sale.lead?.phone) && <p className="text-sm text-gray-500">{sale.leadPhone || sale.lead?.phone}</p>}
+              </div>
+              <div className="sm:text-right"><p className="text-xl font-bold text-gray-900">R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p><p className="mt-1 text-sm capitalize text-gray-500">{sale.paymentMethod || 'Pagamento não informado'} · {new Date(sale.createdAt).toLocaleDateString('pt-BR')}</p></div>
+            </div>
+            <div className="mt-4 grid gap-2 border-t border-gray-100 pt-3 sm:flex sm:flex-wrap">
+              <button onClick={() => { setSelectedSale(sale); setShowModal(true); }} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 sm:flex-none"><EyeIcon className="h-4 w-4" /> Ver venda</button>
+              {sale.status === 'PAID' && <button onClick={() => beginInvoice(sale)} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 sm:flex-none"><DocumentTextIcon className="h-4 w-4" /> Emitir nota</button>}
+              {(sale.status === 'PAID' || sale.status === 'PENDING') && <button onClick={() => handleDeleteSale(sale)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100"><TrashIcon className="h-4 w-4" /> Excluir</button>}
+            </div>
+          </article>
+        ))}
+        {!sales.length && <div className="rounded-lg border border-dashed border-gray-300 bg-white py-12 text-center text-gray-500">Nenhuma venda encontrada</div>}
       </div>
 
       {/* Modal de nova venda */}
