@@ -310,6 +310,9 @@ export default function Pdv() {
                 {scanMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               </button>
             </form>
+            <button type="button" onClick={() => setShowManualItem(true)} className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 border border-dashed border-[#116e78] bg-cyan-50 px-3 text-sm font-semibold text-[#0d5961] hover:bg-cyan-100">
+              <Plus className="h-4 w-4" /> Adicionar peça sem cadastro
+            </button>
             {missingCode && (
               <button type="button" onClick={() => { setManualItem((current) => ({ ...current, description: `Peça sem cadastro (${missingCode})` })); setShowManualItem(true); }} className="mt-2 w-full border border-amber-400 bg-amber-50 px-3 py-2 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
                 Código {missingCode} não cadastrado · adicionar peça avulsa
