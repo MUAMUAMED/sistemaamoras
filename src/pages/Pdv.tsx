@@ -40,7 +40,7 @@ interface CartItem {
     description: string;
     barcode?: string;
     categoryName: string;
-    subcategoryName: string;
+    subcategoryName?: string;
   };
 }
 
@@ -242,8 +242,8 @@ export default function Pdv() {
     const category = categories.find((item) => item.id === manualItem.categoryId);
     const subcategory = subcategories.find((item) => item.id === manualItem.subcategoryId);
     const unitPrice = moneyInput(manualItem.unitPrice);
-    if (!manualItem.description.trim() || !category || !subcategory || !manualItem.unitPrice.trim()) {
-      toast.error('Informe nome, categoria, subcategoria e preço da peça');
+    if (!manualItem.description.trim() || !category || !manualItem.unitPrice.trim()) {
+      toast.error('Informe nome, categoria e preço da peça');
       return;
     }
     setCart((current) => [...current, {
@@ -254,7 +254,7 @@ export default function Pdv() {
         description: manualItem.description.trim(),
         barcode: missingCode || undefined,
         categoryName: category.name,
-        subcategoryName: subcategory.name,
+        subcategoryName: subcategory?.name,
       },
     }]);
     setManualItem({ description: '', categoryId: '', subcategoryId: '', unitPrice: '' });
@@ -335,7 +335,7 @@ export default function Pdv() {
                     <div className="min-w-0">
                       <h2 className="truncate text-sm font-semibold">{item.product?.name || item.manual?.description}</h2>
                       <p className="mt-1 text-xs text-slate-500">
-                        {money(item.unitPrice)} · {item.product ? `estoque ${storeStock(item.product)}` : `${item.manual?.categoryName} · ${item.manual?.subcategoryName} · sem estoque`}
+                        {money(item.unitPrice)} · {item.product ? `estoque ${storeStock(item.product)}` : `${[item.manual?.categoryName, item.manual?.subcategoryName].filter(Boolean).join(' · ')} · sem estoque`}
                       </p>
                       <div className="mt-2 flex items-center gap-1">
                         <button
@@ -520,7 +520,7 @@ export default function Pdv() {
               <label className="block text-sm font-medium">Nome da peça<input value={manualItem.description} onChange={(event) => setManualItem((current) => ({ ...current, description: event.target.value }))} className="mt-1 h-11 w-full border border-slate-300 px-3 font-normal" placeholder="Ex.: Vestido liso" /></label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block text-sm font-medium">Categoria<select value={manualItem.categoryId} onChange={(event) => setManualItem((current) => ({ ...current, categoryId: event.target.value, subcategoryId: '' }))} className="mt-1 h-11 w-full border border-slate-300 bg-white px-3 font-normal"><option value="">Selecionar</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-                <label className="block text-sm font-medium">Subcategoria<select disabled={!manualItem.categoryId} value={manualItem.subcategoryId} onChange={(event) => setManualItem((current) => ({ ...current, subcategoryId: event.target.value }))} className="mt-1 h-11 w-full border border-slate-300 bg-white px-3 font-normal disabled:bg-slate-100"><option value="">Selecionar</option>{manualSubcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                <label className="block text-sm font-medium">Subcategoria <span className="font-normal text-slate-500">(opcional)</span><select disabled={!manualItem.categoryId} value={manualItem.subcategoryId} onChange={(event) => setManualItem((current) => ({ ...current, subcategoryId: event.target.value }))} className="mt-1 h-11 w-full border border-slate-300 bg-white px-3 font-normal disabled:bg-slate-100"><option value="">Não informar</option>{manualSubcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
               </div>
               <label className="block text-sm font-medium">Preço (R$)<input type="text" inputMode="decimal" value={manualItem.unitPrice} onChange={(event) => setManualItem((current) => ({ ...current, unitPrice: event.target.value.replace(/[^\d,]/g, '') }))} className="mt-1 h-11 w-full border border-slate-300 px-3 font-normal" placeholder="Ex.: 89,90" /></label>
             </div>

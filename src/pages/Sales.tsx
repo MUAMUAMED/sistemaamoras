@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import BarcodeScanner from '../components/BarcodeScanner';
 import ProductSelector from '../components/ProductSelector';
 import { productDisplayName } from '../utils/productDisplayName';
+import { getProductCardImageUrl } from '../utils/imageUrl';
 
 export default function Sales() {
   const [showModal, setShowModal] = useState(false);
@@ -319,7 +320,9 @@ export default function Sales() {
       {/* Lista de vendas — cartões evitam rolagem horizontal e deixam as ações acessíveis. */}
       <div className="grid gap-3">
         {sales.map((sale: Sale) => (
-          <article key={sale.id} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <article key={sale.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem]">
+              <div className="p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-semibold text-gray-900">#{sale.saleNumber}</span><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStatusColor(sale.status)}`}>{getStatusLabel(sale.status)}</span></div>
@@ -332,6 +335,36 @@ export default function Sales() {
               <button onClick={() => { setSelectedSale(sale); setShowModal(true); }} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 sm:flex-none"><EyeIcon className="h-4 w-4" /> Ver venda</button>
               {sale.status === 'PAID' && <button onClick={() => beginInvoice(sale)} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 sm:flex-none"><DocumentTextIcon className="h-4 w-4" /> Emitir nota</button>}
               {(sale.status === 'PAID' || sale.status === 'PENDING') && <button onClick={() => handleDeleteSale(sale)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100"><TrashIcon className="h-4 w-4" /> Excluir</button>}
+            </div>
+              </div>
+              <aside className="border-t border-gray-100 bg-slate-50 p-4 lg:border-l lg:border-t-0">
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Itens vendidos</p>
+                <div className="space-y-2">
+                  {sale.items?.map((item) => {
+                    const product = item.product;
+                    const image = product ? getProductCardImageUrl(product.images?.[0]?.url || product.imageUrl) : '';
+                    const itemName = product ? productDisplayName(product) : item.manualDescription || 'Peça sem cadastro';
+                    const itemContext = product
+                      ? `Código: ${product.barcode || 'não informado'}`
+                      : [item.manualCategoryName, item.manualSubcategoryName].filter(Boolean).join(' · ') || 'Peça avulsa';
+                    return (
+                      <div key={item.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
+                        {image ? (
+                          <img src={image} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                        ) : (
+                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-slate-200 text-xs font-bold text-slate-500">{product ? 'PEÇA' : 'AVULSA'}</div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">{itemName}</p>
+                          <p className="truncate text-xs text-slate-500">{itemContext}</p>
+                        </div>
+                        <div className="shrink-0 text-right"><p className="text-xs text-slate-500">{item.quantity}x</p><p className="text-sm font-bold text-slate-900">R$ {Number(item.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
+                      </div>
+                    );
+                  })}
+                  {!sale.items?.length && <p className="text-sm text-slate-500">Itens não disponíveis.</p>}
+                </div>
+              </aside>
             </div>
           </article>
         ))}
