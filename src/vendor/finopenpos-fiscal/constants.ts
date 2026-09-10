@@ -55,6 +55,9 @@ export const PAYMENT_TYPES: Record<string, string> = {
   store_credit: "05",
   voucher: "10",
   pix: "17",
+  // PIX apresentado pela própria loja (QR estático), sem identificador E2E.
+  // O código 17 é PIX dinâmico e exige o grupo de integração de pagamento.
+  pix_static: "20",
   other: "99",
   none: "90",
 };

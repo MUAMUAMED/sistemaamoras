@@ -72,7 +72,9 @@ export interface ManualNfceInput {
 
 const paymentType = (method: string) => ({
   CASH: PAYMENT_TYPES.cash,
-  PIX: PAYMENT_TYPES.pix,
+  // O PDV não é integrado ao provedor de PIX e não possui o E2E da transação.
+  // Portanto a NFC-e informa PIX estático (20), que não requer o grupo card.
+  PIX: PAYMENT_TYPES.pix_static,
   CREDIT_CARD: PAYMENT_TYPES.credit_card,
   DEBIT_CARD: PAYMENT_TYPES.debit_card,
   BANK_SLIP: PAYMENT_TYPES.other,
@@ -150,9 +152,20 @@ const validateFiscalProducts = (sale: any, settings: FiscalSettings) => {
 
 const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData => {
   const sale = document.sale;
-  const items: InvoiceItemData[] = document.items.map((item: any) => {
+  const grossTotal = document.items.reduce((sum: number, item: any) => sum + moneyToCents(item.totalPrice), 0);
+  const documentTotal = moneyToCents(document.totalAmount);
+  let remainingDiscount = Math.max(0, grossTotal - documentTotal);
+  const items: InvoiceItemData[] = document.items.map((item: any, index: number) => {
     const totalPrice = moneyToCents(item.totalPrice);
     const icmsPercent = item.icmsRate == null ? 0 : Number(item.icmsRate);
+    // O desconto da venda é repartido entre os itens em centavos. O último
+    // item absorve qualquer arredondamento para que vNF e vPag coincidam.
+    const itemDiscount = remainingDiscount > 0
+      ? Math.min(totalPrice, index === document.items.length - 1
+        ? remainingDiscount
+        : Math.round((grossTotal ? totalPrice / grossTotal : 0) * Math.max(0, grossTotal - documentTotal)))
+      : 0;
+    remainingDiscount -= itemDiscount;
     return {
       itemNumber: item.itemNumber,
       productCode: item.productCode,
@@ -164,6 +177,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
       quantity: Number(item.quantity),
       unitPrice: moneyToCents(item.unitPrice),
       totalPrice,
+      vDesc: itemDiscount || undefined,
       orig: item.fiscalOrigin,
       icmsCst: item.icmsCst,
       icmsRate: Math.round(icmsPercent * 100),

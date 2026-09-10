@@ -58,6 +58,7 @@ export function buildInvoiceXml(data: InvoiceBuildData): {
   // Build items and accumulate tax totals
   const icmsTotals = createIcmsTotals();
   let totalProducts = 0;
+  let totalDiscount = 0;
   let totalIpi = 0;
   let totalPis = 0;
   let totalCofins = 0;
@@ -65,6 +66,7 @@ export function buildInvoiceXml(data: InvoiceBuildData): {
 
   const detElements = data.items.map((item) => {
     totalProducts += item.totalPrice;
+    totalDiscount += item.vDesc ?? 0;
     const detResult = buildDet(item, data);
     mergeIcmsTotals(icmsTotals, detResult.icmsTotals);
     totalIpi += detResult.vIPI;
@@ -82,7 +84,7 @@ export function buildInvoiceXml(data: InvoiceBuildData): {
     ...(data.delivery ? [buildDelivery(data.delivery)] : []),
     ...(data.authorizedXml ? data.authorizedXml.map((a) => buildAutXml(a)) : []),
     ...detElements,
-    buildTotal(totalProducts, icmsTotals, { vIPI: totalIpi, vPIS: totalPis, vCOFINS: totalCofins, vII: totalIi }, data.retTrib),
+    buildTotal(totalProducts, totalDiscount, icmsTotals, { vIPI: totalIpi, vPIS: totalPis, vCOFINS: totalCofins, vII: totalIi }, data.retTrib),
     buildTransp(data),
     ...(data.billing ? [buildCobr(data.billing)] : []),
     buildPag(data.payments, data.changeAmount, data.paymentCardDetails),
@@ -471,8 +473,8 @@ interface OtherTotals {
   vII: number;
 }
 
-function buildTotal(totalProducts: number, icms: IcmsTotals, other: OtherTotals, retTrib?: RetTribData): string {
-  const vNF = totalProducts; // vNF = vProd - vDesc + vST + vFrete + vSeg + vOutro + vII + vIPI + vServ
+function buildTotal(totalProducts: number, totalDiscount: number, icms: IcmsTotals, other: OtherTotals, retTrib?: RetTribData): string {
+  const vNF = totalProducts - totalDiscount; // vNF = vProd - vDesc + vST + vFrete + vSeg + vOutro + vII + vIPI + vServ
   const totalChildren: string[] = [
     tag("ICMSTot", {}, [
       tag("vBC", {}, formatCents(icms.vBC)),
@@ -489,7 +491,7 @@ function buildTotal(totalProducts: number, icms: IcmsTotals, other: OtherTotals,
       tag("vProd", {}, formatCents(totalProducts)),
       tag("vFrete", {}, "0.00"),
       tag("vSeg", {}, "0.00"),
-      tag("vDesc", {}, "0.00"),
+      tag("vDesc", {}, formatCents(totalDiscount)),
       tag("vII", {}, formatCents(other.vII)),
       tag("vIPI", {}, formatCents(other.vIPI)),
       tag("vIPIDevol", {}, "0.00"),
