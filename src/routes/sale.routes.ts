@@ -293,8 +293,21 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       console.log('✅ [DEBUG] Lead validado:', lead.name);
     }
 
-    // Verificar se produtos existem e têm estoque
-    const productIds = items.map(item => item.productId);
+    // Itens avulsos representam uma peça ainda não cadastrada no catálogo.
+    // Eles ficam registrados na venda, mas nunca criam produto nem movimentam estoque.
+    const catalogItems = items.filter((item: any) => Boolean(item.productId));
+    const manualItems = items.filter((item: any) => !item.productId);
+    for (const item of manualItems) {
+      if (!String(item.description || '').trim() || !String(item.categoryName || '').trim() || !String(item.subcategoryName || '').trim()) {
+        return res.status(400).json({ error: 'Item avulso incompleto', message: 'Informe nome, categoria e subcategoria da peça não cadastrada' });
+      }
+      if (!Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) < 0 || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) {
+        return res.status(400).json({ error: 'Item avulso inválido', message: 'Informe quantidade e preço válidos para a peça não cadastrada' });
+      }
+    }
+
+    // Verificar se produtos cadastrados existem e têm estoque
+    const productIds = catalogItems.map((item: any) => item.productId);
     console.log('🔍 [DEBUG] Produtos solicitados:', productIds);
     
     const products = await prisma.product.findMany({
@@ -316,7 +329,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
 
     // Verificar estoque
     console.log('📊 [DEBUG] Verificando estoque...');
-    for (const item of items) {
+    for (const item of catalogItems) {
       const product = products.find(p => p.id === item.productId);
       if (!product) continue;
 
@@ -332,18 +345,23 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
 
     // Calcular total
     let total = 0;
-    const saleItems = items.map(item => {
-      const product = products.find(p => p.id === item.productId)!;
-      const itemTotal = product.price * item.quantity;
+    const saleItems = items.map((item: any) => {
+      const product = item.productId ? products.find(p => p.id === item.productId) : null;
+      const unitPrice = product ? product.price : Number(item.unitPrice);
+      const itemTotal = unitPrice * Number(item.quantity);
       total += itemTotal;
-      
-      console.log(`💰 [DEBUG] ${product.name}: ${item.quantity}x R$ ${product.price} = R$ ${itemTotal}`);
+      console.log(`💰 [DEBUG] ${product?.name || item.description}: ${item.quantity}x R$ ${unitPrice} = R$ ${itemTotal}`);
       
       return {
-        productId: item.productId,
+        productId: product?.id,
         quantity: item.quantity,
-        unitPrice: product.price,
+        unitPrice,
         total: itemTotal,
+        manualDescription: product ? null : String(item.description).trim(),
+        manualBarcode: product ? null : String(item.barcode || '').trim() || null,
+        manualCategoryName: product ? null : String(item.categoryName).trim(),
+        manualSubcategoryName: product ? null : String(item.subcategoryName).trim(),
+        affectsStock: Boolean(product),
       };
     });
 
@@ -614,6 +632,7 @@ async function processSalePayment(saleId: string) {
     if (sale.status !== 'PENDING') throw new Error('Venda não está disponível para pagamento');
 
     for (const item of sale.items) {
+      if (!item.affectsStock || !item.productId || !item.product) continue;
       const updated = await tx.product.updateMany({
         where: { id: item.productId, stock: { gte: item.quantity }, stockLoja: { gte: item.quantity } },
         data: { stock: { decrement: item.quantity }, stockLoja: { decrement: item.quantity } },
@@ -799,6 +818,33 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
  *       404:
  *         description: Venda não encontrada
  */
+// Atualiza somente a identificação do consumidor antes da emissão posterior da NFC-e.
+router.patch('/:id/customer-tax-id', authenticateToken, async (req, res, next) => {
+  try {
+    const customerTaxId = String(req.body?.customerTaxId || '').replace(/\D/g, '');
+    if (customerTaxId && ![11, 14].includes(customerTaxId.length)) {
+      return res.status(400).json({ error: 'CPF/CNPJ inválido', message: 'Informe 11 dígitos para CPF ou 14 para CNPJ' });
+    }
+    const existing = await prisma.sale.findUnique({ where: { id: req.params.id }, include: { fiscalDocuments: { select: { id: true } } } });
+    if (!existing) return res.status(404).json({ error: 'Venda não encontrada' });
+    if (existing.fiscalDocuments.length) {
+      return res.status(409).json({ error: 'Nota já emitida', message: 'Não é possível alterar CPF/CNPJ após criar a nota fiscal' });
+    }
+    const sale = await prisma.sale.update({
+      where: { id: req.params.id },
+      data: {
+        customerTaxId: customerTaxId || null,
+        ...(typeof req.body?.leadName === 'string' && { leadName: req.body.leadName.trim() || null }),
+      },
+      include: { fiscalDocuments: { select: { id: true } } },
+    });
+    return res.json(sale);
+  } catch (error: any) {
+    if (error?.code === 'P2025') return res.status(404).json({ error: 'Venda não encontrada' });
+    return next(error);
+  }
+});
+
 router.patch('/:id/status', authenticateToken, async (req, res, next) => {
   try {
     console.log('🔄 [DEBUG] Atualizando status da venda...');

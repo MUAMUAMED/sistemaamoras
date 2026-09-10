@@ -137,14 +137,14 @@ const loadFiscalSettings = async (): Promise<FiscalSettings> => {
 const validateFiscalProducts = (sale: any, settings: FiscalSettings) => {
   const invalid = sale.items.filter((item: any) => {
     const product = item.product;
-    return !(product.ncm || settings.defaultNcm)
-      || !(product.cfop || settings.defaultCfop)
-      || !(product.icmsCst || settings.defaultIcmsCst)
-      || !(product.pisCst || settings.defaultPisCst)
-      || !(product.cofinsCst || settings.defaultCofinsCst);
+    return !(product?.ncm || settings.defaultNcm)
+      || !(product?.cfop || settings.defaultCfop)
+      || !(product?.icmsCst || settings.defaultIcmsCst)
+      || !(product?.pisCst || settings.defaultPisCst)
+      || !(product?.cofinsCst || settings.defaultCofinsCst);
   });
   if (invalid.length) {
-    throw new Error(`Produtos sem configuracao fiscal: ${invalid.map((item: any) => item.product.name).join(', ')}`);
+    throw new Error(`Produtos sem configuracao fiscal: ${invalid.map((item: any) => item.product?.name || item.manualDescription || 'item avulso').join(', ')}`);
   }
 };
 
@@ -336,22 +336,22 @@ export const issueNfceForSale = async (saleId: string) => {
         paymentSnapshot: { method: sale.paymentMethod, total: sale.total },
         items: {
           create: sale.items.map((item, index) => ({
-            productId: item.productId,
+            productId: item.productId || null,
             itemNumber: index + 1,
-            productCode: item.product.barcode || item.product.id,
-            description: item.product.name || 'PRODUTO',
-            ncm: item.product.ncm || settings.defaultNcm,
-            cest: item.product.cest,
-            cfop: item.product.cfop || settings.defaultCfop,
-            unitOfMeasure: item.product.unitOfMeasure || 'UN',
+            productCode: item.product?.barcode || item.manualBarcode || item.productId || `AVULSO-${index + 1}`,
+            description: item.product?.name || item.manualDescription || 'PRODUTO',
+            ncm: item.product?.ncm || settings.defaultNcm,
+            cest: item.product?.cest,
+            cfop: item.product?.cfop || settings.defaultCfop,
+            unitOfMeasure: item.product?.unitOfMeasure || 'UN',
             quantity: new Prisma.Decimal(item.quantity),
             unitPrice: new Prisma.Decimal(item.unitPrice),
             totalPrice: new Prisma.Decimal(item.total),
-            fiscalOrigin: item.product.fiscalOrigin || '0',
-            icmsCst: item.product.icmsCst || settings.defaultIcmsCst,
-            icmsRate: item.product.icmsRate,
-            pisCst: item.product.pisCst || settings.defaultPisCst,
-            cofinsCst: item.product.cofinsCst || settings.defaultCofinsCst,
+            fiscalOrigin: item.product?.fiscalOrigin || '0',
+            icmsCst: item.product?.icmsCst || settings.defaultIcmsCst,
+            icmsRate: item.product?.icmsRate,
+            pisCst: item.product?.pisCst || settings.defaultPisCst,
+            cofinsCst: item.product?.cofinsCst || settings.defaultCofinsCst,
           })),
         },
       },

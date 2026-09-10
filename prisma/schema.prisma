@@ -351,17 +351,22 @@ model Sale {
 
 // Itens da venda
 model SaleItem {
-  id        String @id @default(cuid())
-  saleId    String
-  productId String
-  quantity  Int
-  unitPrice Float // Preço unitário no momento da venda
-  discount  Float  @default(0) // Desconto específico do item
-  total     Float // Total do item (quantidade × preço - desconto)
+  id                    String   @id @default(cuid())
+  saleId                String
+  productId             String?
+  quantity              Int
+  unitPrice             Float    // Preço unitário no momento da venda
+  discount              Float    @default(0) // Desconto específico do item
+  total                 Float    // Total do item (quantidade × preço - desconto)
+  manualDescription     String?
+  manualBarcode         String?
+  manualCategoryName    String?
+  manualSubcategoryName String?
+  affectsStock          Boolean  @default(true)
 
   // Relacionamentos
-  sale    Sale    @relation(fields: [saleId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  sale    Sale     @relation(fields: [saleId], references: [id])
+  product Product? @relation(fields: [productId], references: [id])
 
   @@map("sale_items")
 }
