@@ -748,21 +748,47 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
 
     console.log('🗑️ [DEBUG] Iniciando exclusão em transação...');
 
-    // Excluir venda e itens relacionados em uma transação
+    // Excluir venda e itens relacionados em uma transação. Uma venda paga já
+    // retirou as peças da loja em processSalePayment; portanto, desfazemos
+    // exatamente essa baixa antes de remover o registro.
     await prisma.$transaction(async (tx) => {
+      if (sale.status === 'PAID') {
+        for (const item of sale.items) {
+          // Itens adicionados manualmente no PDV não pertencem ao catálogo e
+          // nunca alteram estoque. Também toleramos vendas antigas sem produto.
+          if (!item.affectsStock || !item.productId) continue;
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: { increment: item.quantity },
+              stockLoja: { increment: item.quantity },
+            },
+          });
+
+          await tx.stockMovement.create({
+            data: {
+              productId: item.productId,
+              type: 'RETURN',
+              quantity: item.quantity,
+              reason: `Estorno por exclusão da venda ${sale.id}`,
+              reference: sale.id,
+              location: 'LOJA',
+              userId: sale.sellerId,
+            },
+          });
+        }
+      }
+
       // 1. Excluir itens da venda
       console.log('🗑️ [DEBUG] Excluindo itens da venda...');
       await tx.saleItem.deleteMany({
         where: { saleId: id },
       });
 
-      // 2. Excluir movimentações de estoque relacionadas
-      console.log('🗑️ [DEBUG] Excluindo movimentações de estoque...');
-      await tx.stockMovement.deleteMany({
-        where: {
-          reason: { contains: `Venda ${id}` },
-        },
-      });
+      // 2. Mantemos as movimentações de saída e de estorno para auditoria.
+      // A referência aponta para a venda excluída, mas não há vínculo físico
+      // obrigatório e o histórico de estoque continua íntegro.
 
       // 3. Excluir a venda
       console.log('🗑️ [DEBUG] Excluindo venda...');
