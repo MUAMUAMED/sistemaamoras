@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
 import {
   Banknote,
   Check,
@@ -11,7 +10,6 @@ import {
   Minus,
   PackageOpen,
   Plus,
-  ReceiptText,
   RotateCcw,
   ScanLine,
   Search,
@@ -24,18 +22,25 @@ import {
 import toast from 'react-hot-toast';
 import {
   categoryService,
-  fiscalApi,
   paymentGatewayApi,
   productService,
   saleService,
+  subcategoryService,
 } from '../services/api';
 import { Product } from '../types';
 import { getProductCardImageUrl, getImageUrl } from '../utils/imageUrl';
 
 interface CartItem {
-  product: Product;
+  key: string;
+  product?: Product;
   quantity: number;
   unitPrice: number;
+  manual?: {
+    description: string;
+    barcode?: string;
+    categoryName: string;
+    subcategoryName: string;
+  };
 }
 
 const money = (value: number) =>
@@ -44,13 +49,18 @@ const money = (value: number) =>
 const storeStock = (product: Product) =>
   Number.isFinite(Number(product.stockLoja)) ? Number(product.stockLoja) : Number(product.stock || 0);
 
+const moneyInput = (value: string) => {
+  const normalized = value.replace(/[^\d,]/g, '').replace(',', '.');
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : 0;
+};
+
 const productImage = (product: Product) => {
   const image = [...(product.images || [])].sort((a, b) => a.position - b.position)[0]?.url;
   return getProductCardImageUrl(image || product.imageUrl);
 };
 
 export default function Pdv() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const scanInputRef = useRef<HTMLInputElement>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -61,8 +71,10 @@ export default function Pdv() {
   const [customerName, setCustomerName] = useState('');
   const [customerTaxId, setCustomerTaxId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [discount, setDiscount] = useState(0);
-  const [issueNfce, setIssueNfce] = useState(true);
+  const [discount, setDiscount] = useState('');
+  const [missingCode, setMissingCode] = useState('');
+  const [showManualItem, setShowManualItem] = useState(false);
+  const [manualItem, setManualItem] = useState({ description: '', categoryId: '', subcategoryId: '', unitPrice: '' });
   const [pixModal, setPixModal] = useState<{ qr: string; copyPaste: string } | null>(null);
 
   const productsQuery = useQuery({
@@ -75,9 +87,16 @@ export default function Pdv() {
     queryFn: categoryService.list,
     staleTime: 60_000,
   });
+  const subcategoriesQuery = useQuery({
+    queryKey: ['pdv-subcategories'],
+    queryFn: () => subcategoryService.list(),
+    staleTime: 60_000,
+  });
 
   const products = productsQuery.data?.data || [];
   const categories = (categoriesQuery.data || []).filter((category) => category.active);
+  const subcategories = (subcategoriesQuery.data || []).filter((subcategory) => subcategory.active);
+  const manualSubcategories = subcategories.filter((subcategory) => subcategory.categoryId === manualItem.categoryId);
   const visibleProducts = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
     return products.filter((product) => {
@@ -93,7 +112,7 @@ export default function Pdv() {
   }, [categoryId, products, search]);
 
   const subtotal = cart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const safeDiscount = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
+  const safeDiscount = Math.min(Math.max(moneyInput(discount), 0), subtotal);
   const total = Math.max(0, subtotal - safeDiscount);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -108,28 +127,29 @@ export default function Pdv() {
       return;
     }
     setCart((current) => {
-      const existing = current.find((item) => item.product.id === product.id);
+      const existing = current.find((item) => item.product?.id === product.id);
       if (existing) {
         if (existing.quantity >= available) {
           toast.error(`Estoque máximo de ${available} unidade(s)`);
           return current;
         }
         return current.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+          item.product?.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
         );
       }
-      return [...current, { product, quantity: 1, unitPrice: Number(product.price) }];
+      return [...current, { key: product.id, product, quantity: 1, unitPrice: Number(product.price) }];
     });
   };
 
-  const changeQuantity = (productId: string, quantity: number) => {
+  const changeQuantity = (key: string, quantity: number) => {
     if (quantity <= 0) {
-      setCart((current) => current.filter((item) => item.product.id !== productId));
+      setCart((current) => current.filter((item) => item.key !== key));
       return;
     }
     setCart((current) =>
       current.map((item) => {
-        if (item.product.id !== productId) return item;
+        if (item.key !== key) return item;
+        if (!item.product) return { ...item, quantity };
         const available = storeStock(item.product);
         if (quantity > available) {
           toast.error(`Estoque máximo de ${available} unidade(s)`);
@@ -145,9 +165,11 @@ export default function Pdv() {
     onSuccess: (product) => {
       addProduct(product);
       setScanCode('');
+      setMissingCode('');
       window.setTimeout(() => scanInputRef.current?.focus(), 0);
     },
     onError: (error: any) => {
+      setMissingCode(scanCode.trim());
       toast.error(error.response?.data?.message || 'Produto não encontrado');
       setScanCode('');
       window.setTimeout(() => scanInputRef.current?.focus(), 0);
@@ -156,27 +178,11 @@ export default function Pdv() {
 
   const createSaleMutation = useMutation({
     mutationFn: (data: any) => saleService.create(data),
-    onSuccess: async (sale) => {
+    onSuccess: (sale) => {
       queryClient.invalidateQueries({ queryKey: ['pdv-products'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       toast.success(`Venda #${sale.saleNumber} concluída`);
-      if (issueNfce) {
-        try {
-          const document = await fiscalApi.issueNfce(sale.id);
-          if (document.status === 'AUTHORIZED') {
-            toast.success(`NFC-e ${document.series}/${document.number} autorizada`);
-            resetSale();
-            navigate(`/erp/fiscal/${document.id}/danfe`, {
-              state: { fromPdv: true, pdvPath: '/erp/pdv', shareFiscal: true },
-            });
-            return;
-          }
-          toast.error(document.statusMessage || `NFC-e não autorizada: ${document.status}`);
-        } catch (error: any) {
-          toast.error(error.response?.data?.message || 'Venda salva, mas a NFC-e não foi emitida');
-        }
-      }
       resetSale();
     },
     onError: (error: any) => {
@@ -199,7 +205,7 @@ export default function Pdv() {
     setCustomerName('');
     setCustomerTaxId('');
     setPaymentMethod('');
-    setDiscount(0);
+    setDiscount('');
     setShowPayment(false);
     setPixModal(null);
   };
@@ -209,17 +215,16 @@ export default function Pdv() {
       toast.error('Selecione a forma de pagamento');
       return;
     }
-    const unavailable = cart.find((item) => item.quantity > storeStock(item.product));
+    const unavailable = cart.find((item) => item.product && item.quantity > storeStock(item.product));
     if (unavailable) {
-      toast.error(`Estoque insuficiente para ${unavailable.product.name}`);
+      toast.error(`Estoque insuficiente para ${unavailable.product?.name}`);
       setShowPayment(false);
       return;
     }
     createSaleMutation.mutate({
-      items: cart.map((item) => ({
-        productId: item.product.id,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
+      items: cart.map((item) => item.product ? ({ productId: item.product.id, quantity: item.quantity, unitPrice: item.unitPrice }) : ({
+        quantity: item.quantity, unitPrice: item.unitPrice, description: item.manual!.description,
+        barcode: item.manual!.barcode, categoryName: item.manual!.categoryName, subcategoryName: item.manual!.subcategoryName,
       })),
       discount: safeDiscount,
       paymentMethod,
@@ -233,6 +238,31 @@ export default function Pdv() {
     const code = scanCode.trim();
     if (!code) return;
     scanMutation.mutate(code);
+  };
+
+  const addManualItem = () => {
+    const category = categories.find((item) => item.id === manualItem.categoryId);
+    const subcategory = subcategories.find((item) => item.id === manualItem.subcategoryId);
+    const unitPrice = moneyInput(manualItem.unitPrice);
+    if (!manualItem.description.trim() || !category || !subcategory || !manualItem.unitPrice.trim()) {
+      toast.error('Informe nome, categoria, subcategoria e preço da peça');
+      return;
+    }
+    setCart((current) => [...current, {
+      key: `manual-${crypto.randomUUID()}`,
+      quantity: 1,
+      unitPrice,
+      manual: {
+        description: manualItem.description.trim(),
+        barcode: missingCode || undefined,
+        categoryName: category.name,
+        subcategoryName: subcategory.name,
+      },
+    }]);
+    setManualItem({ description: '', categoryId: '', subcategoryId: '', unitPrice: '' });
+    setMissingCode('');
+    setShowManualItem(false);
+    toast.success('Peça avulsa adicionada. O estoque não será alterado.');
   };
 
   return (
@@ -280,6 +310,11 @@ export default function Pdv() {
                 {scanMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               </button>
             </form>
+            {missingCode && (
+              <button type="button" onClick={() => { setManualItem((current) => ({ ...current, description: `Peça sem cadastro (${missingCode})` })); setShowManualItem(true); }} className="mt-2 w-full border border-amber-400 bg-amber-50 px-3 py-2 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100">
+                Código {missingCode} não cadastrado · adicionar peça avulsa
+              </button>
+            )}
           </div>
 
           <div className="custom-scrollbar min-h-[18rem] flex-1 overflow-y-auto">
@@ -294,18 +329,18 @@ export default function Pdv() {
             ) : (
               <div className="divide-y divide-slate-200">
                 {cart.map((item, index) => (
-                  <article key={item.product.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-2 px-3 py-3">
+                  <article key={item.key} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-2 px-3 py-3">
                     <span className="pt-1 text-[11px] font-semibold text-slate-400">{String(index + 1).padStart(2, '0')}</span>
                     <div className="min-w-0">
-                      <h2 className="truncate text-sm font-semibold">{item.product.name}</h2>
+                      <h2 className="truncate text-sm font-semibold">{item.product?.name || item.manual?.description}</h2>
                       <p className="mt-1 text-xs text-slate-500">
-                        {money(item.unitPrice)} · estoque {storeStock(item.product)}
+                        {money(item.unitPrice)} · {item.product ? `estoque ${storeStock(item.product)}` : `${item.manual?.categoryName} · ${item.manual?.subcategoryName} · sem estoque`}
                       </p>
                       <div className="mt-2 flex items-center gap-1">
                         <button
                           type="button"
                           title="Diminuir quantidade"
-                          onClick={() => changeQuantity(item.product.id, item.quantity - 1)}
+                          onClick={() => changeQuantity(item.key, item.quantity - 1)}
                           className="grid h-8 w-8 place-items-center border border-slate-300 hover:bg-slate-100"
                         >
                           <Minus className="h-4 w-4" />
@@ -316,8 +351,8 @@ export default function Pdv() {
                         <button
                           type="button"
                           title="Aumentar quantidade"
-                          disabled={item.quantity >= storeStock(item.product)}
-                          onClick={() => changeQuantity(item.product.id, item.quantity + 1)}
+                          disabled={Boolean(item.product && item.quantity >= storeStock(item.product))}
+                          onClick={() => changeQuantity(item.key, item.quantity + 1)}
                           className="grid h-8 w-8 place-items-center border border-slate-300 hover:bg-slate-100 disabled:opacity-30"
                         >
                           <Plus className="h-4 w-4" />
@@ -328,7 +363,7 @@ export default function Pdv() {
                       <button
                         type="button"
                         title="Remover produto"
-                        onClick={() => changeQuantity(item.product.id, 0)}
+                        onClick={() => changeQuantity(item.key, 0)}
                         className="grid h-8 w-8 place-items-center text-rose-600 hover:bg-rose-50"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -472,6 +507,27 @@ export default function Pdv() {
         </section>
       </div>
 
+      {showManualItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-lg bg-white shadow-2xl">
+            <header className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div><h2 className="text-lg font-bold">Adicionar peça sem cadastro</h2><p className="text-sm text-slate-500">Esta venda não criará produto nem movimentará estoque.</p></div>
+              <button type="button" onClick={() => setShowManualItem(false)} className="grid h-9 w-9 place-items-center hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </header>
+            <div className="space-y-4 p-5">
+              {missingCode && <p className="border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">Código bipado: <strong className="font-mono">{missingCode}</strong></p>}
+              <label className="block text-sm font-medium">Nome da peça<input value={manualItem.description} onChange={(event) => setManualItem((current) => ({ ...current, description: event.target.value }))} className="mt-1 h-11 w-full border border-slate-300 px-3 font-normal" placeholder="Ex.: Vestido liso" /></label>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-sm font-medium">Categoria<select value={manualItem.categoryId} onChange={(event) => setManualItem((current) => ({ ...current, categoryId: event.target.value, subcategoryId: '' }))} className="mt-1 h-11 w-full border border-slate-300 bg-white px-3 font-normal"><option value="">Selecionar</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+                <label className="block text-sm font-medium">Subcategoria<select disabled={!manualItem.categoryId} value={manualItem.subcategoryId} onChange={(event) => setManualItem((current) => ({ ...current, subcategoryId: event.target.value }))} className="mt-1 h-11 w-full border border-slate-300 bg-white px-3 font-normal disabled:bg-slate-100"><option value="">Selecionar</option>{manualSubcategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+              </div>
+              <label className="block text-sm font-medium">Preço (R$)<input type="text" inputMode="decimal" value={manualItem.unitPrice} onChange={(event) => setManualItem((current) => ({ ...current, unitPrice: event.target.value.replace(/[^\d,]/g, '') }))} className="mt-1 h-11 w-full border border-slate-300 px-3 font-normal" placeholder="Ex.: 89,90" /></label>
+            </div>
+            <footer className="flex justify-end gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4"><button type="button" onClick={() => setShowManualItem(false)} className="h-11 border border-slate-300 px-4 font-semibold">Cancelar</button><button type="button" onClick={addManualItem} className="h-11 bg-[#116e78] px-5 font-semibold text-white">Adicionar à venda</button></footer>
+          </div>
+        </div>
+      )}
+
       {showPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
           <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto bg-white shadow-2xl">
@@ -494,13 +550,9 @@ export default function Pdv() {
                 <input value={customerTaxId} onChange={(event) => setCustomerTaxId(event.target.value.replace(/\D/g, '').slice(0, 14))} placeholder="CPF/CNPJ na nota (opcional)" className="h-11 w-full border border-slate-300 px-3 font-mono outline-none focus:border-[#116e78]" />
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-slate-700">Desconto em reais</span>
-                  <input type="number" min="0" max={subtotal} step="0.01" value={discount} onChange={(event) => setDiscount(Number(event.target.value))} className="h-11 w-full border border-slate-300 px-3 outline-none focus:border-[#116e78]" />
+                  <input type="text" inputMode="decimal" value={discount} onChange={(event) => setDiscount(event.target.value.replace(/[^\d,]/g, ''))} placeholder="Ex.: 15,00" className="h-11 w-full border border-slate-300 px-3 outline-none focus:border-[#116e78]" />
                 </label>
-                <label className="flex items-center gap-3 border border-slate-300 p-3 text-sm">
-                  <input type="checkbox" checked={issueNfce} onChange={(event) => setIssueNfce(event.target.checked)} className="h-4 w-4 accent-[#116e78]" />
-                  <ReceiptText className="h-5 w-5 text-[#116e78]" />
-                  Emitir NFC-e após o pagamento
-                </label>
+                <p className="border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-950">A venda será finalizada sem emitir nota. Se precisar, emita depois pela tela de Vendas.</p>
               </div>
 
               <div>

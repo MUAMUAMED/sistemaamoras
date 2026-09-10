@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, EyeIcon, CreditCardIcon, QrCodeIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { saleService, productService } from '../services/api';
+import { PlusIcon, EyeIcon, CreditCardIcon, QrCodeIcon, TrashIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { saleService, productService, fiscalApi } from '../services/api';
 import { Sale, Product } from '../types';
 import toast from 'react-hot-toast';
 import BarcodeScanner from '../components/BarcodeScanner';
@@ -14,6 +14,8 @@ export default function Sales() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
+  const [saleForInvoice, setSaleForInvoice] = useState<Sale | null>(null);
+  const [invoiceTaxId, setInvoiceTaxId] = useState('');
   
   // Estados para nova venda
   const [newSale, setNewSale] = useState({
@@ -71,6 +73,25 @@ export default function Sales() {
       toast.error(error.response?.data?.message || 'Erro ao excluir venda');
     },
   });
+
+  const issueNfceMutation = useMutation({
+    mutationFn: async ({ sale, customerTaxId }: { sale: Sale; customerTaxId?: string }) => {
+      if (customerTaxId !== undefined) await saleService.updateCustomerTaxId(sale.id, { customerTaxId, leadName: sale.leadName });
+      return fiscalApi.issueNfce(sale.id);
+    },
+    onSuccess: (document, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
+      toast.success(document.status === 'AUTHORIZED' ? `NFC-e ${document.series}/${document.number} emitida` : 'NFC-e enviada para processamento');
+      setSaleForInvoice(null);
+      setInvoiceTaxId('');
+    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Não foi possível emitir a nota fiscal'),
+  });
+
+  const beginInvoice = (sale: Sale) => {
+    setSaleForInvoice(sale);
+    setInvoiceTaxId(sale.customerTaxId || '');
+  };
 
   const sales = salesData?.data || [];
 
@@ -246,7 +267,7 @@ export default function Sales() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Vendas</h1>
           <p className="text-gray-600">Gerencie suas vendas e faturamento</p>
@@ -354,21 +375,26 @@ export default function Sales() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
                           setSelectedSale(sale);
                           setShowModal(true);
                         }}
-                        className="text-indigo-600 hover:text-indigo-900"
+                        className="inline-flex min-h-9 min-w-9 items-center justify-center rounded border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
                         title="Ver detalhes"
                       >
                         <EyeIcon className="h-4 w-4" />
                       </button>
+                      {sale.status === 'PAID' && (
+                        <button onClick={() => beginInvoice(sale)} className="inline-flex min-h-9 items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 text-emerald-700 hover:bg-emerald-100" title="Emitir nota fiscal">
+                          <DocumentTextIcon className="h-4 w-4" /><span className="hidden lg:inline">Nota</span>
+                        </button>
+                      )}
                       {(sale.status === 'PAID' || sale.status === 'PENDING') && (
                         <button
                           onClick={() => handleDeleteSale(sale)}
-                          className="text-red-600 hover:text-red-900"
+                          className="inline-flex min-h-9 min-w-9 items-center justify-center rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                           title="Excluir venda"
                         >
                           <TrashIcon className="h-4 w-4" />
@@ -552,6 +578,22 @@ export default function Sales() {
       )}
 
       {/* Modal do Scanner */}
+      {saleForInvoice && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900">Emitir nota fiscal</h3>
+            <p className="mt-1 text-sm text-gray-600">Venda #{saleForInvoice.saleNumber}. O CPF/CNPJ é opcional; deixe vazio para emitir para consumidor não identificado.</p>
+            <label className="mt-5 block text-sm font-medium text-gray-700">CPF ou CNPJ do cliente (opcional)
+              <input value={invoiceTaxId} inputMode="numeric" onChange={(event) => setInvoiceTaxId(event.target.value.replace(/\D/g, '').slice(0, 14))} placeholder="Somente números" className="input-field mt-1 font-mono" />
+            </label>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button onClick={() => { setSaleForInvoice(null); setInvoiceTaxId(''); }} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">Cancelar</button>
+              <button onClick={() => issueNfceMutation.mutate({ sale: saleForInvoice, customerTaxId: invoiceTaxId })} disabled={issueNfceMutation.isPending} className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><DocumentTextIcon className="h-4 w-4" />{issueNfceMutation.isPending ? 'Emitindo…' : 'Emitir nota'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showScanner && (
         <BarcodeScanner
           onProductFound={handleProductFound}

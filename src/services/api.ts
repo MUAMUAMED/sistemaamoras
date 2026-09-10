@@ -684,6 +684,11 @@ export const salesApi = {
     const response = await api.post(`/sales/${id}/process-payment`, data);
     return response.data;
   },
+
+  updateCustomerTaxId: async (id: string, data: { customerTaxId?: string; leadName?: string }): Promise<Sale> => {
+    const response = await api.patch(`/sales/${id}/customer-tax-id`, data);
+    return response.data;
+  },
   
   delete: async (id: string): Promise<{ message: string; saleNumber: string }> => {
     const response = await api.delete(`/sales/${id}`);
@@ -936,6 +941,7 @@ export const saleService = {
   cancel: salesApi.cancel,
   generatePayment: salesApi.generatePayment,
   processPayment: salesApi.processPayment,
+  updateCustomerTaxId: salesApi.updateCustomerTaxId,
 };
 
 export const categoryService = categoriesApi;

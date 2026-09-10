@@ -255,10 +255,15 @@ export interface Sale {
 export interface SaleItem {
   id: string;
   saleId: string;
-  productId: string;
+  productId?: string;
   quantity: number;
   unitPrice: number;
   total: number;
+  manualDescription?: string;
+  manualBarcode?: string;
+  manualCategoryName?: string;
+  manualSubcategoryName?: string;
+  affectsStock?: boolean;
   
   // Relações
   product?: Product;
