@@ -102,9 +102,16 @@ router.get('/', authenticateToken, async (req, res, next) => {
                   id: true,
                   name: true,
                   barcode: true,
+                  imageUrl: true,
                   category: true,
+                  subcategory: true,
                   pattern: true,
                   size: true,
+                  images: {
+                    select: { id: true, url: true, position: true },
+                    orderBy: { position: 'asc' },
+                    take: 1,
+                  },
                 },
               },
             },
@@ -298,8 +305,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     const catalogItems = items.filter((item: any) => Boolean(item.productId));
     const manualItems = items.filter((item: any) => !item.productId);
     for (const item of manualItems) {
-      if (!String(item.description || '').trim() || !String(item.categoryName || '').trim() || !String(item.subcategoryName || '').trim()) {
-        return res.status(400).json({ error: 'Item avulso incompleto', message: 'Informe nome, categoria e subcategoria da peça não cadastrada' });
+      if (!String(item.description || '').trim() || !String(item.categoryName || '').trim()) {
+        return res.status(400).json({ error: 'Item avulso incompleto', message: 'Informe nome e categoria da peça não cadastrada' });
       }
       if (!Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) < 0 || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) {
         return res.status(400).json({ error: 'Item avulso inválido', message: 'Informe quantidade e preço válidos para a peça não cadastrada' });
@@ -360,7 +367,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         manualDescription: product ? null : String(item.description).trim(),
         manualBarcode: product ? null : String(item.barcode || '').trim() || null,
         manualCategoryName: product ? null : String(item.categoryName).trim(),
-        manualSubcategoryName: product ? null : String(item.subcategoryName).trim(),
+        manualSubcategoryName: product ? null : String(item.subcategoryName || '').trim() || null,
         affectsStock: Boolean(product),
       };
     });
