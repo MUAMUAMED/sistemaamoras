@@ -254,7 +254,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     console.log('🛒 [DEBUG] Iniciando criação de venda...');
     console.log('🛒 [DEBUG] Dados recebidos:', JSON.stringify(req.body, null, 2));
     
-    const { leadId, items, paymentMethod, notes, leadName, leadPhone, customerTaxId } = req.body;
+    const { leadId, items, paymentMethod, notes, leadName, leadPhone, customerTaxId, discount } = req.body;
 
     // Validações básicas
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -365,7 +365,9 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       };
     });
 
-    console.log(`💰 [DEBUG] Total da venda: R$ ${total}`);
+    const safeDiscount = Math.min(Math.max(Number(discount) || 0, 0), total);
+    const saleTotal = total - safeDiscount;
+    console.log(`💰 [DEBUG] Total da venda: R$ ${saleTotal} (desconto: R$ ${safeDiscount})`);
 
     // Gerar número da venda
     const saleNumber = `V${Date.now()}`;
@@ -382,7 +384,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         customerTaxId: customerTaxId ? String(customerTaxId).replace(/\D/g, '') : null,
         sellerId: req.user!.id,
         subtotal: total,
-        total,
+        discount: safeDiscount,
+        total: saleTotal,
         status: 'PENDING',
         paymentMethod,
         notes,
