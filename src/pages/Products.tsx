@@ -25,6 +25,7 @@ import {
 import api from '../services/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { getImageUrl, getProductCardImageUrl } from '../utils/imageUrl';
+import { productDisplayName } from '../utils/productDisplayName';
 
 const Products: React.FC = () => {
   const queryClient = useQueryClient();
@@ -4259,9 +4260,9 @@ const EntryStockModal: React.FC<EntryStockModalProps> = ({ onClose, onSuccess })
                     onClick={() => handleProductSelect(product)}
                     className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                   >
-                    <div className="font-medium">{product.name}</div>
+                    <div className="font-medium">{productDisplayName(product)}</div>
                     <div className="text-sm text-gray-500">
-                      {product.category?.name} • {product.pattern?.name} • {product.size?.name}
+                      Código: {product.barcode}
                     </div>
                     <div className="text-xs text-gray-400">
                       Estoque: Loja {product.stockLoja} | Armazém {product.stockArmazem}
@@ -4515,9 +4516,9 @@ const ExitStockModal: React.FC<ExitStockModalProps> = ({ onClose, onSuccess }) =
                     onClick={() => handleProductSelect(product)}
                     className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                   >
-                    <div className="font-medium">{product.name}</div>
+                    <div className="font-medium">{productDisplayName(product)}</div>
                     <div className="text-sm text-gray-500">
-                      {product.category?.name} • {product.pattern?.name} • {product.size?.name}
+                      Código: {product.barcode}
                     </div>
                     <div className="text-xs text-gray-400">
                       Estoque: Loja {product.stockLoja} | Armazém {product.stockArmazem}

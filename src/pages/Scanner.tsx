@@ -12,6 +12,7 @@ import { barcodeApi, productService, saleService, paymentGatewayApi, fiscalApi }
 import { Product, Sale } from '../types';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { productDisplayName } from '../utils/productDisplayName';
 
 interface CartItem {
   product: Product;
@@ -291,7 +292,7 @@ export default function Scanner() {
               {cart.map((item) => (
                 <div key={item.product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-900">{item.product.name}</h4>
+                    <h4 className="font-medium text-gray-900">{productDisplayName(item.product)}</h4>
                     <p className="text-sm text-gray-600">
                       R$ {item.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} cada
                     </p>

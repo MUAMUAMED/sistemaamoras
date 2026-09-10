@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Product } from '../types';
+import { productDisplayName, productSearchText } from '../utils/productDisplayName';
 
 interface ProductSelectorProps {
   products: Product[];
@@ -23,13 +24,8 @@ export default function ProductSelector({
 
   // Filtrar produtos baseado na pesquisa
   const filteredProducts = products.filter(product => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      product.name.toLowerCase().includes(searchLower) ||
-      product.barcode?.toLowerCase().includes(searchLower) ||
-      product.category?.name.toLowerCase().includes(searchLower) ||
-      product.pattern?.name.toLowerCase().includes(searchLower)
-    );
+    const searchLower = searchTerm.toLocaleLowerCase('pt-BR');
+    return productSearchText(product).includes(searchLower);
   });
 
   // Limpar seleção quando fechar
@@ -168,10 +164,8 @@ export default function ProductSelector({
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <div className="font-medium">{product.name}</div>
+                    <div className="font-medium">{productDisplayName(product)}</div>
                     <div className={`text-xs ${index === selectedIndex ? 'text-indigo-200' : 'text-gray-500'}`}>
-                      {product.category?.name && `${product.category.name}`}
-                      {product.pattern?.name && ` • ${product.pattern.name}`}
                       {product.barcode && ` • Código: ${product.barcode}`}
                     </div>
                   </div>

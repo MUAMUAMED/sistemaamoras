@@ -20,6 +20,7 @@ import {
 import toast from 'react-hot-toast';
 import { fiscalApi, productsApi } from '../services/api';
 import type { Product } from '../types';
+import { productDisplayName } from '../utils/productDisplayName';
 
 type PaymentMethod = 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
 type AiProvider = 'gemini' | 'groq' | 'openrouter';
@@ -425,7 +426,7 @@ export default function ManualFiscal() {
                       className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-indigo-50"
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-gray-950">{product.name}</span>
+                        <span className="block truncate text-sm font-semibold text-gray-950">{productDisplayName(product)}</span>
                         <span className="mt-0.5 block truncate text-xs text-gray-500">
                           {product.barcode || 'Sem código'} · {product.size?.name || 'Sem tamanho'} · estoque {product.stock}
                         </span>

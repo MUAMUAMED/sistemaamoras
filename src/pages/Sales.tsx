@@ -6,6 +6,7 @@ import { Sale, Product } from '../types';
 import toast from 'react-hot-toast';
 import BarcodeScanner from '../components/BarcodeScanner';
 import ProductSelector from '../components/ProductSelector';
+import { productDisplayName } from '../utils/productDisplayName';
 
 export default function Sales() {
   const [showModal, setShowModal] = useState(false);
@@ -421,10 +422,8 @@ export default function Sales() {
                         return (
                           <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                             <div className="flex-1">
-                              <div className="font-medium text-sm">{product?.name || 'Produto não encontrado'}</div>
+                              <div className="font-medium text-sm">{product ? productDisplayName(product) : 'Produto não encontrado'}</div>
                               <div className="text-xs text-gray-500">
-                                {product?.category?.name && `${product.category.name}`}
-                                {product?.pattern?.name && ` • ${product.pattern.name}`}
                                 {product?.barcode && ` • Código: ${product.barcode}`}
                               </div>
                             </div>

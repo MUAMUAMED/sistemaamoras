@@ -29,6 +29,7 @@ import {
 } from '../services/api';
 import { Product } from '../types';
 import { getProductCardImageUrl, getImageUrl } from '../utils/imageUrl';
+import { productDisplayName, productSearchText } from '../utils/productDisplayName';
 
 interface CartItem {
   key: string;
@@ -103,10 +104,7 @@ export default function Pdv() {
       const matchesCategory = categoryId === 'all' || product.categoryId === categoryId;
       const matchesSearch =
         !term ||
-        product.name.toLocaleLowerCase('pt-BR').includes(term) ||
-        product.barcode?.toLocaleLowerCase('pt-BR').includes(term) ||
-        product.size?.name?.toLocaleLowerCase('pt-BR').includes(term) ||
-        product.pattern?.name?.toLocaleLowerCase('pt-BR').includes(term);
+        productSearchText(product).includes(term);
       return matchesCategory && matchesSearch;
     });
   }, [categoryId, products, search]);
@@ -409,7 +407,7 @@ export default function Pdv() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Pesquisar produto, código, tamanho ou estampa"
+                  placeholder="Pesquisar categoria, subcategoria, estampa, tamanho ou código"
                   className="h-11 w-full min-w-0 border border-slate-300 bg-white pl-11 pr-10 text-sm outline-none focus:border-[#116e78] focus:ring-2 focus:ring-cyan-100"
                 />
                 {search && (
@@ -487,9 +485,9 @@ export default function Pdv() {
                         </span>
                       </div>
                       <div className="flex flex-1 flex-col p-3">
-                        <h2 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5">{product.name}</h2>
+                        <h2 className="line-clamp-3 min-h-15 text-sm font-semibold leading-5">{productDisplayName(product)}</h2>
                         <p className="mt-1 truncate text-xs text-slate-500">
-                          {[product.size?.name, product.pattern?.name].filter(Boolean).join(' · ') || product.barcode}
+                          {product.barcode || 'Sem código'}
                         </p>
                         <strong className="mt-auto pt-2 text-base text-[#116e78]">{money(Number(product.price))}</strong>
                       </div>
