@@ -1,155 +1,129 @@
-# 🍇 Sistema Amoras Capital
+# 🚀 Amoras Capital - Backend API
 
-Sistema completo de gestão para a Amoras Capital, incluindo backend em Node.js/TypeScript com Prisma e frontend em React.
+Sistema de CRM e ERP para Amoras Capital - Backend Node.js com TypeScript, Prisma e PostgreSQL.
 
-## 🚀 Status do Projeto
+## 📋 Tecnologias
 
-**✅ DEPLOY COMPLETO REALIZADO - SISTEMA 100% FUNCIONAL**
+- **Node.js** 18+
+- **TypeScript** 5.x
+- **Express.js** 4.x
+- **Prisma ORM** 5.x
+- **PostgreSQL** 15+
+- **JWT** Authentication
+- **Swagger** Documentation
 
-- ✅ Todos os 28 erros de TypeScript corrigidos
-- ✅ Schema Prisma atualizado com modelo Subcategory
-- ✅ Sistema compilando e funcionando perfeitamente
-- ✅ Deploy realizado no GitHub
-
-## 📋 Funcionalidades
-
-### Backend (Node.js + TypeScript + Prisma)
-- **Gestão de Usuários**: Autenticação e autorização
-- **Gestão de Produtos**: CRUD completo com categorias, subcategorias, tamanhos e estampas
-- **Gestão de Leads**: Sistema de leads com tags e interações
-- **Gestão de Vendas**: Processamento de vendas com múltiplos métodos de pagamento
-- **Gestão de Estoque**: Controle de estoque com movimentações
-- **Códigos de Barras**: Geração automática de códigos de barras e QR codes
-- **API REST**: Documentada com Swagger
-
-### Frontend (React)
-- Interface moderna e responsiva
-- Dashboard com métricas em tempo real
-- Gestão completa de produtos, leads e vendas
-- Sistema de autenticação integrado
-
-## 🛠️ Tecnologias Utilizadas
-
-### Backend
-- **Node.js** + **TypeScript**
-- **Express.js** para API REST
-- **Prisma** como ORM
-- **PostgreSQL** como banco de dados
-- **JWT** para autenticação
-- **Swagger** para documentação da API
-- **Multer** para upload de arquivos
-
-### Frontend
-- **React** + **TypeScript**
-- **Material-UI** para componentes
-- **React Router** para navegação
-- **Axios** para requisições HTTP
-- **Chart.js** para gráficos
-
-## 📦 Instalação e Configuração
+## 🛠️ Desenvolvimento Local
 
 ### Pré-requisitos
-- Node.js 18+
-- PostgreSQL 12+
-- Git
+- Node.js 18+ 
+- PostgreSQL 15+
+- npm ou yarn
 
-### 1. Clone o repositório
+### Setup
 ```bash
-git clone https://github.com/MUAMUAMED/sistemaamoras.git
-cd sistemaamoras
-```
-
-### 2. Configure o banco de dados
-```bash
-# Configure a variável DATABASE_URL no arquivo .env
-cp backend/.env.backup backend/.env
-# Edite backend/.env com suas configurações do PostgreSQL
-```
-
-### 3. Instale as dependências
-```bash
-# Backend
-cd backend
+# Instalar dependências
 npm install
 
-# Frontend
-cd ../frontend
-npm install
-```
+# Configurar ambiente
+cp .env.example .env
 
-### 4. Configure o banco de dados
-```bash
-cd backend
-npx prisma generate
-npx prisma db push
+# Executar migrations
+npx prisma migrate dev
+
+# Popular banco com dados iniciais
 npx prisma db seed
-```
 
-### 5. Execute o sistema
-```bash
-# Na pasta raiz
+# Iniciar servidor de desenvolvimento
 npm run dev
 ```
 
-## 🔧 Scripts Disponíveis
+### Variáveis de Ambiente (.env)
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/amoras_capital"
+JWT_SECRET="seu_jwt_secret_aqui"
+NODE_ENV="development"
+PORT=3001
+```
 
-### Backend
+## 🚀 Deploy em Produção
+
+### EasyPanel/VPS
+
+1. **Configurar PostgreSQL Database**
+2. **Configurar variáveis de ambiente:**
+```env
+DATABASE_URL=postgresql://user:pass@host:5432/amoras_capital
+JWT_SECRET=seu_jwt_super_secreto_32_chars_min
+NODE_ENV=production
+CORS_ORIGINS=https://app.exemplo.com
+```
+
+3. **Deploy usando Dockerfile.production**
+4. **Executar migrations:**
 ```bash
-npm run dev          # Desenvolvimento com hot reload
-npm run build        # Build de produção
-npm run start        # Execução em produção
-npm run seed         # Popular banco com dados de teste
+npx prisma migrate deploy
+npx prisma db seed
 ```
 
-### Frontend
+## 📚 API Documentation
+
+- **Desenvolvimento:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
+- **Produção:** https://api.exemplo.com/api-docs
+
+## 🔍 Health Check
+
+- **Endpoint:** `/health`
+- **Desenvolvimento:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
+- **Produção:** https://api.exemplo.com/health
+
+## 🗂️ Estrutura
+
+```
+src/
+├── config/          # Configurações (DB, Logger)
+├── middleware/      # Middlewares (Auth, Error)
+├── routes/          # Rotas da API
+├── services/        # Serviços de negócio
+├── scripts/         # Scripts (Seed, etc)
+└── index.ts         # Entrada da aplicação
+```
+
+## 🔐 Funcionalidades
+
+- ✅ Autenticação JWT
+- ✅ Gestão de Usuários
+- ✅ CRM - Leads e Pipeline
+- ✅ ERP - Produtos e Vendas
+- ✅ Sistema de Codes/Barras
+- ✅ Upload de Imagens
+- ✅ Relatórios e Dashboard
+- ✅ Integrações (Chatwoot, N8N)
+
+## 📝 Scripts Disponíveis
+
 ```bash
-npm start            # Desenvolvimento
-npm run build        # Build de produção
-npm test             # Executar testes
+npm run dev         # Desenvolvimento com hot reload
+npm run build       # Build para produção
+npm run start       # Iniciar servidor produção
+npm run migrate:dev # Migrations desenvolvimento
+npm run migrate:deploy # Deploy migrations produção
+npm run db:seed     # Popular banco com dados
 ```
 
-## 📊 Estrutura do Banco de Dados
+## 🛡️ Segurança
 
-### Modelos Principais
-- **User**: Usuários do sistema (admin, gerente, atendente)
-- **Category**: Categorias de produtos
-- **Subcategory**: Subcategorias de produtos
-- **Pattern**: Estampas/cores dos produtos
-- **Size**: Tamanhos dos produtos
-- **Product**: Produtos com estoque e preços
-- **Lead**: Clientes/leads com histórico
-- **Interaction**: Interações com leads
-- **Sale**: Vendas com itens e pagamentos
-- **StockMovement**: Movimentações de estoque
+- Rate Limiting configurado
+- CORS configurável
+- Helmet para security headers
+- Validação com Joi
+- Sanitização de dados
 
-## 🔐 Autenticação
+## 📊 Monitoramento
 
-O sistema utiliza JWT para autenticação. Endpoints protegidos requerem o header:
-```
-Authorization: Bearer <token>
-```
-
-## 📚 Documentação da API
-
-A documentação da API está disponível em `/api-docs` quando o servidor estiver rodando.
-
-## 🚀 Deploy
-
-### Último Deploy
-- **Data**: Dezembro 2024
-- **Status**: ✅ Concluído com sucesso
-- **Correções**: Todos os 28 erros de TypeScript corrigidos
-- **Funcionalidades**: Sistema 100% operacional
-
-### Repositório
-- **GitHub**: https://github.com/MUAMUAMED/sistemaamoras
-- **Branch Principal**: `main`
-
-## 📞 Suporte
-
-Para suporte técnico ou dúvidas sobre o sistema, entre em contato com a equipe de desenvolvimento.
+- Health check endpoint
+- Logs estruturados (Winston)
+- Error tracking e handling
 
 ---
 
-**🍇 Sistema Amoras Capital - Versão 1.0.0**  
-*Desenvolvido com ❤️ para a Amoras Capital* 
+**Desenvolvido para Amoras Capital** 🌸 
