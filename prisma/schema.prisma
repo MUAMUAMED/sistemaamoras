@@ -68,18 +68,43 @@ model Subcategory {
 
 // Estampas dos produtos
 model Pattern {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  code        String   @unique // Código numérico de 4 dígitos (ex: Azul Marinho = 0032)
-  description String?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  name               String    @unique
+  code               String    @unique // Código numérico de 4 dígitos (ex: Azul Marinho = 0032)
+  description        String?
+  active             Boolean   @default(true)
+  canonicalPatternId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   // Relacionamentos
-  products Product[]
+  canonicalPattern   Pattern?          @relation("PatternMergeHistory", fields: [canonicalPatternId], references: [id])
+  mergedPatterns     Pattern[]         @relation("PatternMergeHistory")
+  products           Product[]
+  redirectsFrom      PatternRedirect[] @relation("SourcePatternRedirect")
+  redirectsTo        PatternRedirect[] @relation("TargetPatternRedirect")
 
   @@map("patterns")
+}
+
+// Redirecionamento de códigos de estampas antigas para a estampa principal
+model PatternRedirect {
+  id                String   @id @default(cuid())
+  sourcePatternId   String
+  sourcePatternCode String   @unique
+  sourcePatternName String
+  targetPatternId   String
+  targetPatternCode String
+  targetPatternName String
+  createdAt         DateTime @default(now())
+
+  sourcePattern     Pattern  @relation("SourcePatternRedirect", fields: [sourcePatternId], references: [id], onDelete: Cascade)
+  targetPattern     Pattern  @relation("TargetPatternRedirect", fields: [targetPatternId], references: [id], onDelete: Cascade)
+
+  @@index([sourcePatternId])
+  @@index([targetPatternId])
+  @@index([targetPatternCode])
+  @@map("pattern_redirects")
 }
 
 // Tamanhos dos produtos
@@ -95,6 +120,19 @@ model Size {
   products Product[]
 
   @@map("sizes")
+}
+
+// Códigos de barras já impressos que apontam para um produto
+model ProductBarcodeAlias {
+  id        String   @id @default(cuid())
+  barcode   String   @unique
+  productId String
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_barcode_aliases")
 }
 
 // Produtos (roupas)
@@ -136,6 +174,7 @@ model Product {
   subcategory       Subcategory?       @relation(fields: [subcategoryId], references: [id])
   size              Size?              @relation(fields: [sizeId], references: [id])
   pattern           Pattern?           @relation(fields: [patternId], references: [id])
+  barcodeAliases    ProductBarcodeAlias[]
   saleItems         SaleItem[]
   stockMovements    StockMovement[]
   commercialProduct CommercialProduct?

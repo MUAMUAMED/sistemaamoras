@@ -125,8 +125,8 @@ export class BarcodeService {
     try {
       // QR Code contém apenas o código SKU - formato simples para escaneamento
       const qrCodeDataUrl = await QRCode.toDataURL(sku, {
-        errorCorrectionLevel: 'H' as const,
-        width: 512,
+        errorCorrectionLevel: 'M' as const,
+        width: 256,
         margin: 1,
         color: {
           dark: '#000000',
@@ -203,56 +203,132 @@ export class BarcodeService {
   }
 
   /**
-   * Busca produto por código de barras ou SKU
+   * Extrai informações do SKU resolvendo redirecionamento de estampa se houver
+   */
+  static async parseSkuInfoWithRedirect(sku: string) {
+    const skuInfo = this.parseSkuInfo(sku);
+    if (!skuInfo) return null;
+
+    const redirect = await prisma.patternRedirect.findUnique({
+      where: { sourcePatternCode: skuInfo.patternCode }
+    });
+
+    if (redirect) {
+      return {
+        ...skuInfo,
+        originalPatternCode: skuInfo.patternCode,
+        patternCode: redirect.targetPatternCode,
+        targetPatternName: redirect.targetPatternName,
+        redirected: true
+      };
+    }
+
+    return {
+      ...skuInfo,
+      redirected: false
+    };
+  }
+
+  /**
+   * Busca produto por código de barras ou SKU, resolvendo aliases e redirecionamentos de estampa
    */
   static async findProductByCode(code: string) {
     try {
-      // Tentar encontrar por código de barras primeiro
-      let product = await prisma.product.findUnique({
+      let product: any = null;
+
+      // 1. Tentar encontrar diretamente pelo código de barras
+      product = await prisma.product.findUnique({
         where: { barcode: code },
         include: {
           category: true,
-          pattern: true
+          subcategory: true,
+          pattern: true,
+          size: true,
+          images: true
         }
       });
 
-      // Se não encontrar, tentar por SKU (formato TTCCSSEEEE)
+      // 2. Se não encontrar, verificar se é um código antigo registrado em aliases
+      if (!product) {
+        const alias = await prisma.productBarcodeAlias.findUnique({
+          where: { barcode: code },
+          include: {
+            product: {
+              include: {
+                category: true,
+                subcategory: true,
+                pattern: true,
+                size: true,
+                images: true
+              }
+            }
+          }
+        });
+
+        if (alias?.product) {
+          product = alias.product;
+        }
+      }
+
+      // 3. Se não encontrar e for formato de SKU de 10 dígitos (TTCCSSEEEE)
       if (!product && code.length === 10) {
-        const skuInfo = this.parseSkuInfo(code);
+        const skuInfo = await this.parseSkuInfoWithRedirect(code);
         if (skuInfo) {
-          // Buscar produto que corresponda ao SKU
-          const whereClause: any = {
-            sizeCode: skuInfo.sizeCode,
-            category: {
-              code: skuInfo.categoryCode
-            },
-            pattern: {
-              code: skuInfo.patternCode
-            }
-          };
+          // Tentar buscar pelo código de barras gerado com a estampa principal
+          const targetBarcode = `${skuInfo.sizeCode}${skuInfo.categoryCode}${skuInfo.subcategoryCode}${skuInfo.patternCode}`;
+          
+          if (targetBarcode !== code) {
+            product = await prisma.product.findUnique({
+              where: { barcode: targetBarcode },
+              include: {
+                category: true,
+                subcategory: true,
+                pattern: true,
+                size: true,
+                images: true
+              }
+            });
+          }
 
-          // Adicionar filtro de subcategoria se não for '00'
-          if (skuInfo.subcategoryCode !== '00') {
-            whereClause.subcategory = {
-              code: skuInfo.subcategoryCode
+          // Se ainda não encontrou, buscar por filtros relacionais
+          if (!product) {
+            const whereClause: any = {
+              size: { code: skuInfo.sizeCode },
+              category: { code: skuInfo.categoryCode },
+              pattern: { code: skuInfo.patternCode }
             };
-          } else {
-            whereClause.subcategoryId = null;
-          }
 
-          const products = await prisma.product.findMany({
-            where: whereClause,
-            include: {
-              category: true,
-              subcategory: true,
-              pattern: true
+            if (skuInfo.subcategoryCode !== '00') {
+              whereClause.subcategory = { code: skuInfo.subcategoryCode };
             }
-          });
 
-          // Retornar o primeiro produto encontrado
-          if (products.length > 0) {
-            product = products[0];
+            const products = await prisma.product.findMany({
+              where: whereClause,
+              include: {
+                category: true,
+                subcategory: true,
+                pattern: true,
+                size: true,
+                images: true
+              }
+            });
+
+            if (products.length > 0) {
+              product = products[0];
+            }
           }
+        }
+      }
+
+      // 4. Se a estampa do produto for uma estampa mesclada, retornar a estampa canônica principal
+      if (product?.pattern?.canonicalPatternId) {
+        const canonical = await prisma.pattern.findUnique({
+          where: { id: product.pattern.canonicalPatternId }
+        });
+        if (canonical) {
+          product.originalPattern = product.pattern;
+          product.pattern = canonical;
+          product.patternId = canonical.id;
         }
       }
 

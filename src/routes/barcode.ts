@@ -278,10 +278,10 @@ router.post('/parse-sku', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'SKU é obrigatório' });
     }
 
-    const skuInfo = BarcodeService.parseSkuInfo(sku);
+    const skuInfo = await BarcodeService.parseSkuInfoWithRedirect(sku);
 
     if (!skuInfo) {
-      return res.status(400).json({ error: 'SKU inválido. Deve ter 8 dígitos no formato TTCCEEEE' });
+      return res.status(400).json({ error: 'SKU inválido. Deve ter 10 dígitos no formato TTCCSSEEEE' });
     }
 
     // Buscar detalhes do tamanho, categoria e estampa
