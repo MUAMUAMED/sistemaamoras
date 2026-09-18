@@ -18,7 +18,99 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Pattern, PatternCluster, PatternRedirect } from '../types';
 import { patternsApi } from '../services/api';
-import { getImageUrl } from '../utils/imageUrl';
+import { getImageUrl, getProductCardImageUrl } from '../utils/imageUrl';
+
+interface PatternImageThumbnailProps {
+  url: string;
+  patternName: string;
+  patternCode?: string;
+  onPreviewClick: (data: { url: string; patternName: string; patternCode?: string }) => void;
+}
+
+function PatternImageThumbnail({
+  url,
+  patternName,
+  patternCode,
+  onPreviewClick,
+}: PatternImageThumbnailProps) {
+  const [loaded, setLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [useRawFallback, setUseRawFallback] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const optimizedUrl = url ? getProductCardImageUrl(url) : '';
+  const rawUrl = url ? getImageUrl(url) : '';
+  const currentUrl = useRawFallback ? rawUrl : (optimizedUrl || rawUrl);
+
+  if (!currentUrl || hasError) {
+    return (
+      <div className="w-14 h-14 rounded-xl bg-purple-50 text-purple-400 border border-purple-100 flex items-center justify-center text-xs shrink-0 select-none">
+        <ImageIcon className="w-5 h-5 opacity-50" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative shrink-0"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <button
+        type="button"
+        onClick={() => onPreviewClick({ url, patternName, patternCode })}
+        title={`Clique para ampliar foto de ${patternName}`}
+        className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative block group hover:ring-2 hover:ring-purple-500 hover:border-purple-400 transition-all cursor-zoom-in shadow-2xs"
+      >
+        {!loaded && (
+          <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+            <ImageIcon className="w-4 h-4 text-gray-400 opacity-40" />
+          </div>
+        )}
+        <img
+          src={currentUrl}
+          alt={patternName}
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+          onLoad={() => setLoaded(true)}
+          onError={() => {
+            if (!useRawFallback && rawUrl && rawUrl !== optimizedUrl) {
+              setUseRawFallback(true);
+            } else {
+              setHasError(true);
+            }
+          }}
+          className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-110 ${
+            loaded ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <Search className="w-4 h-4 text-white drop-shadow-md" />
+        </div>
+      </button>
+
+      {/* Popover flutuante rápido ao passar o mouse (desktop) */}
+      {isHovered && loaded && (
+        <div className="hidden sm:block absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-white rounded-2xl shadow-2xl border border-purple-200 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+          <div className="w-full h-52 rounded-xl overflow-hidden bg-gray-100 mb-1.5 border border-gray-100">
+            <img
+              src={currentUrl}
+              alt={patternName}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <p className="text-[11px] font-bold text-gray-900 truncate text-center px-1">
+            {patternName}
+          </p>
+          <p className="text-[10px] text-purple-600 font-medium text-center">
+            Clique para tela cheia
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface PatternMergeModalProps {
   isOpen: boolean;
@@ -50,6 +142,17 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
     principalPattern: Pattern | { id: string; name: string; code: string };
     secondaryPatterns: Array<Pattern | { id: string; name: string; code: string }>;
   } | null>(null);
+
+  // Estado para visualização ampliada / popup da roupa ou estampa
+  const [previewImage, setPreviewImage] = useState<{
+    url: string;
+    patternName: string;
+    patternCode?: string;
+  } | null>(null);
+
+  // Limite de grupos exibidos inicialmente para renderização instantânea sem travamento
+  const CLUSTERS_PER_PAGE = 8;
+  const [visibleClustersCount, setVisibleClustersCount] = useState(CLUSTERS_PER_PAGE);
 
   // Queries
   const {
@@ -312,7 +415,7 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
                     </button>
                   </div>
 
-                  {clusters.map((cluster) => {
+                  {clusters.slice(0, visibleClustersCount).map((cluster) => {
                     const config = getClusterConfig(cluster);
 
                     return (
@@ -374,14 +477,12 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
                                     <div className="flex gap-2">
                                       {p.sampleImages.length > 0 ? (
                                         p.sampleImages.map((imgUrl, idx) => (
-                                          <img
+                                          <PatternImageThumbnail
                                             key={idx}
-                                            src={getImageUrl(imgUrl)}
-                                            alt={p.name}
-                                            className="w-14 h-14 object-cover rounded-xl border border-gray-200 shadow-2xs"
-                                            onError={(e) => {
-                                              (e.target as HTMLElement).style.display = 'none';
-                                            }}
+                                            url={imgUrl}
+                                            patternName={p.name}
+                                            patternCode={p.code}
+                                            onPreviewClick={(data) => setPreviewImage(data)}
                                           />
                                         ))
                                       ) : (
@@ -466,6 +567,32 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
                       </div>
                     );
                   })}
+
+                  {/* Paginação de Grupos para abertura instantânea sem travamento */}
+                  {clusters.length > visibleClustersCount && (
+                    <div className="text-center py-6 bg-purple-50/60 rounded-2xl border border-dashed border-purple-200">
+                      <p className="text-xs text-gray-600 mb-2.5">
+                        Exibindo <strong>{Math.min(visibleClustersCount, clusters.length)}</strong> de <strong>{clusters.length}</strong> grupos de estampas sugeridos
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setVisibleClustersCount((prev) => Math.min(clusters.length, prev + CLUSTERS_PER_PAGE))}
+                          className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Carregar mais 8 grupos (+{Math.min(CLUSTERS_PER_PAGE, clusters.length - visibleClustersCount)})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setVisibleClustersCount(clusters.length)}
+                          className="px-4 py-2.5 bg-white hover:bg-purple-100 text-purple-700 text-xs font-semibold rounded-xl border border-purple-200 transition-all cursor-pointer"
+                        >
+                          Mostrar todos ({clusters.length} grupos)
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -780,6 +907,70 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
                     Confirmar e Unificar
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL POPUP DE VISUALIZAÇÃO AMPLIADA DA ROUPA / ESTAMPA */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-70 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md sm:max-w-lg w-full overflow-hidden shadow-2xl border border-gray-100 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Header */}
+            <div className="p-4 sm:p-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-purple-50/70 to-pink-50/70">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 bg-purple-100 text-purple-700 rounded-xl">
+                  <ImageIcon className="w-5 h-5" />
+                </span>
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base leading-tight">
+                    {previewImage.patternName}
+                  </h4>
+                  {previewImage.patternCode && (
+                    <span className="text-xs font-mono text-gray-500">
+                      Código da estampa: #{previewImage.patternCode}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+                title="Fechar visualização"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Imagem Ampliada */}
+            <div className="p-4 sm:p-6 bg-slate-50 flex items-center justify-center">
+              <div className="max-h-[65vh] w-full flex items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-inner">
+                <img
+                  src={getImageUrl(previewImage.url)}
+                  alt={previewImage.patternName}
+                  className="max-h-[65vh] w-auto max-w-full object-contain rounded-2xl"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 sm:p-4 bg-white border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+              <span>Foto real da peça vinculada a esta estampa.</span>
+              <button
+                type="button"
+                onClick={() => setPreviewImage(null)}
+                className="px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors cursor-pointer"
+              >
+                Fechar
               </button>
             </div>
           </div>
