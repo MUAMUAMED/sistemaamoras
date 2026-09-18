@@ -472,7 +472,6 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
       include: {
         pattern: true,
         images: {
-          where: { type: 'ROUPA' },
           orderBy: { position: 'asc' },
           take: 3
         }
