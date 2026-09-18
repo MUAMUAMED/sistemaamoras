@@ -61,13 +61,39 @@ function stringSimilarity(str1: string, str2: string): number {
   return (2.0 * intersection) / (s1.length - 1 + s2.length - 1);
 }
 
-// Estrutura Union-Find para agrupar estampas similares
+// Garantir tabela de pares de estampas descartadas/ignoradas da unificação
+let dismissedPairsSetupDone = false;
+async function ensurePatternDismissedPairsTable() {
+  if (dismissedPairsSetupDone) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "pattern_dismissed_pairs" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "patternId1" TEXT NOT NULL,
+        "patternId2" TEXT NOT NULL,
+        "reason" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "pattern_dismissed_pairs_unique" UNIQUE ("patternId1", "patternId2")
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS "pattern_dismissed_pairs_idx" ON "pattern_dismissed_pairs" ("patternId1", "patternId2")
+    `);
+    dismissedPairsSetupDone = true;
+  } catch (err: any) {
+    console.warn('[PATTERN DISMISSED PAIRS] Erro ao assegurar tabela:', err?.message || err);
+  }
+}
+
+// Estrutura Union-Find para agrupar estampas similares com suporte a pares proibidos/descartados
 class DisjointSet {
   private parent = new Map<string, string>();
+  private members = new Map<string, Set<string>>();
 
   find(item: string): string {
     if (!this.parent.has(item)) {
       this.parent.set(item, item);
+      this.members.set(item, new Set([item]));
       return item;
     }
     const p = this.parent.get(item)!;
@@ -77,12 +103,42 @@ class DisjointSet {
     return root;
   }
 
-  union(a: string, b: string) {
+  canUnion(a: string, b: string, dismissedSet: Set<string>): boolean {
     const rootA = this.find(a);
     const rootB = this.find(b);
-    if (rootA !== rootB) {
-      this.parent.set(rootA, rootB);
+    if (rootA === rootB) return true;
+
+    const membersA = this.members.get(rootA) || new Set([rootA]);
+    const membersB = this.members.get(rootB) || new Set([rootB]);
+
+    // Se qualquer membro do grupo A tiver restrição com qualquer membro do grupo B, rejeita a união
+    for (const mA of membersA) {
+      for (const mB of membersB) {
+        if (dismissedSet.has(`${mA}:${mB}`) || dismissedSet.has(`${mB}:${mA}`)) {
+          return false;
+        }
+      }
     }
+    return true;
+  }
+
+  union(a: string, b: string, dismissedSet?: Set<string>): boolean {
+    const rootA = this.find(a);
+    const rootB = this.find(b);
+    if (rootA === rootB) return true;
+
+    if (dismissedSet && !this.canUnion(a, b, dismissedSet)) {
+      return false;
+    }
+
+    this.parent.set(rootA, rootB);
+    const membersA = this.members.get(rootA) || new Set([rootA]);
+    const membersB = this.members.get(rootB) || new Set([rootB]);
+    for (const mA of membersA) {
+      membersB.add(mA);
+    }
+    this.members.delete(rootA);
+    return true;
   }
 }
 
@@ -276,6 +332,18 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       return res.json({ clusters: [], totalDuplicatesFound: 0 });
     }
 
+    // Carregar todos os pares que o usuário marcou para NUNCA unificar
+    await ensurePatternDismissedPairsTable();
+    const dismissedRows = await prisma.$queryRaw<Array<{ patternId1: string; patternId2: string }>>`
+      SELECT "patternId1", "patternId2" FROM "pattern_dismissed_pairs"
+    `.catch(() => []);
+
+    const dismissedSet = new Set<string>();
+    for (const row of dismissedRows) {
+      dismissedSet.add(`${row.patternId1}:${row.patternId2}`);
+      dismissedSet.add(`${row.patternId2}:${row.patternId1}`);
+    }
+
     const uf = new DisjointSet();
     const pairwiseMatches = new Map<string, { reason: string; score: number }>();
 
@@ -284,6 +352,11 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       for (let j = i + 1; j < patterns.length; j++) {
         const p1 = patterns[i];
         const p2 = patterns[j];
+
+        // Se este par foi descartado pelo usuário, ignorar
+        if (dismissedSet.has(`${p1.id}:${p2.id}`)) {
+          continue;
+        }
 
         const norm1 = normalizeText(p1.name);
         const norm2 = normalizeText(p2.name);
@@ -308,9 +381,11 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
         }
 
         if (score > 0) {
-          uf.union(p1.id, p2.id);
-          const pairKey = [p1.id, p2.id].sort().join(':');
-          pairwiseMatches.set(pairKey, { reason: matchReason, score });
+          const merged = uf.union(p1.id, p2.id, dismissedSet);
+          if (merged) {
+            const pairKey = [p1.id, p2.id].sort().join(':');
+            pairwiseMatches.set(pairKey, { reason: matchReason, score });
+          }
         }
       }
     }
@@ -339,7 +414,13 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       `);
 
       for (const pair of visualPairs) {
-        uf.union(pair.id1, pair.id2);
+        if (dismissedSet.has(`${pair.id1}:${pair.id2}`)) {
+          continue;
+        }
+
+        const merged = uf.union(pair.id1, pair.id2, dismissedSet);
+        if (!merged) continue;
+
         const pairKey = [pair.id1, pair.id2].sort().join(':');
         const existing = pairwiseMatches.get(pairKey);
         const visualScore = Number(pair.similarity);
@@ -455,6 +536,124 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       clusters,
       totalDuplicatesFound: clusters.reduce((acc, c) => acc + c.patterns.length, 0)
     });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ==========================================
+// 2.2 Descartar Par ou Grupo de Estampas da Unificação (Nunca mais sugerir)
+// ==========================================
+router.post('/dismiss-cluster-pair', authenticateToken, async (req, res, next) => {
+  try {
+    await ensurePatternDismissedPairsTable();
+
+    const { patternId, otherPatternIds, patternIds, reason } = req.body;
+
+    const pairsToInsert: Array<[string, string]> = [];
+
+    if (patternId && Array.isArray(otherPatternIds) && otherPatternIds.length > 0) {
+      for (const otherId of otherPatternIds) {
+        if (!otherId || otherId === patternId) continue;
+        const [p1, p2] = [patternId, otherId].sort();
+        pairsToInsert.push([p1, p2]);
+      }
+    } else if (Array.isArray(patternIds) && patternIds.length >= 2) {
+      for (let i = 0; i < patternIds.length; i++) {
+        for (let j = i + 1; j < patternIds.length; j++) {
+          const [p1, p2] = [patternIds[i], patternIds[j]].sort();
+          pairsToInsert.push([p1, p2]);
+        }
+      }
+    } else {
+      return res.status(400).json({
+        error: 'Forneça patternId com otherPatternIds, ou patternIds com ao menos 2 estampas.',
+      });
+    }
+
+    if (pairsToInsert.length === 0) {
+      return res.status(400).json({ error: 'Nenhum par válido para descartar.' });
+    }
+
+    let insertedCount = 0;
+    for (const [p1, p2] of pairsToInsert) {
+      const id = `dp_${p1}_${p2}`;
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "pattern_dismissed_pairs" ("id", "patternId1", "patternId2", "reason", "createdAt")
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT ("patternId1", "patternId2") DO NOTHING`,
+        id,
+        p1,
+        p2,
+        reason || 'Descartado manualmente pelo usuário'
+      );
+      insertedCount++;
+    }
+
+    return res.json({
+      success: true,
+      dismissedCount: insertedCount,
+      message: 'Estampa removida da sugestão e gravada para nunca mais ser unificada com este grupo.',
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ==========================================
+// 2.3 Listar Pares Descartados/Ignorados da Unificação
+// ==========================================
+router.get('/dismissed-pairs', authenticateToken, async (req, res, next) => {
+  try {
+    await ensurePatternDismissedPairsTable();
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        patternId1: string;
+        patternId2: string;
+        reason: string | null;
+        createdAt: Date;
+        name1: string;
+        code1: string;
+        name2: string;
+        code2: string;
+      }>
+    >(Prisma.sql`
+      SELECT
+        dp.id,
+        dp."patternId1",
+        dp."patternId2",
+        dp.reason,
+        dp."createdAt",
+        COALESCE(p1.name, 'Estampa removida') AS name1,
+        COALESCE(p1.code, '----') AS code1,
+        COALESCE(p2.name, 'Estampa removida') AS name2,
+        COALESCE(p2.code, '----') AS code2
+      FROM "pattern_dismissed_pairs" dp
+      LEFT JOIN "patterns" p1 ON p1.id = dp."patternId1"
+      LEFT JOIN "patterns" p2 ON p2.id = dp."patternId2"
+      ORDER BY dp."createdAt" DESC
+      LIMIT 100
+    `);
+
+    return res.json({ dismissedPairs: rows });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ==========================================
+// 2.4 Restaurar Par Descartado (Permitir sugestão novamente)
+// ==========================================
+router.delete('/dismissed-pairs/:id', authenticateToken, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await ensurePatternDismissedPairsTable();
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "pattern_dismissed_pairs" WHERE "id" = $1`,
+      id
+    );
+    return res.json({ success: true, message: 'Par restaurado com sucesso.' });
   } catch (error) {
     return next(error);
   }
