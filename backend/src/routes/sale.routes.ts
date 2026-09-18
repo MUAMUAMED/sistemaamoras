@@ -103,8 +103,13 @@ router.get('/', authenticateToken, async (req, res, next) => {
                   name: true,
                   barcode: true,
                   category: true,
+                  subcategory: true,
                   pattern: true,
                   size: true,
+                  images: {
+                    take: 1,
+                    orderBy: { position: 'asc' }
+                  },
                 },
               },
             },
@@ -132,6 +137,330 @@ router.get('/', authenticateToken, async (req, res, next) => {
     return next(error);
   }
   return;
+});
+
+/**
+ * @swagger
+ * /api/sales/report:
+ *   get:
+ *     summary: Relatório agregado de vendas para calendário e rankings
+ *     tags: [Sales]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/report', authenticateToken, async (req, res, next) => {
+  try {
+    const { startDate, endDate, status, sellerId } = req.query;
+
+    const where: any = {};
+
+    // Status: default to PAID unless specified otherwise, or ALL
+    if (status && status !== 'ALL') {
+      where.status = status;
+    } else if (!status) {
+      where.status = 'PAID';
+    }
+
+    if (sellerId) {
+      where.sellerId = sellerId;
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate as string);
+        if (!isNaN(start.getTime())) {
+          where.createdAt.gte = start;
+        }
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        if (!isNaN(end.getTime())) {
+          where.createdAt.lte = end;
+        }
+      }
+    }
+
+    const sales = await prisma.sale.findMany({
+      where,
+      include: {
+        seller: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                subcategory: true,
+                pattern: {
+                  include: {
+                    canonicalPattern: true,
+                  },
+                },
+                size: true,
+                images: {
+                  orderBy: { position: 'asc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let totalRevenue = 0;
+    let totalDiscount = 0;
+    let totalItemsSold = 0;
+
+    const patternsMap = new Map<string, {
+      id: string;
+      name: string;
+      code: string;
+      totalQuantity: number;
+      totalRevenue: number;
+      sampleImage?: string | null;
+    }>();
+
+    const categoriesMap = new Map<string, {
+      id: string;
+      name: string;
+      code: string;
+      totalQuantity: number;
+      totalRevenue: number;
+    }>();
+
+    const subcategoriesMap = new Map<string, {
+      id: string;
+      name: string;
+      code: string;
+      categoryName: string;
+      totalQuantity: number;
+      totalRevenue: number;
+    }>();
+
+    const paymentMethodsMap = new Map<string, {
+      method: string;
+      count: number;
+      totalRevenue: number;
+    }>();
+
+    const timelineMap = new Map<string, {
+      date: string;
+      formattedDate: string;
+      totalRevenue: number;
+      salesCount: number;
+      itemsCount: number;
+    }>();
+
+    const productsMap = new Map<string, {
+      id: string;
+      name: string;
+      categoryName?: string;
+      patternName?: string;
+      sizeName?: string;
+      totalQuantity: number;
+      totalRevenue: number;
+      imageUrl?: string | null;
+    }>();
+
+    for (const sale of sales) {
+      totalRevenue += sale.total || 0;
+      totalDiscount += sale.discount || 0;
+
+      // Payment method
+      const method = sale.paymentMethod || 'OTHER';
+      const currentMethod = paymentMethodsMap.get(method) || {
+        method,
+        count: 0,
+        totalRevenue: 0,
+      };
+      currentMethod.count += 1;
+      currentMethod.totalRevenue += sale.total || 0;
+      paymentMethodsMap.set(method, currentMethod);
+
+      // Timeline (day)
+      const saleDate = new Date(sale.createdAt);
+      const dateKey = saleDate.toISOString().split('T')[0];
+      const dayStr = String(saleDate.getDate()).padStart(2, '0');
+      const monthStr = String(saleDate.getMonth() + 1).padStart(2, '0');
+      const formattedDate = `${dayStr}/${monthStr}`;
+
+      const currentDay = timelineMap.get(dateKey) || {
+        date: dateKey,
+        formattedDate,
+        totalRevenue: 0,
+        salesCount: 0,
+        itemsCount: 0,
+      };
+      currentDay.totalRevenue += sale.total || 0;
+      currentDay.salesCount += 1;
+
+      // Items
+      for (const item of sale.items || []) {
+        const qty = item.quantity || 0;
+        const itemRevenue = item.total || (qty * (item.unitPrice || 0));
+        totalItemsSold += qty;
+        currentDay.itemsCount += qty;
+
+        const product = item.product;
+
+        // Pattern (resolve to canonical if merged)
+        const patternObj = product?.pattern?.canonicalPattern || product?.pattern;
+        const patternId = patternObj?.id || 'sem-estampa';
+        const patternName = patternObj?.name || 'Sem Estampa';
+        const patternCode = patternObj?.code || '0000';
+        const sampleImage = product?.images?.[0]?.url || product?.imageUrl;
+
+        const currentPattern = patternsMap.get(patternId) || {
+          id: patternId,
+          name: patternName,
+          code: patternCode,
+          totalQuantity: 0,
+          totalRevenue: 0,
+          sampleImage,
+        };
+        currentPattern.totalQuantity += qty;
+        currentPattern.totalRevenue += itemRevenue;
+        if (!currentPattern.sampleImage && sampleImage) {
+          currentPattern.sampleImage = sampleImage;
+        }
+        patternsMap.set(patternId, currentPattern);
+
+        // Category
+        const catObj = product?.category;
+        const catId = catObj?.id || 'sem-categoria';
+        const catName = catObj?.name || 'Sem Categoria';
+        const catCode = catObj?.code || '00';
+
+        const currentCat = categoriesMap.get(catId) || {
+          id: catId,
+          name: catName,
+          code: catCode,
+          totalQuantity: 0,
+          totalRevenue: 0,
+        };
+        currentCat.totalQuantity += qty;
+        currentCat.totalRevenue += itemRevenue;
+        categoriesMap.set(catId, currentCat);
+
+        // Subcategory
+        const subcatObj = product?.subcategory;
+        if (subcatObj) {
+          const subcatId = subcatObj.id;
+          const subcatName = subcatObj.name;
+          const subcatCode = subcatObj.code;
+
+          const currentSubcat = subcategoriesMap.get(subcatId) || {
+            id: subcatId,
+            name: subcatName,
+            code: subcatCode,
+            categoryName: catName,
+            totalQuantity: 0,
+            totalRevenue: 0,
+          };
+          currentSubcat.totalQuantity += qty;
+          currentSubcat.totalRevenue += itemRevenue;
+          subcategoriesMap.set(subcatId, currentSubcat);
+        }
+
+        // Top products
+        if (product) {
+          const prodId = product.id;
+          const currentProd = productsMap.get(prodId) || {
+            id: prodId,
+            name: product.name || 'Produto',
+            categoryName: catName,
+            patternName,
+            sizeName: product.size?.name,
+            totalQuantity: 0,
+            totalRevenue: 0,
+            imageUrl: sampleImage,
+          };
+          currentProd.totalQuantity += qty;
+          currentProd.totalRevenue += itemRevenue;
+          productsMap.set(prodId, currentProd);
+        }
+      }
+
+      timelineMap.set(dateKey, currentDay);
+    }
+
+    const patternsRanking = Array.from(patternsMap.values())
+      .map((p) => ({
+        ...p,
+        totalRevenue: Math.round(p.totalRevenue * 100) / 100,
+        percentageOfTotal: totalItemsSold > 0 ? Math.round((p.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    const categoriesRanking = Array.from(categoriesMap.values())
+      .map((c) => ({
+        ...c,
+        totalRevenue: Math.round(c.totalRevenue * 100) / 100,
+        percentageOfTotal: totalItemsSold > 0 ? Math.round((c.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    const subcategoriesRanking = Array.from(subcategoriesMap.values())
+      .map((s) => ({
+        ...s,
+        totalRevenue: Math.round(s.totalRevenue * 100) / 100,
+        percentageOfTotal: totalItemsSold > 0 ? Math.round((s.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    const paymentMethods = Array.from(paymentMethodsMap.values())
+      .map((pm) => ({
+        ...pm,
+        totalRevenue: Math.round(pm.totalRevenue * 100) / 100,
+        percentage: totalRevenue > 0 ? Math.round((pm.totalRevenue / totalRevenue) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    const timeline = Array.from(timelineMap.values())
+      .map((t) => ({
+        ...t,
+        totalRevenue: Math.round(t.totalRevenue * 100) / 100,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const topProducts = Array.from(productsMap.values())
+      .map((pr) => ({
+        ...pr,
+        totalRevenue: Math.round(pr.totalRevenue * 100) / 100,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 15);
+
+    const totalSales = sales.length;
+    const averageTicket = totalSales > 0 ? Math.round((totalRevenue / totalSales) * 100) / 100 : 0;
+
+    return res.json({
+      summary: {
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalSales,
+        totalItemsSold,
+        averageTicket,
+        totalDiscount: Math.round(totalDiscount * 100) / 100,
+      },
+      patternsRanking,
+      categoriesRanking,
+      subcategoriesRanking,
+      paymentMethods,
+      timeline,
+      topProducts,
+      salesCount: totalSales,
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 /**

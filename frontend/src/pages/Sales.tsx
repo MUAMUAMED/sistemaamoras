@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon, EyeIcon, CreditCardIcon, QrCodeIcon, TrashIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, EyeIcon, CreditCardIcon, QrCodeIcon, TrashIcon, DocumentTextIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { saleService, productService } from '../services/api';
 import { Sale, Product } from '../types';
 import toast from 'react-hot-toast';
@@ -8,6 +9,8 @@ import BarcodeScanner from '../components/BarcodeScanner';
 import ProductSelector from '../components/ProductSelector';
 
 export default function Sales() {
+  const location = useLocation();
+  const reportHref = location.pathname.startsWith('/crm') ? '/crm/sales/report' : '/erp/sales/report';
   const [showModal, setShowModal] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -268,18 +271,27 @@ export default function Sales() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Vendas</h1>
           <p className="text-gray-600">Gerencie suas vendas e faturamento</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>Nova Venda</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Link
+            to={reportHref}
+            className="inline-flex items-center space-x-2 px-3.5 py-2 sm:px-4 sm:py-2.5 bg-white border border-pink-200 text-pink-700 hover:bg-pink-50 hover:border-pink-300 font-medium text-xs sm:text-sm rounded-lg shadow-xs transition-all"
+          >
+            <ChartBarIcon className="h-5 w-5 text-pink-600" />
+            <span>Acessar relatório de vendas</span>
+          </Link>
+          <button
+            onClick={() => setShowModal(true)}
+            className="btn-primary flex items-center space-x-2 text-xs sm:text-sm px-3.5 py-2 sm:px-4 sm:py-2.5"
+          >
+            <PlusIcon className="h-5 w-5" />
+            <span>Nova Venda</span>
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

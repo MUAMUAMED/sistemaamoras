@@ -64,8 +64,72 @@ export interface Pattern {
   code: string;
   description?: string;
   active: boolean;
+  canonicalPatternId?: string | null;
+  canonicalPattern?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    products?: number;
+    mergedPatterns?: number;
+  };
+}
+
+export interface PatternClusterItem {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  active: boolean;
+  createdAt: string;
+  productsCount: number;
+  sampleImages: string[];
+}
+
+export interface PatternCluster {
+  id: string;
+  title: string;
+  primaryReason: string;
+  averageSimilarity: number;
+  suggestedPrincipalId: string;
+  patterns: PatternClusterItem[];
+}
+
+export interface PatternRedirect {
+  id: string;
+  sourcePatternId: string;
+  sourcePatternCode: string;
+  sourcePatternName: string;
+  targetPatternId: string;
+  targetPatternCode: string;
+  targetPatternName: string;
+  createdAt: string;
+  sourcePattern?: { id: string; name: string; code: string; active: boolean };
+  targetPattern?: { id: string; name: string; code: string; active: boolean };
+}
+
+export interface MergePatternsPayload {
+  principalPatternId: string;
+  mergedPatternIds: string[];
+}
+
+export interface MergePatternsResponse {
+  success: boolean;
+  message: string;
+  result: {
+    principalPattern: Pattern;
+    secondaryPatternsCount: number;
+    productsUpdatedCount: number;
+    redirectedCodes: Array<{
+      fromCode: string;
+      fromName: string;
+      toCode: string;
+      toName: string;
+    }>;
+  };
 }
 
 // Tipos de tamanho
@@ -606,4 +670,82 @@ export interface StockReport {
     count: number;
     totalQuantity: number;
   }>;
-} 
+}
+
+// Relatório de Vendas
+export interface SalesReportSummary {
+  totalRevenue: number;
+  totalSales: number;
+  totalItemsSold: number;
+  averageTicket: number;
+  totalDiscount: number;
+}
+
+export interface PatternSalesRankingItem {
+  id: string;
+  name: string;
+  code: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  sampleImage?: string | null;
+  percentageOfTotal: number;
+}
+
+export interface CategorySalesRankingItem {
+  id: string;
+  name: string;
+  code: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  percentageOfTotal: number;
+}
+
+export interface SubcategorySalesRankingItem {
+  id: string;
+  name: string;
+  code: string;
+  categoryName: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  percentageOfTotal: number;
+}
+
+export interface PaymentMethodStats {
+  method: string;
+  count: number;
+  totalRevenue: number;
+  percentage: number;
+}
+
+export interface DailySalesTimelinePoint {
+  date: string;
+  formattedDate: string;
+  totalRevenue: number;
+  salesCount: number;
+  itemsCount: number;
+}
+
+export interface TopProductSalesItem {
+  id: string;
+  name: string;
+  categoryName?: string;
+  patternName?: string;
+  sizeName?: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  imageUrl?: string | null;
+}
+
+export interface SalesReportData {
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  summary: SalesReportSummary;
+  patternsRanking: PatternSalesRankingItem[];
+  categoriesRanking: CategorySalesRankingItem[];
+  subcategoriesRanking: SubcategorySalesRankingItem[];
+  paymentMethods: PaymentMethodStats[];
+  timeline: DailySalesTimelinePoint[];
+  topProducts: TopProductSalesItem[];
+}

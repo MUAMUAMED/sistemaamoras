@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Palette, AlertTriangle } from 'lucide-react';
+import { Plus, Edit3, Trash2, Palette, AlertTriangle, Layers } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Pattern } from '../types';
 import { patternsApi } from '../services/api';
+import { PatternMergeModal } from '../components/PatternMergeModal';
 
 const Patterns: React.FC = () => {
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedPattern, setSelectedPattern] = useState<Pattern | null>(null);
   const [forceDeleteId, setForceDeleteId] = useState<string | null>(null);
   const [forceDeleteLoading, setForceDeleteLoading] = useState(false);
@@ -47,7 +49,7 @@ const Patterns: React.FC = () => {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: patternsApi.delete,
+    mutationFn: (id: string) => patternsApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patterns'] });
       toast.success('Estampa excluída com sucesso!');
@@ -104,6 +106,14 @@ const Patterns: React.FC = () => {
               <p className="text-purple-100 text-lg">Gerencie as estampas de produtos</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => setShowMergeModal(true)}
+                className="bg-purple-800/60 hover:bg-purple-800 text-white border border-purple-400/40 px-5 py-3 rounded-xl flex items-center justify-center gap-2 font-medium shadow-md hover:shadow-lg transition-all duration-200 backdrop-blur-sm"
+                title="Detectar duplicidades e unificar estampas similares"
+              >
+                <Layers className="w-5 h-5 text-purple-200" />
+                Unificar Estampas
+              </button>
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="bg-white text-purple-600 px-6 py-3 rounded-xl hover:bg-purple-50 flex items-center justify-center gap-2 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
@@ -332,6 +342,13 @@ const Patterns: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal de Unificação de Estampas e Redirecionamentos */}
+      <PatternMergeModal
+        isOpen={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        patterns={patterns}
+      />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Sales from './pages/Sales';
+import SalesReport from './pages/SalesReport';
 import Scanner from './pages/Scanner';
 import Leads from './pages/Leads';
 import Settings from './pages/Settings';
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="/erp/patterns" element={<Patterns />} />
               <Route path="/erp/sizes" element={<Sizes />} />
               <Route path="/erp/sales" element={<Sales />} />
+              <Route path="/erp/sales/report" element={<SalesReport />} />
               <Route path="/erp/scanner" element={<Scanner />} />
               <Route path="/erp/pdv" element={<Pdv />} />
               <Route path="/erp/fiscal" element={<Fiscal />} />
@@ -83,6 +85,7 @@ export default function App() {
               <Route path="/crm/leads" element={<Leads />} />
               <Route path="/crm/kanban" element={<Kanban />} />
               <Route path="/crm/sales" element={<Sales />} />
+              <Route path="/crm/sales/report" element={<SalesReport />} />
               <Route path="/crm/settings" element={<Settings />} />
             </Route>
           </Routes>
@@ -90,4 +93,4 @@ export default function App() {
       </BrowserRouter>
     </QueryClientProvider>
   );
-} 
+}
