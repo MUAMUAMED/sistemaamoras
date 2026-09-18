@@ -19,6 +19,8 @@ import {
   CircleDollarSign,
   PackageCheck,
   CalendarRange,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { salesApi } from '../services/api';
 import { SalesReportData } from '../types';
@@ -54,6 +56,59 @@ const MONTH_NAMES = [
 ];
 
 const WEEKDAY_NAMES = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+interface ReportThumbnailProps {
+  src?: string | null;
+  alt: string;
+  className?: string;
+  fallbackIcon?: React.ReactNode;
+}
+
+function ReportThumbnail({
+  src,
+  alt,
+  className = 'w-14 h-14 sm:w-16 sm:h-16',
+  fallbackIcon,
+}: ReportThumbnailProps) {
+  const [loaded, setLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  const fullUrl = src ? getImageUrl(src) : '';
+
+  if (!fullUrl || hasError) {
+    return (
+      <div
+        className={`${className} rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center border border-pink-100 shrink-0 select-none`}
+      >
+        {fallbackIcon || <Sparkles className="w-6 h-6 opacity-70" />}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${className} rounded-lg bg-gray-100 border border-gray-200 overflow-hidden relative shrink-0 select-none shadow-xs`}
+    >
+      {!loaded && (
+        <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+          <Sparkles className="w-5 h-5 text-gray-400 opacity-40" />
+        </div>
+      )}
+      <img
+        src={fullUrl}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        fetchPriority="low"
+        onLoad={() => setLoaded(true)}
+        onError={() => setHasError(true)}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
+          loaded ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+    </div>
+  );
+}
 
 export default function SalesReport() {
   const location = useLocation();
@@ -271,6 +326,13 @@ export default function SalesReport() {
   const paymentMethods = report?.paymentMethods || [];
   const timeline = report?.timeline || [];
   const topProducts = report?.topProducts || [];
+
+  const [showAllPatterns, setShowAllPatterns] = useState(false);
+  const INITIAL_PATTERNS_COUNT = 9;
+  const displayedPatterns = useMemo(() => {
+    if (showAllPatterns) return patternsRanking;
+    return patternsRanking.slice(0, INITIAL_PATTERNS_COUNT);
+  }, [patternsRanking, showAllPatterns]);
 
   // Calcular valor máximo no timeline para barras proporcionais
   const maxDailyRevenue = useMemo(() => {
@@ -639,99 +701,117 @@ export default function SalesReport() {
               <p className="text-xs text-gray-400 mt-1">Experimente selecionar outro dia ou intervalo no calendário acima.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {patternsRanking.map((pat, idx) => {
-                const isTop1 = idx === 0;
-                const isTop2 = idx === 1;
-                const isTop3 = idx === 2;
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                {displayedPatterns.map((pat, idx) => {
+                  const isTop1 = idx === 0;
+                  const isTop2 = idx === 1;
+                  const isTop3 = idx === 2;
 
-                return (
-                  <div
-                    key={pat.id}
-                    className={`p-3.5 sm:p-4 rounded-xl border transition-all hover:shadow-md flex flex-col justify-between ${
-                      isTop1
-                        ? 'border-pink-300 bg-gradient-to-b from-pink-50/40 to-white ring-1 ring-pink-200'
-                        : isTop2
-                        ? 'border-amber-200 bg-gradient-to-b from-amber-50/20 to-white'
-                        : isTop3
-                        ? 'border-sky-200 bg-gradient-to-b from-sky-50/20 to-white'
-                        : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div>
-                      {/* Top row: Posição no Ranking + Foto */}
-                      <div className="flex items-start gap-3">
-                        <div className="relative flex-shrink-0">
-                          {pat.sampleImage ? (
-                            <img
-                              src={getImageUrl(pat.sampleImage)}
+                  return (
+                    <div
+                      key={pat.id}
+                      className={`p-3.5 sm:p-4 rounded-xl border transition-all hover:shadow-md flex flex-col justify-between ${
+                        isTop1
+                          ? 'border-pink-300 bg-gradient-to-b from-pink-50/40 to-white ring-1 ring-pink-200'
+                          : isTop2
+                          ? 'border-amber-200 bg-gradient-to-b from-amber-50/20 to-white'
+                          : isTop3
+                          ? 'border-sky-200 bg-gradient-to-b from-sky-50/20 to-white'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div>
+                        {/* Top row: Posição no Ranking + Foto */}
+                        <div className="flex items-start gap-3">
+                          <div className="relative flex-shrink-0">
+                            <ReportThumbnail
+                              src={pat.sampleImage}
                               alt={pat.name}
-                              className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg object-cover border border-gray-200 shadow-xs"
-                              onError={(e) => {
-                                (e.target as HTMLElement).style.display = 'none';
-                              }}
+                              fallbackIcon={isTop1 ? <Sparkles className="w-6 h-6 text-pink-600" /> : undefined}
                             />
-                          ) : (
-                            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center border border-pink-100">
-                              <Sparkles className="w-6 h-6 opacity-70" />
-                            </div>
-                          )}
 
-                          {/* Medalha / Badge */}
-                          <span
-                            className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-xs ${
-                              isTop1
-                                ? 'bg-amber-400 text-amber-950 ring-2 ring-white'
-                                : isTop2
-                                ? 'bg-slate-300 text-slate-900 ring-2 ring-white'
-                                : isTop3
-                                ? 'bg-amber-700 text-white ring-2 ring-white'
-                                : 'bg-gray-100 text-gray-600 text-[11px]'
-                            }`}
-                          >
-                            {idx + 1}º
-                          </span>
+                            {/* Medalha / Badge */}
+                            <span
+                              className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shadow-xs pointer-events-none ${
+                                isTop1
+                                  ? 'bg-amber-400 text-amber-950 ring-2 ring-white'
+                                  : isTop2
+                                  ? 'bg-slate-300 text-slate-900 ring-2 ring-white'
+                                  : isTop3
+                                  ? 'bg-amber-700 text-white ring-2 ring-white'
+                                  : 'bg-gray-100 text-gray-600 text-[11px]'
+                              }`}
+                            >
+                              {idx + 1}º
+                            </span>
+                          </div>
+
+                          {/* Informações da estampa */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate" title={pat.name}>
+                              {pat.name}
+                            </h3>
+                            <p className="text-xs text-gray-500 font-mono">
+                              Código: #{pat.code}
+                            </p>
+
+                            <div className="mt-1 flex items-baseline gap-2">
+                              <span className="text-base sm:text-lg font-black text-pink-700">
+                                {pat.totalQuantity} un
+                              </span>
+                              <span className="text-xs text-gray-600 font-medium">
+                                ({formatCurrency(pat.totalRevenue)})
+                              </span>
+                            </div>
+                          </div>
                         </div>
 
-                        {/* Informações da estampa */}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-gray-900 text-sm sm:text-base truncate" title={pat.name}>
-                            {pat.name}
-                          </h3>
-                          <p className="text-xs text-gray-500 font-mono">
-                            Código: #{pat.code}
-                          </p>
-
-                          <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-base sm:text-lg font-black text-pink-700">
-                              {pat.totalQuantity} un
-                            </span>
-                            <span className="text-xs text-gray-600 font-medium">
-                              ({formatCurrency(pat.totalRevenue)})
-                            </span>
+                        {/* Barra de Porcentagem de Vendas */}
+                        <div className="mt-3">
+                          <div className="flex justify-between items-center text-[11px] text-gray-500 mb-1">
+                            <span>Participação nas peças</span>
+                            <span className="font-semibold text-gray-700">{pat.percentageOfTotal}%</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-2 rounded-full transition-all ${
+                                isTop1 ? 'bg-pink-600' : isTop2 ? 'bg-amber-500' : isTop3 ? 'bg-sky-500' : 'bg-gray-400'
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(4, pat.percentageOfTotal))}%` }}
+                            />
                           </div>
                         </div>
                       </div>
-
-                      {/* Barra de Porcentagem de Vendas */}
-                      <div className="mt-3">
-                        <div className="flex justify-between items-center text-[11px] text-gray-500 mb-1">
-                          <span>Participação nas peças</span>
-                          <span className="font-semibold text-gray-700">{pat.percentageOfTotal}%</span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                          <div
-                            className={`h-2 rounded-full transition-all ${
-                              isTop1 ? 'bg-pink-600' : isTop2 ? 'bg-amber-500' : isTop3 ? 'bg-sky-500' : 'bg-gray-400'
-                            }`}
-                            style={{ width: `${Math.min(100, Math.max(4, pat.percentageOfTotal))}%` }}
-                          />
-                        </div>
-                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+
+              {/* Botão para carregar mais estampas se houver mais de 9 */}
+              {patternsRanking.length > INITIAL_PATTERNS_COUNT && (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPatterns(!showAllPatterns)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 transition-colors shadow-xs cursor-pointer"
+                  >
+                    {showAllPatterns ? (
+                      <>
+                        <ChevronUp className="w-4 h-4" />
+                        <span>Mostrar menos estampas</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        <span>
+                          Ver todas as {patternsRanking.length} estampas (+{patternsRanking.length - INITIAL_PATTERNS_COUNT})
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -994,18 +1074,16 @@ export default function SalesReport() {
                   <tr key={prod.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-xs font-bold text-gray-400">{idx + 1}º</td>
                     <td className="px-4 py-3 font-medium text-gray-900 flex items-center gap-2.5">
-                      {prod.imageUrl ? (
-                        <img
-                          src={getImageUrl(prod.imageUrl)}
-                          alt={prod.name}
-                          className="w-8 h-8 rounded object-cover border border-gray-200 flex-shrink-0"
-                          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded bg-gray-100 text-gray-400 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {prod.name.charAt(0)}
-                        </div>
-                      )}
+                      <ReportThumbnail
+                        src={prod.imageUrl}
+                        alt={prod.name}
+                        className="w-8 h-8"
+                        fallbackIcon={
+                          <span className="text-xs font-bold text-gray-400">
+                            {prod.name.charAt(0)}
+                          </span>
+                        }
+                      />
                       <span className="truncate max-w-xs">{prod.name}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600">{prod.patternName || '-'}</td>
