@@ -6,6 +6,10 @@ import {
   Category,
   Subcategory,
   Pattern,
+  PatternCluster,
+  PatternRedirect,
+  MergePatternsPayload,
+  MergePatternsResponse,
   Size,
   Sale,
   SaleItem,
@@ -33,47 +37,17 @@ import {
   FiscalConfig,
   FiscalDocument,
   FiscalDanfe,
+  SalesReportData,
 } from '../types';
 
 // Configuração base do Axios
-// Usa variável de ambiente ou URL relativa (proxy)
-const getBaseURL = () => {
-  const legacyEnv = typeof process !== 'undefined' ? process.env : {};
-  // Em Vite, variáveis de ambiente são expostas via import.meta.env
-  // Prioridade: REACT_APP_API_URL > VITE_API_URL > process.env.REACT_APP_API_URL
-  const apiUrl = 
-    import.meta.env.REACT_APP_API_URL || 
-    import.meta.env.VITE_API_URL || 
-    legacyEnv.REACT_APP_API_URL;
-  
-  // Se REACT_APP_API_URL ou VITE_API_URL estiverem definidas, usa elas (OBRIGATÓRIO em produção)
-  if (apiUrl) {
-    // Garantir que termina com /api se não terminar
-    if (apiUrl.endsWith('/api')) {
-      return apiUrl;
-    }
-    // Se não terminar com /api, adicionar
-    return apiUrl.endsWith('/') ? `${apiUrl}api` : `${apiUrl}/api`;
-  }
-  
-  // Em desenvolvimento, usa proxy relativo
-  if ((import.meta.env.DEV === true) || legacyEnv.NODE_ENV === 'development') {
-    return '/api';
-  }
-  
-  // Fallback explícito para o backend público atual. Assim o ERP não depende
-  // de um proxy do frontend que pode não existir no serviço da Zeabur.
-  return 'https://amorasbackenddd.zeabur.app/api';
-};
-
 const api = axios.create({
-  baseURL: getBaseURL(),
-  timeout: parseInt(
-    import.meta.env.REACT_APP_API_TIMEOUT || 
-    import.meta.env.VITE_API_TIMEOUT || 
-    (typeof process !== 'undefined' ? process.env.REACT_APP_API_TIMEOUT : undefined) ||
-    '30000'
+  baseURL: process.env.REACT_APP_API_URL || (
+    process.env.NODE_ENV === 'production' 
+      ? 'https://amorasbackenddd.zeabur.app/api'
+      : 'https://amorasbackenddd.zeabur.app/api'
   ),
+  timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
 });
 
 // Interceptor para adicionar token de autenticação
@@ -83,15 +57,6 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Se for FormData, garantir que o Content-Type não seja setado manualmente
-    // O browser precisa definir o boundary automaticamente
-    if (config.data instanceof FormData) {
-      // Remover Content-Type se estiver definido - o browser define automaticamente
-      delete config.headers['Content-Type'];
-      console.log('📦 [AXIOS] FormData detectado, Content-Type será definido pelo browser');
-    }
-    
     return config;
   },
   (error) => {
@@ -103,14 +68,11 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Não redirecionar automaticamente para login se já estiver na página de login
-    // Isso evita loops de redirecionamento
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-    // Sempre rejeitar o erro para que seja tratado no catch
     return Promise.reject(error);
   }
 );
@@ -118,16 +80,7 @@ api.interceptors.response.use(
 // Serviços de autenticação
 export const authApi = {
   login: async (data: LoginData): Promise<LoginResponse> => {
-    // O axios já lança exceção para status 4xx/5xx, então só precisamos tratar sucesso
     const response = await api.post('/auth/login', data);
-    
-    // Se chegou aqui, é sucesso (status 200)
-    // Validar se a resposta tem o formato esperado
-    if (!response.data || !response.data.token || !response.data.user) {
-      console.error('Resposta inválida do servidor:', response.data);
-      throw new Error('Resposta inválida do servidor. Tente novamente.');
-    }
-    
     return response.data;
   },
   
@@ -139,16 +92,6 @@ export const authApi = {
   
   me: async (): Promise<User> => {
     const response = await api.get('/auth/me');
-    return response.data;
-  },
-
-  checkFirstUser: async (): Promise<{ hasUsers: boolean; canCreateAccount: boolean }> => {
-    const response = await api.get('/auth/check-first-user');
-    return response.data;
-  },
-
-  register: async (data: { name: string; email: string; password: string; role?: string }): Promise<{ message: string; user: User; isFirstUser?: boolean }> => {
-    const response = await api.post('/auth/register', data);
     return response.data;
   },
 };
@@ -295,6 +238,21 @@ export const patternsApi = {
     const params = force ? { force: 'true' } : {};
     await api.delete(`/patterns/${id}`, { params });
   },
+
+  getClusters: async (): Promise<{ clusters: PatternCluster[]; totalDuplicatesFound: number }> => {
+    const response = await api.get('/patterns/clusters');
+    return response.data;
+  },
+
+  merge: async (data: MergePatternsPayload): Promise<MergePatternsResponse> => {
+    const response = await api.post('/patterns/merge', data);
+    return response.data;
+  },
+
+  getRedirects: async (): Promise<PatternRedirect[]> => {
+    const response = await api.get('/patterns/redirects');
+    return response.data;
+  },
 };
 
 // Serviços de produtos
@@ -338,54 +296,20 @@ export const productsApi = {
     const formData = new FormData();
     formData.append('image', imageFile);
     
-    // NÃO setar Content-Type manualmente - o browser define o boundary automaticamente
-    const response = await api.post(`/products/${id}/image`, formData);
+    const response = await api.post(`/products/${id}/image`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 
   uploadImages: async (id: string, images: File[], type: 'ROUPA' | 'IA'): Promise<{ message: string }> => {
-    // Validar que todos os arquivos são Files válidos
-    const validFiles: File[] = [];
-    images.forEach((file, index) => {
-      if (file instanceof File && file.size > 0) {
-        validFiles.push(file);
-        console.log(`✅ [UPLOAD] Arquivo ${index + 1} válido:`, {
-          name: file.name,
-          size: file.size,
-          type: file.type
-        });
-      } else {
-        console.error(`❌ [UPLOAD] Arquivo ${index + 1} inválido:`, {
-          isFile: file instanceof File,
-          size: file?.size,
-          type: typeof file
-        });
-      }
-    });
-
-    if (validFiles.length === 0) {
-      throw new Error('Nenhum arquivo válido para upload');
-    }
-
     const formData = new FormData();
-    validFiles.forEach((file) => {
-      formData.append('images', file);
+    images.forEach((file) => formData.append('images', file));
+    const response = await api.post(`/products/${id}/images?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-    
-    console.log(`📤 [UPLOAD] Enviando ${validFiles.length} arquivo(s) válido(s) de ${images.length} total`);
-    
-    // NÃO setar Content-Type manualmente - o browser define o boundary automaticamente
-    const response = await api.post(`/products/${id}/images?type=${type}`, formData);
-    return response.data;
-  },
-
-  deleteImage: async (productId: string, imageId: string): Promise<{ message: string; images: any[] }> => {
-    const response = await api.delete(`/products/${productId}/images/${imageId}`);
-    return response.data;
-  },
-
-  setMainImage: async (productId: string, imageId: string): Promise<{ message: string; product: Product }> => {
-    const response = await api.put(`/products/${productId}/images/${imageId}/set-main`);
     return response.data;
   },
   
@@ -684,15 +608,162 @@ export const salesApi = {
     const response = await api.post(`/sales/${id}/process-payment`, data);
     return response.data;
   },
-
-  updateCustomerTaxId: async (id: string, data: { customerTaxId?: string; leadName?: string }): Promise<Sale> => {
-    const response = await api.patch(`/sales/${id}/customer-tax-id`, data);
-    return response.data;
-  },
   
   delete: async (id: string): Promise<{ message: string; saleNumber: string }> => {
     const response = await api.delete(`/sales/${id}`);
     return response.data;
+  },
+
+  /** Emite (ou consulta, se já existir) a NFC-e da venda já concluída. */
+  issueNfce: async (id: string): Promise<{ id: string; number: number; series: number; status: string; statusMessage?: string | null }> => {
+    const response = await api.post(`/fiscal/sales/${id}/issue-nfce`);
+    return response.data;
+  },
+
+  getReport: async (params?: {
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+    sellerId?: string;
+  }): Promise<SalesReportData> => {
+    try {
+      const response = await api.get('/sales/report', { params });
+      return response.data;
+    } catch (err: any) {
+      console.warn('Backend /sales/report fallback triggered:', err);
+      // Fallback em caso de atraso na propagação do deploy
+      const salesRes = await salesApi.list({ limit: 500 });
+      const sales = salesRes.data || [];
+
+      const start = params?.startDate ? new Date(params.startDate) : null;
+      const end = params?.endDate ? new Date(params.endDate) : null;
+      if (end) end.setHours(23, 59, 59, 999);
+
+      const filtered = sales.filter((s: Sale) => {
+        if (params?.status && params.status !== 'ALL' && s.status !== params.status) return false;
+        const d = new Date(s.createdAt);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        return true;
+      });
+
+      let totalRevenue = 0;
+      let totalDiscount = 0;
+      let totalItemsSold = 0;
+
+      const patternsMap = new Map<string, any>();
+      const categoriesMap = new Map<string, any>();
+      const subcategoriesMap = new Map<string, any>();
+      const paymentMethodsMap = new Map<string, any>();
+      const timelineMap = new Map<string, any>();
+      const productsMap = new Map<string, any>();
+
+      for (const sale of filtered) {
+        totalRevenue += sale.total || 0;
+        totalDiscount += sale.discount || 0;
+
+        const method = sale.paymentMethod || 'OUTRO';
+        const currentMethod = paymentMethodsMap.get(method) || { method, count: 0, totalRevenue: 0 };
+        currentMethod.count += 1;
+        currentMethod.totalRevenue += sale.total || 0;
+        paymentMethodsMap.set(method, currentMethod);
+
+        const saleDate = new Date(sale.createdAt);
+        const dateKey = saleDate.toISOString().split('T')[0];
+        const formattedDate = `${String(saleDate.getDate()).padStart(2, '0')}/${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
+        const currentDay = timelineMap.get(dateKey) || { date: dateKey, formattedDate, totalRevenue: 0, salesCount: 0, itemsCount: 0 };
+        currentDay.totalRevenue += sale.total || 0;
+        currentDay.salesCount += 1;
+
+        for (const item of sale.items || []) {
+          const qty = item.quantity || 0;
+          const itemRev = item.total || (qty * (item.unitPrice || 0));
+          totalItemsSold += qty;
+          currentDay.itemsCount += qty;
+
+          const p = item.product;
+          if (p) {
+            const pat = p.pattern;
+            const patId = pat?.id || 'sem-estampa';
+            const patName = pat?.name || 'Sem Estampa';
+            const patCode = pat?.code || '0000';
+            const img = p.images?.[0]?.url || p.imageUrl;
+            const curPat = patternsMap.get(patId) || { id: patId, name: patName, code: patCode, totalQuantity: 0, totalRevenue: 0, sampleImage: img };
+            curPat.totalQuantity += qty;
+            curPat.totalRevenue += itemRev;
+            if (!curPat.sampleImage && img) curPat.sampleImage = img;
+            patternsMap.set(patId, curPat);
+
+            const cat = p.category;
+            const catId = cat?.id || 'sem-categoria';
+            const catName = cat?.name || 'Sem Categoria';
+            const catCode = cat?.code || '00';
+            const curCat = categoriesMap.get(catId) || { id: catId, name: catName, code: catCode, totalQuantity: 0, totalRevenue: 0 };
+            curCat.totalQuantity += qty;
+            curCat.totalRevenue += itemRev;
+            categoriesMap.set(catId, curCat);
+
+            const sub = p.subcategory;
+            if (sub) {
+              const curSub = subcategoriesMap.get(sub.id) || { id: sub.id, name: sub.name, code: sub.code, categoryName: catName, totalQuantity: 0, totalRevenue: 0 };
+              curSub.totalQuantity += qty;
+              curSub.totalRevenue += itemRev;
+              subcategoriesMap.set(sub.id, curSub);
+            }
+
+            const curProd = productsMap.get(p.id) || { id: p.id, name: p.name, categoryName: catName, patternName: patName, sizeName: p.size?.name, totalQuantity: 0, totalRevenue: 0, imageUrl: img };
+            curProd.totalQuantity += qty;
+            curProd.totalRevenue += itemRev;
+            productsMap.set(p.id, curProd);
+          }
+        }
+        timelineMap.set(dateKey, currentDay);
+      }
+
+      return {
+        period: {
+          startDate: params?.startDate || '',
+          endDate: params?.endDate || '',
+        },
+        summary: {
+          totalRevenue: Math.round(totalRevenue * 100) / 100,
+          totalSales: filtered.length,
+          totalItemsSold,
+          averageTicket: filtered.length > 0 ? Math.round((totalRevenue / filtered.length) * 100) / 100 : 0,
+          totalDiscount: Math.round(totalDiscount * 100) / 100,
+        },
+        patternsRanking: Array.from(patternsMap.values())
+          .map((p: any) => ({
+            ...p,
+            totalRevenue: Math.round(p.totalRevenue * 100) / 100,
+            percentageOfTotal: totalItemsSold > 0 ? Math.round((p.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalQuantity - a.totalQuantity),
+        categoriesRanking: Array.from(categoriesMap.values())
+          .map((c: any) => ({
+            ...c,
+            totalRevenue: Math.round(c.totalRevenue * 100) / 100,
+            percentageOfTotal: totalItemsSold > 0 ? Math.round((c.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalQuantity - a.totalQuantity),
+        subcategoriesRanking: Array.from(subcategoriesMap.values())
+          .map((s: any) => ({
+            ...s,
+            totalRevenue: Math.round(s.totalRevenue * 100) / 100,
+            percentageOfTotal: totalItemsSold > 0 ? Math.round((s.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalQuantity - a.totalQuantity),
+        paymentMethods: Array.from(paymentMethodsMap.values())
+          .map((m: any) => ({
+            ...m,
+            totalRevenue: Math.round(m.totalRevenue * 100) / 100,
+            percentage: totalRevenue > 0 ? Math.round((m.totalRevenue / totalRevenue) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue),
+        timeline: Array.from(timelineMap.values()).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+        topProducts: Array.from(productsMap.values()).sort((a: any, b: any) => b.totalQuantity - a.totalQuantity).slice(0, 20),
+      };
+    }
   },
 };
 
@@ -941,7 +1012,8 @@ export const saleService = {
   cancel: salesApi.cancel,
   generatePayment: salesApi.generatePayment,
   processPayment: salesApi.processPayment,
-  updateCustomerTaxId: salesApi.updateCustomerTaxId,
+  issueNfce: salesApi.issueNfce,
+  getReport: salesApi.getReport,
 };
 
 export const categoryService = categoriesApi;
@@ -955,4 +1027,4 @@ export const dashboardService = {
   getStockMetrics: dashboardApi.getStockMetrics,
 };
 
-export default api;
+export default api; 

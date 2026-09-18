@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Sales from './pages/Sales';
+import SalesReport from './pages/SalesReport';
 import Scanner from './pages/Scanner';
 import Leads from './pages/Leads';
 import Settings from './pages/Settings';
@@ -26,18 +27,7 @@ import ManualFiscal from './pages/ManualFiscal';
 import AdminRoute from './components/AdminRoute';
 import { useAuthStore } from './stores/authStore';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Mantem os dados de navegacao no cache da aplicacao. As alteracoes de
-      // estoque e produto continuam invalidando esta chave explicitamente.
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      retry: 1,
-    },
-  },
-});
+const queryClient = new QueryClient();
 
 function ERPLayout() {
   return (
@@ -80,6 +70,7 @@ export default function App() {
               <Route path="/erp/patterns" element={<Patterns />} />
               <Route path="/erp/sizes" element={<Sizes />} />
               <Route path="/erp/sales" element={<Sales />} />
+              <Route path="/erp/sales/report" element={<SalesReport />} />
               <Route path="/erp/scanner" element={<Scanner />} />
               <Route path="/erp/pdv" element={<Pdv />} />
               <Route path="/erp/fiscal" element={<Fiscal />} />
@@ -94,6 +85,7 @@ export default function App() {
               <Route path="/crm/leads" element={<Leads />} />
               <Route path="/crm/kanban" element={<Kanban />} />
               <Route path="/crm/sales" element={<Sales />} />
+              <Route path="/crm/sales/report" element={<SalesReport />} />
               <Route path="/crm/settings" element={<Settings />} />
             </Route>
           </Routes>
