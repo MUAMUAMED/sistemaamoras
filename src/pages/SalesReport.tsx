@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { salesApi } from '../services/api';
 import { SalesReportData } from '../types';
-import { getImageUrl } from '../utils/imageUrl';
+import { getImageUrl, getProductCardImageUrl } from '../utils/imageUrl';
 
 type PeriodMode = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
 
@@ -72,8 +72,11 @@ function ReportThumbnail({
 }: ReportThumbnailProps) {
   const [loaded, setLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [useRawFallback, setUseRawFallback] = useState(false);
 
-  const fullUrl = src ? getImageUrl(src) : '';
+  const optimizedUrl = src ? getProductCardImageUrl(src) : '';
+  const rawUrl = src ? getImageUrl(src) : '';
+  const fullUrl = useRawFallback ? rawUrl : (optimizedUrl || rawUrl);
 
   if (!fullUrl || hasError) {
     return (
@@ -101,7 +104,13 @@ function ReportThumbnail({
         decoding="async"
         fetchPriority="low"
         onLoad={() => setLoaded(true)}
-        onError={() => setHasError(true)}
+        onError={() => {
+          if (!useRawFallback && rawUrl && rawUrl !== optimizedUrl) {
+            setUseRawFallback(true);
+          } else {
+            setHasError(true);
+          }
+        }}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           loaded ? 'opacity-100' : 'opacity-0'
         }`}
