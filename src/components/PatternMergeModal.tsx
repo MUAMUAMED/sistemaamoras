@@ -1009,8 +1009,8 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
               {isLoadingClusters ? (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                   <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-3" />
-                  <p className="font-medium text-gray-700">Analisando similaridade de nomes e fotos vetoriais...</p>
-                  <p className="text-xs text-gray-400 mt-1">Comparando embeddings de fotos e variações de texto.</p>
+                  <p className="font-medium text-gray-700">Analisando similaridade visual das estampas via pgvector...</p>
+                  <p className="text-xs text-gray-400 mt-1">Comparando embeddings matemáticos das fotos reais das roupas no catálogo.</p>
                 </div>
               ) : clusters.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center max-w-lg mx-auto shadow-sm">
@@ -1019,7 +1019,7 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Nenhuma estampa duplicada detectada!</h3>
                   <p className="text-gray-600 text-sm mb-6">
-                    Todas as suas estampas ativas possuem nomes e características visuais bem diferenciadas.
+                    Todas as suas estampas ativas possuem características visuais bem diferenciadas nas fotos.
                   </p>
                   <button
                     onClick={() => setActiveTab('manual')}
@@ -1033,7 +1033,7 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-gray-600">
-                      Encontramos <strong>{clusters.length} grupo(s)</strong> de estampas que são muito parecidas. Escolha a <strong>Principal 👑</strong> de cada grupo e confirme a unificação.
+                      Encontramos <strong>{clusters.length} grupo(s)</strong> de estampas com alta semelhança visual nas fotos (pgvector). Escolha a <strong>Principal 👑</strong> de cada grupo e confirme a unificação.
                     </p>
                     <button
                       onClick={() => refetchClusters()}
