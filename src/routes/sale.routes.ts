@@ -102,23 +102,17 @@ router.get('/', authenticateToken, async (req, res, next) => {
                   id: true,
                   name: true,
                   barcode: true,
-                  imageUrl: true,
                   category: true,
                   subcategory: true,
                   pattern: true,
                   size: true,
                   images: {
-                    select: { id: true, url: true, position: true },
-                    orderBy: { position: 'asc' },
                     take: 1,
+                    orderBy: { position: 'asc' }
                   },
                 },
               },
             },
-          },
-          fiscalDocuments: {
-            select: { id: true, status: true, model: true, series: true, number: true, accessKey: true },
-            orderBy: { createdAt: 'desc' },
           },
         },
         skip,
@@ -143,6 +137,330 @@ router.get('/', authenticateToken, async (req, res, next) => {
     return next(error);
   }
   return;
+});
+
+/**
+ * @swagger
+ * /api/sales/report:
+ *   get:
+ *     summary: Relatório agregado de vendas para calendário e rankings
+ *     tags: [Sales]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/report', authenticateToken, async (req, res, next) => {
+  try {
+    const { startDate, endDate, status, sellerId } = req.query;
+
+    const where: any = {};
+
+    // Status: default to PAID unless specified otherwise, or ALL
+    if (status && status !== 'ALL') {
+      where.status = status;
+    } else if (!status) {
+      where.status = 'PAID';
+    }
+
+    if (sellerId) {
+      where.sellerId = sellerId;
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate as string);
+        if (!isNaN(start.getTime())) {
+          where.createdAt.gte = start;
+        }
+      }
+      if (endDate) {
+        const end = new Date(endDate as string);
+        if (!isNaN(end.getTime())) {
+          where.createdAt.lte = end;
+        }
+      }
+    }
+
+    const sales = await prisma.sale.findMany({
+      where,
+      include: {
+        seller: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                subcategory: true,
+                pattern: {
+                  include: {
+                    canonicalPattern: true,
+                  },
+                },
+                size: true,
+                images: {
+                  orderBy: { position: 'asc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    let totalRevenue = 0;
+    let totalDiscount = 0;
+    let totalItemsSold = 0;
+
+    const patternsMap = new Map<string, {
+      id: string;
+      name: string;
+      code: string;
+      totalQuantity: number;
+      totalRevenue: number;
+      sampleImage?: string | null;
+    }>();
+
+    const categoriesMap = new Map<string, {
+      id: string;
+      name: string;
+      code: string;
+      totalQuantity: number;
+      totalRevenue: number;
+    }>();
+
+    const subcategoriesMap = new Map<string, {
+      id: string;
+      name: string;
+      code: string;
+      categoryName: string;
+      totalQuantity: number;
+      totalRevenue: number;
+    }>();
+
+    const paymentMethodsMap = new Map<string, {
+      method: string;
+      count: number;
+      totalRevenue: number;
+    }>();
+
+    const timelineMap = new Map<string, {
+      date: string;
+      formattedDate: string;
+      totalRevenue: number;
+      salesCount: number;
+      itemsCount: number;
+    }>();
+
+    const productsMap = new Map<string, {
+      id: string;
+      name: string;
+      categoryName?: string;
+      patternName?: string;
+      sizeName?: string;
+      totalQuantity: number;
+      totalRevenue: number;
+      imageUrl?: string | null;
+    }>();
+
+    for (const sale of sales) {
+      totalRevenue += sale.total || 0;
+      totalDiscount += sale.discount || 0;
+
+      // Payment method
+      const method = sale.paymentMethod || 'OTHER';
+      const currentMethod = paymentMethodsMap.get(method) || {
+        method,
+        count: 0,
+        totalRevenue: 0,
+      };
+      currentMethod.count += 1;
+      currentMethod.totalRevenue += sale.total || 0;
+      paymentMethodsMap.set(method, currentMethod);
+
+      // Timeline (day)
+      const saleDate = new Date(sale.createdAt);
+      const dateKey = saleDate.toISOString().split('T')[0];
+      const dayStr = String(saleDate.getDate()).padStart(2, '0');
+      const monthStr = String(saleDate.getMonth() + 1).padStart(2, '0');
+      const formattedDate = `${dayStr}/${monthStr}`;
+
+      const currentDay = timelineMap.get(dateKey) || {
+        date: dateKey,
+        formattedDate,
+        totalRevenue: 0,
+        salesCount: 0,
+        itemsCount: 0,
+      };
+      currentDay.totalRevenue += sale.total || 0;
+      currentDay.salesCount += 1;
+
+      // Items
+      for (const item of sale.items || []) {
+        const qty = item.quantity || 0;
+        const itemRevenue = item.total || (qty * (item.unitPrice || 0));
+        totalItemsSold += qty;
+        currentDay.itemsCount += qty;
+
+        const product = item.product;
+
+        // Pattern (resolve to canonical if merged)
+        const patternObj = product?.pattern?.canonicalPattern || product?.pattern;
+        const patternId = patternObj?.id || 'sem-estampa';
+        const patternName = patternObj?.name || 'Sem Estampa';
+        const patternCode = patternObj?.code || '0000';
+        const sampleImage = product?.images?.[0]?.url || product?.imageUrl;
+
+        const currentPattern = patternsMap.get(patternId) || {
+          id: patternId,
+          name: patternName,
+          code: patternCode,
+          totalQuantity: 0,
+          totalRevenue: 0,
+          sampleImage,
+        };
+        currentPattern.totalQuantity += qty;
+        currentPattern.totalRevenue += itemRevenue;
+        if (!currentPattern.sampleImage && sampleImage) {
+          currentPattern.sampleImage = sampleImage;
+        }
+        patternsMap.set(patternId, currentPattern);
+
+        // Category
+        const catObj = product?.category;
+        const catId = catObj?.id || 'sem-categoria';
+        const catName = catObj?.name || 'Sem Categoria';
+        const catCode = catObj?.code || '00';
+
+        const currentCat = categoriesMap.get(catId) || {
+          id: catId,
+          name: catName,
+          code: catCode,
+          totalQuantity: 0,
+          totalRevenue: 0,
+        };
+        currentCat.totalQuantity += qty;
+        currentCat.totalRevenue += itemRevenue;
+        categoriesMap.set(catId, currentCat);
+
+        // Subcategory
+        const subcatObj = product?.subcategory;
+        if (subcatObj) {
+          const subcatId = subcatObj.id;
+          const subcatName = subcatObj.name;
+          const subcatCode = subcatObj.code;
+
+          const currentSubcat = subcategoriesMap.get(subcatId) || {
+            id: subcatId,
+            name: subcatName,
+            code: subcatCode,
+            categoryName: catName,
+            totalQuantity: 0,
+            totalRevenue: 0,
+          };
+          currentSubcat.totalQuantity += qty;
+          currentSubcat.totalRevenue += itemRevenue;
+          subcategoriesMap.set(subcatId, currentSubcat);
+        }
+
+        // Top products
+        if (product) {
+          const prodId = product.id;
+          const currentProd = productsMap.get(prodId) || {
+            id: prodId,
+            name: product.name || 'Produto',
+            categoryName: catName,
+            patternName,
+            sizeName: product.size?.name,
+            totalQuantity: 0,
+            totalRevenue: 0,
+            imageUrl: sampleImage,
+          };
+          currentProd.totalQuantity += qty;
+          currentProd.totalRevenue += itemRevenue;
+          productsMap.set(prodId, currentProd);
+        }
+      }
+
+      timelineMap.set(dateKey, currentDay);
+    }
+
+    const patternsRanking = Array.from(patternsMap.values())
+      .map((p) => ({
+        ...p,
+        totalRevenue: Math.round(p.totalRevenue * 100) / 100,
+        percentageOfTotal: totalItemsSold > 0 ? Math.round((p.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    const categoriesRanking = Array.from(categoriesMap.values())
+      .map((c) => ({
+        ...c,
+        totalRevenue: Math.round(c.totalRevenue * 100) / 100,
+        percentageOfTotal: totalItemsSold > 0 ? Math.round((c.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    const subcategoriesRanking = Array.from(subcategoriesMap.values())
+      .map((s) => ({
+        ...s,
+        totalRevenue: Math.round(s.totalRevenue * 100) / 100,
+        percentageOfTotal: totalItemsSold > 0 ? Math.round((s.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+    const paymentMethods = Array.from(paymentMethodsMap.values())
+      .map((pm) => ({
+        ...pm,
+        totalRevenue: Math.round(pm.totalRevenue * 100) / 100,
+        percentage: totalRevenue > 0 ? Math.round((pm.totalRevenue / totalRevenue) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    const timeline = Array.from(timelineMap.values())
+      .map((t) => ({
+        ...t,
+        totalRevenue: Math.round(t.totalRevenue * 100) / 100,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const topProducts = Array.from(productsMap.values())
+      .map((pr) => ({
+        ...pr,
+        totalRevenue: Math.round(pr.totalRevenue * 100) / 100,
+      }))
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 15);
+
+    const totalSales = sales.length;
+    const averageTicket = totalSales > 0 ? Math.round((totalRevenue / totalSales) * 100) / 100 : 0;
+
+    return res.json({
+      summary: {
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalSales,
+        totalItemsSold,
+        averageTicket,
+        totalDiscount: Math.round(totalDiscount * 100) / 100,
+      },
+      patternsRanking,
+      categoriesRanking,
+      subcategoriesRanking,
+      paymentMethods,
+      timeline,
+      topProducts,
+      salesCount: totalSales,
+    });
+  } catch (error) {
+    return next(error);
+  }
 });
 
 /**
@@ -189,10 +507,6 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
               },
             },
           },
-        },
-        fiscalDocuments: {
-          include: { events: { orderBy: { createdAt: 'desc' } } },
-          orderBy: { createdAt: 'desc' },
         },
       },
     });
@@ -261,7 +575,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     console.log('🛒 [DEBUG] Iniciando criação de venda...');
     console.log('🛒 [DEBUG] Dados recebidos:', JSON.stringify(req.body, null, 2));
     
-    const { leadId, items, paymentMethod, notes, leadName, leadPhone, customerTaxId, discount } = req.body;
+    const { leadId, items, paymentMethod, notes, leadName, leadPhone } = req.body;
 
     // Validações básicas
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -300,21 +614,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       console.log('✅ [DEBUG] Lead validado:', lead.name);
     }
 
-    // Itens avulsos representam uma peça ainda não cadastrada no catálogo.
-    // Eles ficam registrados na venda, mas nunca criam produto nem movimentam estoque.
-    const catalogItems = items.filter((item: any) => Boolean(item.productId));
-    const manualItems = items.filter((item: any) => !item.productId);
-    for (const item of manualItems) {
-      if (!String(item.description || '').trim() || !String(item.categoryName || '').trim()) {
-        return res.status(400).json({ error: 'Item avulso incompleto', message: 'Informe nome e categoria da peça não cadastrada' });
-      }
-      if (!Number.isFinite(Number(item.unitPrice)) || Number(item.unitPrice) < 0 || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1) {
-        return res.status(400).json({ error: 'Item avulso inválido', message: 'Informe quantidade e preço válidos para a peça não cadastrada' });
-      }
-    }
-
-    // Verificar se produtos cadastrados existem e têm estoque
-    const productIds = catalogItems.map((item: any) => item.productId);
+    // Verificar se produtos existem e têm estoque
+    const productIds = items.map(item => item.productId);
     console.log('🔍 [DEBUG] Produtos solicitados:', productIds);
     
     const products = await prisma.product.findMany({
@@ -336,7 +637,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
 
     // Verificar estoque
     console.log('📊 [DEBUG] Verificando estoque...');
-    for (const item of catalogItems) {
+    for (const item of items) {
       const product = products.find(p => p.id === item.productId);
       if (!product) continue;
 
@@ -352,29 +653,22 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
 
     // Calcular total
     let total = 0;
-    const saleItems = items.map((item: any) => {
-      const product = item.productId ? products.find(p => p.id === item.productId) : null;
-      const unitPrice = product ? product.price : Number(item.unitPrice);
-      const itemTotal = unitPrice * Number(item.quantity);
+    const saleItems = items.map(item => {
+      const product = products.find(p => p.id === item.productId)!;
+      const itemTotal = product.price * item.quantity;
       total += itemTotal;
-      console.log(`💰 [DEBUG] ${product?.name || item.description}: ${item.quantity}x R$ ${unitPrice} = R$ ${itemTotal}`);
+      
+      console.log(`💰 [DEBUG] ${product.name}: ${item.quantity}x R$ ${product.price} = R$ ${itemTotal}`);
       
       return {
-        productId: product?.id,
+        productId: item.productId,
         quantity: item.quantity,
-        unitPrice,
+        unitPrice: product.price,
         total: itemTotal,
-        manualDescription: product ? null : String(item.description).trim(),
-        manualBarcode: product ? null : String(item.barcode || '').trim() || null,
-        manualCategoryName: product ? null : String(item.categoryName).trim(),
-        manualSubcategoryName: product ? null : String(item.subcategoryName || '').trim() || null,
-        affectsStock: Boolean(product),
       };
     });
 
-    const safeDiscount = Math.min(Math.max(Number(discount) || 0, 0), total);
-    const saleTotal = total - safeDiscount;
-    console.log(`💰 [DEBUG] Total da venda: R$ ${saleTotal} (desconto: R$ ${safeDiscount})`);
+    console.log(`💰 [DEBUG] Total da venda: R$ ${total}`);
 
     // Gerar número da venda
     const saleNumber = `V${Date.now()}`;
@@ -388,12 +682,10 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
         leadId: validatedLeadId,
         leadName: leadName || null,
         leadPhone: leadPhone || null,
-        customerTaxId: customerTaxId ? String(customerTaxId).replace(/\D/g, '') : null,
         sellerId: req.user!.id,
         subtotal: total,
-        discount: safeDiscount,
-        total: saleTotal,
-        status: 'PENDING',
+        total,
+        status: 'PAID',
         paymentMethod,
         notes,
         items: {
@@ -402,7 +694,6 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
       },
       include: {
         lead: true,
-        fiscalDocuments: true,
         seller: {
           select: {
             id: true,
@@ -427,15 +718,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
 
     // Processar pagamento para atualizar estoque e movimentações
     console.log('📦 [DEBUG] Processando pagamento para atualizar estoque...');
-    try {
-      await processSalePayment(sale.id);
-    } catch (paymentError) {
-      await prisma.$transaction([
-        prisma.saleItem.deleteMany({ where: { saleId: sale.id } }),
-        prisma.sale.delete({ where: { id: sale.id } }),
-      ]);
-      throw paymentError;
-    }
+    await processSalePayment(sale.id);
 
     // Nota: Todas as vendas são criadas com status PAID (concluídas)
     // Podem ser excluídas mesmo sendo concluídas
@@ -451,16 +734,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res, next)
     console.log(`   - Pagamento: ${sale.paymentMethod}`);
     console.log(`   - Itens: ${sale.items.length}`);
 
-    const completedSale = await prisma.sale.findUnique({
-      where: { id: sale.id },
-      include: {
-        lead: true,
-        fiscalDocuments: true,
-        seller: { select: { id: true, name: true, email: true } },
-        items: { include: { product: { include: { category: true, pattern: true } } } },
-      },
-    });
-    return res.status(201).json(completedSale);
+    return res.status(201).json(sale);
   } catch (error: any) {
     console.error('❌ [DEBUG] Erro na criação da venda:', error);
     console.error('❌ [DEBUG] Stack trace:', error.stack);
@@ -632,52 +906,80 @@ router.patch('/:id/confirm', authenticateToken, async (req, res, next) => {
 
 // Função auxiliar para processar pagamento
 async function processSalePayment(saleId: string) {
-  await prisma.$transaction(async (tx) => {
-    const sale = await tx.sale.findUnique({
-      where: { id: saleId },
-      include: { items: { include: { product: true } }, lead: true },
-    });
-    if (!sale) throw new Error('Venda não encontrada');
-    if (sale.status === 'PAID') return;
-    if (sale.status !== 'PENDING') throw new Error('Venda não está disponível para pagamento');
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    include: {
+      items: {
+        include: {
+          product: true,
+        },
+      },
+      lead: true,
+    },
+  });
 
-    for (const item of sale.items) {
-      if (!item.affectsStock || !item.productId || !item.product) continue;
-      const updated = await tx.product.updateMany({
-        where: { id: item.productId, stock: { gte: item.quantity }, stockLoja: { gte: item.quantity } },
-        data: { stock: { decrement: item.quantity }, stockLoja: { decrement: item.quantity } },
-      });
-      if (updated.count !== 1) throw new Error(`Estoque insuficiente na loja para ${item.product.name}`);
-      await tx.stockMovement.create({
+  if (!sale) {
+    throw new Error('Venda não encontrada');
+  }
+
+  // Atualizar status da venda
+  await prisma.sale.update({
+    where: { id: saleId },
+    data: { status: 'PAID' },
+  });
+
+  // Atualizar estoque dos produtos
+  for (const item of sale.items) {
+    await Promise.all([
+      // Reduzir estoque
+      prisma.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: {
+            decrement: item.quantity,
+          },
+        },
+      }),
+      // Registrar movimentação de estoque
+      prisma.stockMovement.create({
         data: {
           productId: item.productId,
           type: 'EXIT',
           quantity: item.quantity,
           reason: `Venda ${sale.id}`,
-          reference: sale.id,
-          location: 'LOJA',
           userId: sale.sellerId,
         },
-      });
-    }
+      }),
+    ]);
+  }
 
-    await tx.sale.update({ where: { id: saleId }, data: { status: 'PAID', paidAt: new Date() } });
-    if (sale.lead) {
-      await tx.lead.update({
-        where: { id: sale.lead.id },
-        data: { status: 'SALE_COMPLETED', totalPurchases: { increment: sale.total }, purchaseCount: { increment: 1 }, lastInteraction: new Date() },
-      });
-      await tx.interaction.create({
-        data: {
-          leadId: sale.lead.id,
-          userId: sale.sellerId,
-          type: 'NOTE',
-          title: 'Venda Realizada',
-          description: `Venda realizada no valor de R$ ${sale.total.toFixed(2)}`,
+  // Atualizar dados do lead se existe
+  if (sale.lead) {
+    await prisma.lead.update({
+      where: { id: sale.lead.id },
+      data: {
+        status: 'SALE_COMPLETED',
+        totalPurchases: {
+          increment: sale.total,
         },
-      });
-    }
-  });
+        purchaseCount: {
+          increment: 1,
+        },
+        lastInteraction: new Date(),
+      },
+    });
+
+    // Registrar interação
+    await prisma.interaction.create({
+      data: {
+        leadId: sale.lead.id,
+        userId: sale.sellerId,
+        type: 'NOTE',
+        title: 'Venda Realizada',
+        description: `Venda realizada no valor de R$ ${sale.total.toFixed(2)}`,
+      },
+    });
+  }
 }
 
 /**
@@ -718,7 +1020,6 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
           },
         },
         lead: true,
-        fiscalDocuments: { select: { id: true, status: true } },
       },
     });
 
@@ -727,13 +1028,6 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
       return res.status(404).json({
         error: 'Venda não encontrada',
         message: 'A venda solicitada não foi encontrada',
-      });
-    }
-
-    if (sale.fiscalDocuments.length > 0) {
-      return res.status(409).json({
-        error: 'Venda possui documento fiscal',
-        message: 'Vendas com historico fiscal nao podem ser excluidas. Cancele a NFC-e quando aplicavel e preserve o registro para auditoria.',
       });
     }
 
@@ -755,47 +1049,21 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
 
     console.log('🗑️ [DEBUG] Iniciando exclusão em transação...');
 
-    // Excluir venda e itens relacionados em uma transação. Uma venda paga já
-    // retirou as peças da loja em processSalePayment; portanto, desfazemos
-    // exatamente essa baixa antes de remover o registro.
+    // Excluir venda e itens relacionados em uma transação
     await prisma.$transaction(async (tx) => {
-      if (sale.status === 'PAID') {
-        for (const item of sale.items) {
-          // Itens adicionados manualmente no PDV não pertencem ao catálogo e
-          // nunca alteram estoque. Também toleramos vendas antigas sem produto.
-          if (!item.affectsStock || !item.productId) continue;
-
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: item.quantity },
-              stockLoja: { increment: item.quantity },
-            },
-          });
-
-          await tx.stockMovement.create({
-            data: {
-              productId: item.productId,
-              type: 'RETURN',
-              quantity: item.quantity,
-              reason: `Estorno por exclusão da venda ${sale.id}`,
-              reference: sale.id,
-              location: 'LOJA',
-              userId: sale.sellerId,
-            },
-          });
-        }
-      }
-
       // 1. Excluir itens da venda
       console.log('🗑️ [DEBUG] Excluindo itens da venda...');
       await tx.saleItem.deleteMany({
         where: { saleId: id },
       });
 
-      // 2. Mantemos as movimentações de saída e de estorno para auditoria.
-      // A referência aponta para a venda excluída, mas não há vínculo físico
-      // obrigatório e o histórico de estoque continua íntegro.
+      // 2. Excluir movimentações de estoque relacionadas
+      console.log('🗑️ [DEBUG] Excluindo movimentações de estoque...');
+      await tx.stockMovement.deleteMany({
+        where: {
+          reason: { contains: `Venda ${id}` },
+        },
+      });
 
       // 3. Excluir a venda
       console.log('🗑️ [DEBUG] Excluindo venda...');
@@ -854,33 +1122,6 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
  *       404:
  *         description: Venda não encontrada
  */
-// Atualiza somente a identificação do consumidor antes da emissão posterior da NFC-e.
-router.patch('/:id/customer-tax-id', authenticateToken, async (req, res, next) => {
-  try {
-    const customerTaxId = String(req.body?.customerTaxId || '').replace(/\D/g, '');
-    if (customerTaxId && ![11, 14].includes(customerTaxId.length)) {
-      return res.status(400).json({ error: 'CPF/CNPJ inválido', message: 'Informe 11 dígitos para CPF ou 14 para CNPJ' });
-    }
-    const existing = await prisma.sale.findUnique({ where: { id: req.params.id }, include: { fiscalDocuments: { select: { id: true } } } });
-    if (!existing) return res.status(404).json({ error: 'Venda não encontrada' });
-    if (existing.fiscalDocuments.length) {
-      return res.status(409).json({ error: 'Nota já emitida', message: 'Não é possível alterar CPF/CNPJ após criar a nota fiscal' });
-    }
-    const sale = await prisma.sale.update({
-      where: { id: req.params.id },
-      data: {
-        customerTaxId: customerTaxId || null,
-        ...(typeof req.body?.leadName === 'string' && { leadName: req.body.leadName.trim() || null }),
-      },
-      include: { fiscalDocuments: { select: { id: true } } },
-    });
-    return res.json(sale);
-  } catch (error: any) {
-    if (error?.code === 'P2025') return res.status(404).json({ error: 'Venda não encontrada' });
-    return next(error);
-  }
-});
-
 router.patch('/:id/status', authenticateToken, async (req, res, next) => {
   try {
     console.log('🔄 [DEBUG] Atualizando status da venda...');
@@ -961,4 +1202,4 @@ router.patch('/:id/status', authenticateToken, async (req, res, next) => {
   }
 });
 
-export default router;
+export default router; 
