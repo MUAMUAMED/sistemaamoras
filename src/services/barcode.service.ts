@@ -81,7 +81,7 @@ export class BarcodeService {
   /**
    * Gera código de barras EAN-13 baseado no SKU
    */
-  private static generateEAN13(sku: string): string {
+  public static generateEAN13(sku: string): string {
     // Prefixo da empresa (pode ser configurável)
     const companyPrefix = '789'; // 3 dígitos
     

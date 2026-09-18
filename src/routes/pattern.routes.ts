@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { authenticateToken } from '../middleware/auth';
+import { BarcodeService } from '../services/barcode.service';
+import { vectorDatabase } from '../config/vector-database';
+import { indexProductImage } from '../services/product-image-embedding.service';
 
 const router = Router();
 
@@ -77,6 +80,16 @@ class DisjointSet {
   }
 }
 
+async function freePatternCode(tx: Prisma.TransactionClient): Promise<string> {
+  const rows = await tx.pattern.findMany({ select: { code: true } });
+  const used = new Set(rows.map((p) => p.code));
+  for (let num = 1; num < 10000; num++) {
+    const code = String(num).padStart(4, '0');
+    if (!used.has(code)) return code;
+  }
+  throw new Error('Não há códigos disponíveis para novas estampas.');
+}
+
 // ==========================================
 // 1. Listar estampas (ativas por padrão)
 // ==========================================
@@ -115,15 +128,16 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
           select: { products: true }
         },
         products: {
-          take: 4,
+          take: 6,
           where: { active: true },
           select: {
             id: true,
             name: true,
+            barcode: true,
             images: {
               take: 1,
               where: { type: 'ROUPA' },
-              select: { url: true }
+              select: { id: true, url: true }
             }
           }
         }
@@ -297,6 +311,15 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
             .flatMap((prod) => prod.images.map((img) => img.url))
             .filter(Boolean)
             .slice(0, 4),
+          sampleProducts: p.products
+            .map((prod) => ({
+              id: prod.id,
+              name: prod.name || 'Roupa sem nome',
+              barcode: prod.barcode,
+              imageUrl: prod.images[0]?.url || (prod as any).imageUrl || '',
+            }))
+            .filter((sp) => Boolean(sp.imageUrl))
+            .slice(0, 6),
         })),
       });
     }
@@ -306,6 +329,331 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       totalDuplicatesFound: clusters.reduce((acc, c) => acc + c.patterns.length, 0)
     });
   } catch (error) {
+    return next(error);
+  }
+});
+
+// ==========================================
+// 2.5 Buscar as 5 Estampas Mais Parecidas com uma Roupa (pgvector)
+// ==========================================
+router.get('/similar-for-product/:productId', authenticateToken, async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      include: {
+        pattern: true,
+        images: {
+          where: { type: 'ROUPA' },
+          orderBy: { position: 'asc' },
+          take: 3
+        }
+      }
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        error: 'Produto não encontrado',
+        message: 'A peça de roupa solicitada não foi encontrada.'
+      });
+    }
+
+    const currentPatternId = product.patternId || undefined;
+
+    type SimilarPatternResult = {
+      id: string;
+      name: string;
+      code: string;
+      similarity: number;
+      sampleImageUrl?: string;
+      isVectorMatch: boolean;
+    };
+
+    const similarPatterns: SimilarPatternResult[] = [];
+    const seenPatternIds = new Set<string>();
+    if (currentPatternId) seenPatternIds.add(currentPatternId);
+
+    // 1. Tentar busca vetorial via pgvector se houver foto e vectorDatabase disponível
+    try {
+      const db = vectorDatabase();
+      const targetImageId = product.images[0]?.id;
+
+      let targetHasEmbedding = false;
+      if (targetImageId) {
+        const check = await db.$queryRawUnsafe<Array<{ count: bigint }>>(
+          'SELECT COUNT(*)::bigint AS count FROM product_image_embeddings WHERE "productImageId" = $1',
+          targetImageId
+        );
+        targetHasEmbedding = Number(check[0]?.count || 0) > 0;
+
+        if (!targetHasEmbedding && process.env.OPENROUTER_API_KEY) {
+          try {
+            await indexProductImage(product.images[0]);
+            targetHasEmbedding = true;
+          } catch (e: any) {
+            console.warn('Falha ao indexar imagem do produto na hora:', e?.message || e);
+          }
+        }
+      }
+
+      if (targetHasEmbedding && targetImageId) {
+        // Query de similaridade no pgvector (distância de cosseno)
+        const rows = await db.$queryRaw<Array<{
+          patternId: string;
+          patternName: string;
+          patternCode: string;
+          similarity: number;
+        }>>(Prisma.sql`
+          SELECT
+            p."patternId" AS "patternId",
+            pat.name AS "patternName",
+            pat.code AS "patternCode",
+            ROUND((MAX(1 - (pie.embedding <=> target.embedding)) * 100)::numeric, 1)::float AS similarity
+          FROM product_image_embeddings pie
+          INNER JOIN product_images pi ON pi.id = pie."productImageId"
+          INNER JOIN products p ON p.id = pi."productId"
+          INNER JOIN patterns pat ON pat.id = p."patternId"
+          CROSS JOIN (
+            SELECT embedding
+            FROM product_image_embeddings
+            WHERE "productImageId" = ${targetImageId}
+            LIMIT 1
+          ) target
+          WHERE p."patternId" IS NOT NULL
+            ${currentPatternId ? Prisma.sql`AND p."patternId" != ${currentPatternId}` : Prisma.empty}
+            AND pat.active = true
+            AND p.active = true
+          GROUP BY p."patternId", pat.name, pat.code
+          ORDER BY similarity DESC
+          LIMIT 10
+        `);
+
+        for (const row of rows) {
+          if (similarPatterns.length >= 5) break;
+          if (seenPatternIds.has(row.patternId)) continue;
+          seenPatternIds.add(row.patternId);
+
+          const sampleProd = await prisma.product.findFirst({
+            where: { patternId: row.patternId, active: true },
+            include: { images: { take: 1, where: { type: 'ROUPA' } } }
+          });
+
+          similarPatterns.push({
+            id: row.patternId,
+            name: row.patternName,
+            code: row.patternCode,
+            similarity: Math.min(100, Math.max(10, Number(row.similarity))),
+            sampleImageUrl: sampleProd?.images[0]?.url || (sampleProd as any)?.imageUrl || undefined,
+            isVectorMatch: true
+          });
+        }
+      }
+    } catch (vectorErr: any) {
+      console.warn('[SIMILAR-BY-IMAGE] Aviso na busca pgvector:', vectorErr?.message || vectorErr);
+    }
+
+    // 2. Fallback / Complemento: Se retornou menos de 5 estampas, completar com as estampas ativas do catálogo
+    if (similarPatterns.length < 5) {
+      const remainingNeeded = 5 - similarPatterns.length;
+      const additionalPatterns = await prisma.pattern.findMany({
+        where: {
+          active: true,
+          id: { notIn: Array.from(seenPatternIds) }
+        },
+        take: remainingNeeded,
+        orderBy: { products: { _count: 'desc' } },
+        include: {
+          products: {
+            where: { active: true },
+            take: 1,
+            include: { images: { take: 1, where: { type: 'ROUPA' } } }
+          }
+        }
+      });
+
+      for (const p of additionalPatterns) {
+        similarPatterns.push({
+          id: p.id,
+          name: p.name,
+          code: p.code,
+          similarity: 70 - (similarPatterns.length * 5),
+          sampleImageUrl: p.products[0]?.images[0]?.url || (p.products[0] as any)?.imageUrl || undefined,
+          isVectorMatch: false
+        });
+      }
+    }
+
+    return res.json({
+      product: {
+        id: product.id,
+        name: product.name || 'Peça sem nome',
+        barcode: product.barcode,
+        imageUrl: product.images[0]?.url || (product as any).imageUrl || '',
+        pattern: product.pattern ? {
+          id: product.pattern.id,
+          name: product.pattern.name,
+          code: product.pattern.code
+        } : null
+      },
+      similarPatterns: similarPatterns.slice(0, 5)
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ==========================================
+// 2.6 Trocar Estampa de Roupa Individual com Preservação de Código
+// ==========================================
+router.post('/reassign-product', authenticateToken, async (req, res, next) => {
+  try {
+    const { productId, targetPatternId, newPattern } = req.body as {
+      productId?: string;
+      targetPatternId?: string;
+      newPattern?: { name?: string; code?: string };
+    };
+
+    if (!productId) {
+      return res.status(400).json({
+        error: 'Parâmetro obrigatório',
+        message: 'O ID da peça de roupa (productId) é obrigatório.'
+      });
+    }
+
+    if (!targetPatternId && (!newPattern || !newPattern.name?.trim())) {
+      return res.status(400).json({
+        error: 'Estampa de destino obrigatória',
+        message: 'Selecione uma das 5 estampas sugeridas ou informe o nome para criar uma nova estampa.'
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Obter o produto atual com suas relações de código
+      const product = await tx.product.findUnique({
+        where: { id: productId },
+        include: {
+          pattern: true,
+          size: true,
+          category: true,
+          subcategory: true
+        }
+      });
+
+      if (!product) {
+        throw new Error('Peça de roupa não encontrada.');
+      }
+
+      // 2. Obter ou criar a estampa de destino
+      let targetPattern: any = null;
+
+      if (newPattern && newPattern.name?.trim()) {
+        const cleanName = newPattern.name.trim();
+        const existingByName = await tx.pattern.findFirst({
+          where: { name: cleanName, active: true }
+        });
+
+        if (existingByName) {
+          targetPattern = existingByName;
+        } else {
+          let codeToUse = newPattern.code?.trim();
+          if (!codeToUse || !/^\d{1,4}$/.test(codeToUse)) {
+            codeToUse = await freePatternCode(tx);
+          } else {
+            codeToUse = codeToUse.padStart(4, '0');
+            const codeTaken = await tx.pattern.findUnique({ where: { code: codeToUse } });
+            if (codeTaken) {
+              codeToUse = await freePatternCode(tx);
+            }
+          }
+
+          targetPattern = await tx.pattern.create({
+            data: {
+              name: cleanName,
+              code: codeToUse,
+              active: true
+            }
+          });
+        }
+      } else if (targetPatternId) {
+        targetPattern = await tx.pattern.findUnique({
+          where: { id: targetPatternId }
+        });
+
+        if (!targetPattern) {
+          throw new Error('Estampa de destino não encontrada.');
+        }
+      }
+
+      if (product.patternId === targetPattern.id) {
+        throw new Error(`A roupa já está vinculada à estampa "${targetPattern.name}".`);
+      }
+
+      // 3. PRESERVAR O CÓDIGO ANTIGO:
+      // Salvar tanto o código de barras atual quanto o SKU anterior em product_barcode_aliases
+      // Isso assegura que ao bipar a etiqueta impressa anterior no caixa, o produto é lido normalmente!
+      if (product.barcode) {
+        await tx.productBarcodeAlias.upsert({
+          where: { barcode: product.barcode },
+          create: {
+            barcode: product.barcode,
+            productId: product.id,
+          },
+          update: {
+            productId: product.id,
+          }
+        });
+      }
+
+      // 4. Gerar novos códigos com a nova estampa
+      let newBarcode = product.barcode;
+      let newQrcodeUrl = product.qrcodeUrl;
+
+      try {
+        if (product.sizeId && product.categoryId) {
+          const generated = await BarcodeService.generateProductCodes({
+            sizeId: product.sizeId,
+            categoryId: product.categoryId,
+            subcategoryId: product.subcategoryId || undefined,
+            patternId: targetPattern.id
+          });
+          newBarcode = generated.barcode;
+          newQrcodeUrl = generated.qrcodeUrl;
+        } else if (product.barcode && product.barcode.length >= 10) {
+          const prefix = product.barcode.slice(0, product.barcode.length - 4);
+          newBarcode = `${prefix}${targetPattern.code.padStart(4, '0')}`;
+        }
+      } catch (codeErr: any) {
+        console.warn('Erro ao recalcular novos códigos da peça:', codeErr?.message || codeErr);
+      }
+
+      // 5. Atualizar o produto com a nova estampa e novos códigos
+      const updatedProduct = await tx.product.update({
+        where: { id: product.id },
+        data: {
+          patternId: targetPattern.id,
+          barcode: newBarcode,
+          qrcodeUrl: newQrcodeUrl,
+        },
+        include: {
+          pattern: true
+        }
+      });
+
+      return {
+        product: updatedProduct,
+        oldBarcode: product.barcode,
+        oldPattern: product.pattern,
+        targetPattern
+      };
+    });
+
+    return res.json({
+      success: true,
+      message: `Roupa transferida para a estampa "${result.targetPattern.name}" com sucesso! O código antigo (${result.oldBarcode || 'etiqueta'}) continuará funcionando normalmente no leitor do caixa.`,
+      data: result
+    });
+  } catch (error: any) {
     return next(error);
   }
 });
