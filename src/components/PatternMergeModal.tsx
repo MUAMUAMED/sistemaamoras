@@ -6,6 +6,7 @@ import {
   Crown,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   ArrowRight,
   Search,
   History,
@@ -180,6 +181,7 @@ function ReassignProductModal({
 }: ReassignProductModalProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [newPatternName, setNewPatternName] = useState('');
+  const [modalPreview, setModalPreview] = useState<{ url: string; name: string; subtitle?: string } | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -266,13 +268,25 @@ function ReassignProductModal({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5">
           {/* Card da Peça Selecionada */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="w-20 h-20 rounded-2xl bg-white border border-gray-200 overflow-hidden shrink-0 shadow-sm relative group">
+            <button
+              type="button"
+              onClick={() => product.imageUrl && setModalPreview({
+                url: product.imageUrl,
+                name: product.productName,
+                subtitle: product.productBarcode ? `Etiqueta #${product.productBarcode}` : undefined,
+              })}
+              title="Clique para ampliar a foto"
+              className="w-20 h-20 rounded-2xl bg-white border border-gray-200 overflow-hidden shrink-0 shadow-sm relative group cursor-pointer"
+            >
               <img
                 src={getProductCardImageUrl(product.imageUrl) || getImageUrl(product.imageUrl)}
                 alt={product.productName}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
               />
-            </div>
+              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <Search className="w-5 h-5 text-white drop-shadow-md" />
+              </div>
+            </button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded-md">
@@ -315,7 +329,7 @@ function ReassignProductModal({
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-purple-600" />
                 <h4 className="font-bold text-gray-900 text-sm">
-                  Top 5 Estampas Mais Parecidas (Detectadas por IA)
+                  Top 5 Estampas (pgvector IA)
                 </h4>
               </div>
               <button
@@ -335,7 +349,7 @@ function ReassignProductModal({
                   Pesquisando no banco vetorial (pgvector)...
                 </p>
                 <p className="text-xs text-gray-400 mt-1">
-                  Comparando as fotos para encontrar as 5 estampas visualmente mais próximas.
+                  Comparando as fotos por similaridade visual de cosseno (768 dimensões).
                 </p>
               </div>
             ) : error ? (
@@ -350,72 +364,107 @@ function ReassignProductModal({
                 </button>
               </div>
             ) : similarData?.similarPatterns && similarData.similarPatterns.length > 0 ? (
-              <div className="space-y-2.5">
-                {similarData.similarPatterns.map((candidate, idx) => (
-                  <div
-                    key={candidate.id}
-                    className="p-3 bg-white hover:bg-purple-50/50 border border-gray-200 hover:border-purple-300 rounded-2xl flex items-center justify-between gap-3 transition-all shadow-2xs group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-2xs">
-                        {candidate.sampleImageUrl ? (
-                          <img
-                            src={getProductCardImageUrl(candidate.sampleImageUrl) || getImageUrl(candidate.sampleImageUrl)}
-                            alt={candidate.name}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-gray-300">
-                            <ImageIcon className="w-5 h-5" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <h5 className="font-bold text-gray-900 text-sm truncate">
-                            {candidate.name}
-                          </h5>
-                          <span className="text-[11px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-semibold">
-                            #{candidate.code}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                              candidate.similarity >= 80
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : candidate.similarity >= 60
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }`}
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            {Math.round(candidate.similarity)}% similaridade
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={reassignMutation.isPending}
-                      onClick={() => handleSelectPattern(candidate.id)}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      {reassignMutation.isPending ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Check className="w-3.5 h-3.5" />
-                      )}
-                      <span>Vincular</span>
-                    </button>
+              <div className="space-y-3">
+                {/* Banner de status do pgvector */}
+                {similarData.similarPatterns.some((c) => c.isVectorMatch) ? (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-semibold">
+                      Estampa(s) com correspondência visual direta encontrada(s) no pgvector:
+                    </span>
                   </div>
-                ))}
+                ) : (
+                  <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Nenhuma estampa visualmente semelhante identificada (&gt;40%)</p>
+                      <p className="text-amber-700 text-[11px] mt-0.5 leading-relaxed">
+                        O modelo vetorial analisou as cores e traços da foto, mas nenhuma estampa cadastrada atingiu a similaridade mínima (&gt;40%). As opções abaixo são sugestões do catálogo ativo. Se nenhuma corresponder, crie uma estampa nova abaixo.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2.5">
+                  {similarData.similarPatterns.map((candidate, idx) => (
+                    <div
+                      key={candidate.id}
+                      className="p-3 bg-white hover:bg-purple-50/50 border border-gray-200 hover:border-purple-300 rounded-2xl flex items-center justify-between gap-3 transition-all shadow-2xs group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => candidate.sampleImageUrl && setModalPreview({
+                            url: candidate.sampleImageUrl,
+                            name: candidate.name,
+                            subtitle: `#${candidate.code}`,
+                          })}
+                          title="Clique para ampliar a estampa"
+                          className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-2xs relative group/img cursor-pointer"
+                        >
+                          {candidate.sampleImageUrl ? (
+                            <>
+                              <img
+                                src={getProductCardImageUrl(candidate.sampleImageUrl) || getImageUrl(candidate.sampleImageUrl)}
+                                alt={candidate.name}
+                                loading="lazy"
+                                decoding="async"
+                                className="w-full h-full object-cover group-hover/img:scale-110 transition-transform"
+                              />
+                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                <Search className="w-4 h-4 text-white drop-shadow-sm" />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-300">
+                              <ImageIcon className="w-5 h-5" />
+                            </div>
+                          )}
+                        </button>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <h5 className="font-bold text-gray-900 text-sm truncate">
+                              {candidate.name}
+                            </h5>
+                            <span className="text-[11px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-semibold">
+                              #{candidate.code}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {candidate.isVectorMatch ? (
+                              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <Sparkles className="w-3 h-3 text-emerald-600" />
+                                {Math.round(candidate.similarity)}% similaridade visual IA
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1 bg-gray-100 text-gray-600 border border-gray-200">
+                                <Tag className="w-3 h-3 text-gray-500" />
+                                Sugestão do catálogo
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={reassignMutation.isPending}
+                        onClick={() => handleSelectPattern(candidate.id)}
+                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {reassignMutation.isPending ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        <span>Vincular</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-500 text-center">
@@ -517,6 +566,42 @@ function ReassignProductModal({
           </button>
         </div>
       </div>
+
+      {/* Popup de Visualização da Foto em Alta Resolução */}
+      {modalPreview && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setModalPreview(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-gray-200 flex flex-col animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-3.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-gray-900 text-sm">{modalPreview.name}</h4>
+                {modalPreview.subtitle && (
+                  <p className="text-xs text-gray-500 font-mono">{modalPreview.subtitle}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalPreview(null)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-200 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3 bg-gray-950 flex items-center justify-center max-h-[70vh]">
+              <img
+                src={getProductCardImageUrl(modalPreview.url) || getImageUrl(modalPreview.url)}
+                alt={modalPreview.name}
+                className="max-h-[65vh] w-auto object-contain rounded-xl shadow-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

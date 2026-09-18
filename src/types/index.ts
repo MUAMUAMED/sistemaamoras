@@ -128,6 +128,7 @@ export interface SimilarPatternsResponse {
     } | null;
   };
   similarPatterns: SimilarPatternItem[];
+  hasVectorMatches?: boolean;
 }
 
 export interface ReassignProductPayload {
