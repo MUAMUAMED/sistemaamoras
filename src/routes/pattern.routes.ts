@@ -4,7 +4,13 @@ import { prisma } from '../config/database';
 import { authenticateToken } from '../middleware/auth';
 import { BarcodeService } from '../services/barcode.service';
 import { vectorDatabase } from '../config/vector-database';
-import { indexProductImage } from '../services/product-image-embedding.service';
+import { vectorLiteral } from '../services/image-embedding.service';
+import {
+  ensureVisualSearchSetup,
+  getOrIndexImageVector,
+  autoIndexCatalogImages,
+  indexProductImage,
+} from '../services/product-image-embedding.service';
 
 const router = Router();
 
@@ -376,58 +382,75 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
 
     // 1. Tentar busca vetorial via pgvector se houver foto e vectorDatabase disponível
     try {
+      await ensureVisualSearchSetup();
       const db = vectorDatabase();
-      const targetImageId = product.images[0]?.id;
 
-      let targetHasEmbedding = false;
-      if (targetImageId) {
-        const check = await db.$queryRawUnsafe<Array<{ count: bigint }>>(
-          'SELECT COUNT(*)::bigint AS count FROM product_image_embeddings WHERE "productImageId" = $1',
-          targetImageId
+      // Verificar quantidade de embeddings no banco
+      let totalEmbeddings = 0;
+      try {
+        const countRes = await db.$queryRawUnsafe<Array<{ count: bigint }>>(
+          'SELECT COUNT(*)::bigint AS count FROM product_image_embeddings'
         );
-        targetHasEmbedding = Number(check[0]?.count || 0) > 0;
-
-        if (!targetHasEmbedding && process.env.OPENROUTER_API_KEY) {
-          try {
-            await indexProductImage(product.images[0]);
-            targetHasEmbedding = true;
-          } catch (e: any) {
-            console.warn('Falha ao indexar imagem do produto na hora:', e?.message || e);
-          }
-        }
+        totalEmbeddings = Number(countRes[0]?.count || 0);
+      } catch (err) {
+        console.warn('[SIMILAR-BY-IMAGE] Erro ao checar count de embeddings:', err);
       }
 
-      if (targetHasEmbedding && targetImageId) {
-        // Query de similaridade no pgvector (distância de cosseno)
-        const rows = await db.$queryRaw<Array<{
+      // Se tiver menos de 10 embeddings indexados no sistema inteiro, indexa uma amostragem síncrona
+      if (totalEmbeddings < 10 && process.env.OPENROUTER_API_KEY) {
+        try {
+          console.log('[SIMILAR-BY-IMAGE] Poucos embeddings no pgvector. Executando auto-indexação inicial...');
+          await autoIndexCatalogImages(15);
+        } catch (e: any) {
+          console.warn('[SIMILAR-BY-IMAGE] Aviso na auto-indexação inicial:', e?.message || e);
+        }
+      } else if (totalEmbeddings < 50 && process.env.OPENROUTER_API_KEY) {
+        // Dispara indexação em segundo plano para ir enriquecendo o catálogo vetorial
+        autoIndexCatalogImages(40).catch(() => {});
+      }
+
+      // Obter ou gerar vetor para a foto do produto
+      const targetImage = product.images[0] || (product as any).imageUrl ? {
+        id: product.images[0]?.id || `temp-${product.id}`,
+        url: product.images[0]?.url || (product as any).imageUrl,
+        mimeType: product.images[0]?.mimeType || 'image/jpeg',
+        data: (product.images[0] as any)?.data || null,
+      } : null;
+
+      let targetVector: number[] | null = null;
+      if (targetImage) {
+        targetVector = await getOrIndexImageVector(targetImage);
+      }
+
+      if (targetVector) {
+        // Query de similaridade no pgvector (distância de cosseno 1 - (embedding <=> $1::vector))
+        const rows = await db.$queryRawUnsafe<Array<{
           patternId: string;
           patternName: string;
           patternCode: string;
           similarity: number;
-        }>>(Prisma.sql`
-          SELECT
+        }>>(
+          `SELECT
             p."patternId" AS "patternId",
             pat.name AS "patternName",
             pat.code AS "patternCode",
-            ROUND((MAX(1 - (pie.embedding <=> target.embedding)) * 100)::numeric, 1)::float AS similarity
+            ROUND((MAX(1 - (pie.embedding <=> $1::vector)) * 100)::numeric, 1)::float AS similarity
           FROM product_image_embeddings pie
           INNER JOIN product_images pi ON pi.id = pie."productImageId"
           INNER JOIN products p ON p.id = pi."productId"
           INNER JOIN patterns pat ON pat.id = p."patternId"
-          CROSS JOIN (
-            SELECT embedding
-            FROM product_image_embeddings
-            WHERE "productImageId" = ${targetImageId}
-            LIMIT 1
-          ) target
           WHERE p."patternId" IS NOT NULL
-            ${currentPatternId ? Prisma.sql`AND p."patternId" != ${currentPatternId}` : Prisma.empty}
+            AND pie."productImageId" != $2
+            ${currentPatternId ? `AND p."patternId" != '${currentPatternId.replace(/'/g, "''")}'` : ''}
             AND pat.active = true
             AND p.active = true
           GROUP BY p."patternId", pat.name, pat.code
+          HAVING MAX(1 - (pie.embedding <=> $1::vector)) >= 0.40
           ORDER BY similarity DESC
-          LIMIT 10
-        `);
+          LIMIT 10`,
+          vectorLiteral(targetVector),
+          targetImage?.id || ''
+        );
 
         for (const row of rows) {
           if (similarPatterns.length >= 5) break;
@@ -436,7 +459,7 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
 
           const sampleProd = await prisma.product.findFirst({
             where: { patternId: row.patternId, active: true },
-            include: { images: { take: 1, where: { type: 'ROUPA' } } }
+            include: { images: { take: 1, where: { type: 'ROUPA' } } },
           });
 
           similarPatterns.push({
@@ -445,7 +468,7 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
             code: row.patternCode,
             similarity: Math.min(100, Math.max(10, Number(row.similarity))),
             sampleImageUrl: sampleProd?.images[0]?.url || (sampleProd as any)?.imageUrl || undefined,
-            isVectorMatch: true
+            isVectorMatch: true,
           });
         }
       }
@@ -453,13 +476,15 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
       console.warn('[SIMILAR-BY-IMAGE] Aviso na busca pgvector:', vectorErr?.message || vectorErr);
     }
 
+    const hasVectorMatches = similarPatterns.length > 0;
+
     // 2. Fallback / Complemento: Se retornou menos de 5 estampas, completar com as estampas ativas do catálogo
     if (similarPatterns.length < 5) {
       const remainingNeeded = 5 - similarPatterns.length;
       const additionalPatterns = await prisma.pattern.findMany({
         where: {
           active: true,
-          id: { notIn: Array.from(seenPatternIds) }
+          id: { notIn: Array.from(seenPatternIds) },
         },
         take: remainingNeeded,
         orderBy: { products: { _count: 'desc' } },
@@ -467,9 +492,9 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
           products: {
             where: { active: true },
             take: 1,
-            include: { images: { take: 1, where: { type: 'ROUPA' } } }
-          }
-        }
+            include: { images: { take: 1, where: { type: 'ROUPA' } } },
+          },
+        },
       });
 
       for (const p of additionalPatterns) {
@@ -477,9 +502,9 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
           id: p.id,
           name: p.name,
           code: p.code,
-          similarity: 70 - (similarPatterns.length * 5),
+          similarity: 0,
           sampleImageUrl: p.products[0]?.images[0]?.url || (p.products[0] as any)?.imageUrl || undefined,
-          isVectorMatch: false
+          isVectorMatch: false,
         });
       }
     }
@@ -493,10 +518,27 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
         pattern: product.pattern ? {
           id: product.pattern.id,
           name: product.pattern.name,
-          code: product.pattern.code
-        } : null
+          code: product.pattern.code,
+        } : null,
       },
-      similarPatterns: similarPatterns.slice(0, 5)
+      similarPatterns: similarPatterns.slice(0, 5),
+      hasVectorMatches,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ==========================================
+// 2.5.1 Endpoint para disparar re-indexação visual em lote (pgvector)
+// ==========================================
+router.post('/reindex-visual-search', authenticateToken, async (req, res, next) => {
+  try {
+    const limit = Math.min(150, Math.max(10, Number(req.query.limit || 50)));
+    const count = await autoIndexCatalogImages(limit);
+    return res.json({
+      message: `${count} novas imagens indexadas no pgvector com sucesso.`,
+      indexed: count,
     });
   } catch (error) {
     return next(error);

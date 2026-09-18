@@ -38,6 +38,9 @@ import productionRoutes from "./routes/production.routes";
 // Pagamento
 import paymentGatewayRoutes from "./routes/payment-gateway.service";
 
+// Busca visual e pgvector
+import { ensureVisualSearchSetup, autoIndexCatalogImages } from "./services/product-image-embedding.service";
+
 // Middlewares
 import { errorHandler } from "./middleware/errorHandler";
 import { notFoundHandler } from "./middleware/notFoundHandler";
@@ -449,6 +452,20 @@ async function startServer() {
     logger.info("Conexão com banco de dados estabelecida");
 
     logger.info("🤖 Automações programadas inicializadas");
+
+    // Inicialização da busca visual com pgvector
+    ensureVisualSearchSetup()
+      .then(async () => {
+        logger.info("⚡ PGVector e tabela de embeddings verificados com sucesso.");
+        if (process.env.OPENROUTER_API_KEY) {
+          autoIndexCatalogImages(50).catch((err) => {
+            logger.warn("Auto-indexação pgvector em segundo plano:", err?.message || err);
+          });
+        }
+      })
+      .catch((err) => {
+        logger.warn("Aviso na inicialização do pgvector:", err?.message || err);
+      });
 
     app.listen(PORT, '0.0.0.0', () => {
       logger.info(`🚀 Servidor rodando na porta ${PORT}`);

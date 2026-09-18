@@ -4,7 +4,7 @@ import path from 'path';
 const MODEL = process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2';
 export const IMAGE_EMBEDDING_DIMENSIONS = 768;
 
-type ImageInput = { path?: string; data?: Buffer; mimeType: string };
+export type ImageInput = { path?: string; data?: Buffer; url?: string; mimeType: string };
 
 function configuredError(message: string): Error {
   return new Error(`Busca visual não configurada: ${message}`);
@@ -22,7 +22,22 @@ export async function embedImages(inputs: ImageInput[]): Promise<number[]> {
   if (!apiKey) throw configuredError('defina OPENROUTER_API_KEY no backend.');
   if (!inputs.length || inputs.length > 6) throw new Error('Envie entre uma e seis imagens para a busca visual.');
   const content = await Promise.all(inputs.map(async (input) => {
-    const data = input.data || (input.path ? await readFile(input.path) : null);
+    let data = input.data || (input.path ? await readFile(input.path).catch(() => null) : null);
+    if (!data && input.url) {
+      try {
+        let fetchUrl = input.url;
+        if (fetchUrl.startsWith('/')) {
+          const apiBase = process.env.REACT_APP_API_URL || process.env.API_URL || 'https://amorasbackenddd.zeabur.app';
+          fetchUrl = `${apiBase.replace(/\/api\/?$/, '')}${fetchUrl}`;
+        }
+        const res = await fetch(fetchUrl);
+        if (res.ok) {
+          data = Buffer.from(await res.arrayBuffer());
+        }
+      } catch (e: any) {
+        console.warn('[EMBED] Falha ao baixar imagem por URL:', e?.message || e);
+      }
+    }
     if (!data) throw new Error('Não foi possível ler a foto para a busca visual.');
     return { type: 'image_url', image_url: { url: `data:${normalizeMimeType(input.mimeType)};base64,${data.toString('base64')}` } };
   }));
