@@ -162,6 +162,87 @@ router.get('/diagnostic-status', async (req, res) => {
 });
 
 // ==========================================
+// 1.2 Teste direto de busca por código de barras
+// ==========================================
+router.get('/test-search/:barcode', async (req, res) => {
+  try {
+    const { barcode } = req.params;
+    const product = await prisma.product.findFirst({
+      where: {
+        OR: [
+          { barcode },
+          { barcodeAliases: { some: { barcode } } },
+        ],
+      },
+      include: {
+        pattern: true,
+        images: {
+          orderBy: { position: 'asc' },
+          take: 3,
+        },
+      },
+    });
+
+    if (!product) return res.status(404).json({ error: 'Produto não encontrado para barcode ' + barcode });
+
+    const targetImage = product.images[0] || (product as any).imageUrl ? {
+      id: product.images[0]?.id || `temp-${product.id}`,
+      url: product.images[0]?.url || (product as any).imageUrl,
+      mimeType: product.images[0]?.mimeType || 'image/jpeg',
+      data: (product.images[0] as any)?.data || null,
+    } : null;
+
+    if (!targetImage) return res.status(400).json({ error: 'Produto não possui imagem' });
+
+    const vector = await getOrIndexImageVector(targetImage);
+    if (!vector) return res.status(500).json({ error: 'Falha ao gerar vetor' });
+
+    const db = vectorDatabase();
+    const rawRows = await db.$queryRawUnsafe<Array<{ productImageId: string; score: number }>>(
+      'SELECT "productImageId", (1 - (embedding <=> $1::vector))::float AS score FROM product_image_embeddings WHERE "productImageId" != $2 ORDER BY embedding <=> $1::vector LIMIT 20',
+      vectorLiteral(vector),
+      targetImage.id
+    );
+
+    const matchedImages = await (prisma as any).productImage.findMany({
+      where: {
+        id: { in: rawRows.map((r) => r.productImageId) },
+        product: { active: true, pattern: { active: true } },
+      },
+      select: {
+        id: true,
+        url: true,
+        product: {
+          select: {
+            id: true,
+            name: true,
+            pattern: {
+              select: { id: true, name: true, code: true },
+            },
+          },
+        },
+      },
+    });
+
+    return res.json({
+      product: { id: product.id, name: product.name, pattern: product.pattern },
+      targetImageId: targetImage.id,
+      targetImageUrl: targetImage.url,
+      rawRowsCount: rawRows.length,
+      topScores: rawRows.slice(0, 5),
+      matchedImagesCount: matchedImages.length,
+      sampleMatches: matchedImages.slice(0, 5).map((img: any) => ({
+        id: img.id,
+        name: img.product?.name,
+        pattern: img.product?.pattern,
+      })),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// ==========================================
 // 2. Detecção e Agrupamento de Estampas Semelhantes (Clusters)
 // ==========================================
 router.get('/clusters', authenticateToken, async (req, res, next) => {
@@ -463,53 +544,82 @@ router.get('/similar-for-product/:productId', authenticateToken, async (req, res
       }
 
       if (targetVector) {
-        // Query de similaridade no pgvector (distância de cosseno 1 - (embedding <=> $1::vector))
-        const rows = await db.$queryRawUnsafe<Array<{
-          patternId: string;
-          patternName: string;
-          patternCode: string;
-          similarity: number;
-        }>>(
-          `SELECT
-            p."patternId" AS "patternId",
-            pat.name AS "patternName",
-            pat.code AS "patternCode",
-            ROUND((MAX(1 - (pie.embedding <=> $1::vector)) * 100)::numeric, 1)::float AS similarity
-          FROM product_image_embeddings pie
-          INNER JOIN product_images pi ON pi.id = pie."productImageId"
-          INNER JOIN products p ON p.id = pi."productId"
-          INNER JOIN patterns pat ON pat.id = p."patternId"
-          WHERE p."patternId" IS NOT NULL
-            AND pie."productImageId" != $2
-            ${currentPatternId ? `AND p."patternId" != '${currentPatternId.replace(/'/g, "''")}'` : ''}
-            AND pat.active = true
-            AND p.active = true
-          GROUP BY p."patternId", pat.name, pat.code
-          HAVING MAX(1 - (pie.embedding <=> $1::vector)) >= 0.40
-          ORDER BY similarity DESC
-          LIMIT 10`,
+        // 1. Busca os vizinhos mais próximos no pgvector exatamente como no app mobile
+        const rows = await db.$queryRawUnsafe<Array<{ productImageId: string; score: number }>>(
+          'SELECT "productImageId", (1 - (embedding <=> $1::vector))::float AS score FROM product_image_embeddings WHERE "productImageId" != $2 ORDER BY embedding <=> $1::vector LIMIT 100',
           vectorLiteral(targetVector),
           targetImage?.id || ''
         );
 
-        for (const row of rows) {
-          if (similarPatterns.length >= 5) break;
-          if (seenPatternIds.has(row.patternId)) continue;
-          seenPatternIds.add(row.patternId);
+        const scores = new Map<string, number>(
+          rows
+            .map((r): [string, number] => [r.productImageId, Number(r.score)])
+            .filter((entry) => Number.isFinite(entry[1]))
+        );
 
-          const sampleProd = await prisma.product.findFirst({
-            where: { patternId: row.patternId, active: true },
-            include: { images: { take: 1, where: { type: 'ROUPA' } } },
+        if (scores.size > 0) {
+          // 2. Busca os produtos e estampas associados via Prisma (sem depender de joins SQL)
+          const matchedImages = await (prisma as any).productImage.findMany({
+            where: {
+              id: { in: [...scores.keys()] },
+              product: {
+                active: true,
+                patternId: { not: null },
+                pattern: { active: true },
+              },
+            },
+            select: {
+              id: true,
+              url: true,
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  patternId: true,
+                  pattern: { select: { id: true, name: true, code: true } },
+                },
+              },
+            },
           });
 
-          similarPatterns.push({
-            id: row.patternId,
-            name: row.patternName,
-            code: row.patternCode,
-            similarity: Math.min(100, Math.max(10, Number(row.similarity))),
-            sampleImageUrl: sampleProd?.images[0]?.url || (sampleProd as any)?.imageUrl || undefined,
-            isVectorMatch: true,
-          });
+          // 3. Agrupa por estampa mantendo a maior pontuação de proximidade visual
+          const byPattern = new Map<string, { pattern: any; score: number; sampleImageUrl: string }>();
+          for (const img of matchedImages as Array<any>) {
+            const pattern = img.product?.pattern;
+            const score = scores.get(img.id);
+            if (!pattern || score === undefined) continue;
+            if (currentPatternId && pattern.id === currentPatternId) continue;
+            if (seenPatternIds.has(pattern.id)) continue;
+
+            const existing = byPattern.get(pattern.id);
+            if (!existing || existing.score < score) {
+              byPattern.set(pattern.id, {
+                pattern,
+                score,
+                sampleImageUrl: img.url,
+              });
+            }
+          }
+
+          // 4. Ordena pelas maiores pontuações e pega o Top 5
+          const sortedMatches = [...byPattern.values()]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5);
+
+          for (const match of sortedMatches) {
+            seenPatternIds.add(match.pattern.id);
+            const rawScore = Math.max(0, Math.min(1, match.score));
+            const percentage = Math.round(rawScore * 1000) / 10;
+
+            similarPatterns.push({
+              id: match.pattern.id,
+              name: match.pattern.name,
+              code: match.pattern.code,
+              similarity: percentage,
+              sampleImageUrl: match.sampleImageUrl,
+              isVectorMatch: true,
+            });
+          }
         }
       }
     } catch (vectorErr: any) {
