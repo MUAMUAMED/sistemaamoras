@@ -16,39 +16,50 @@ services:
     networks:
       - amoras-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d amoras_capital"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   # Backend API
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: amoras-backend
     environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/amoras_capital
-      JWT_SECRET: sua_chave_jwt_super_secreta_aqui
-      JWT_EXPIRES_IN: 7d
-      PORT: 3001
-      CORS_ORIGIN: http://localhost:3000
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres123@postgres:5432/amoras_capital}
+      JWT_SECRET: ${JWT_SECRET:-sua_chave_jwt_super_secreta_aqui}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      PORT: ${PORT:-3001}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      APP_URL: ${APP_URL:-http://localhost:3001}
     ports:
       - "3001:3001"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - amoras-network
     restart: unless-stopped
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
 
   # Frontend React
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-/api}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     container_name: amoras-frontend
     ports:
-      - "3000:3000"
+      - "3000:8080"
     depends_on:
       - backend
     networks:
