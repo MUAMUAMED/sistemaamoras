@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, EyeIcon, CreditCardIcon, QrCodeIcon, TrashIcon, DocumentTextIcon, ChartBarIcon } from '@heroicons/react/24/outline';
-import { saleService, productService } from '../services/api';
+import { saleService, productService, fiscalApi } from '../services/api';
 import { Sale, Product } from '../types';
 import toast from 'react-hot-toast';
 import BarcodeScanner from '../components/BarcodeScanner';
 import ProductSelector from '../components/ProductSelector';
+import { productDisplayName } from '../utils/productDisplayName';
+import { getProductCardImageUrl } from '../utils/imageUrl';
 
 export default function Sales() {
   const location = useLocation();
@@ -17,6 +19,8 @@ export default function Sales() {
   const [statusFilter, setStatusFilter] = useState('');
   const [showScanner, setShowScanner] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
+  const [saleForInvoice, setSaleForInvoice] = useState<Sale | null>(null);
+  const [invoiceTaxId, setInvoiceTaxId] = useState('');
   
   // Estados para nova venda
   const [newSale, setNewSale] = useState({
@@ -76,16 +80,23 @@ export default function Sales() {
   });
 
   const issueNfceMutation = useMutation({
-    mutationFn: (sale: Sale) => saleService.issueNfce(sale.id),
-    onSuccess: (document, sale) => {
+    mutationFn: async ({ sale, customerTaxId }: { sale: Sale; customerTaxId?: string }) => {
+      if (customerTaxId !== undefined) await saleService.updateCustomerTaxId(sale.id, { customerTaxId, leadName: sale.leadName });
+      return fiscalApi.issueNfce(sale.id);
+    },
+    onSuccess: (document, variables) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      const state = document.status === 'AUTHORIZED' ? 'emitida' : 'enviada para processamento';
-      toast.success(`NFC-e da venda #${sale.saleNumber} ${state} (nº ${document.number}).`);
+      toast.success(document.status === 'AUTHORIZED' ? `NFC-e ${document.series}/${document.number} emitida` : 'NFC-e enviada para processamento');
+      setSaleForInvoice(null);
+      setInvoiceTaxId('');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Não foi possível emitir a nota fiscal desta venda.');
-    },
+    onError: (error: any) => toast.error(error.response?.data?.message || 'Não foi possível emitir a nota fiscal'),
   });
+
+  const beginInvoice = (sale: Sale) => {
+    setSaleForInvoice(sale);
+    setInvoiceTaxId(sale.customerTaxId || '');
+  };
 
   const sales = salesData?.data || [];
 
@@ -203,16 +214,6 @@ export default function Sales() {
     }
   };
 
-  const handleIssueNfce = (sale: Sale) => {
-    if (sale.status !== 'PAID') {
-      toast.error('A nota fiscal só pode ser emitida após o pagamento da venda.');
-      return;
-    }
-    if (window.confirm(`Emitir a NFC-e da venda #${sale.saleNumber}? A nota será vinculada a esta venda e não criará uma nova cobrança.`)) {
-      issueNfceMutation.mutate(sale);
-    }
-  };
-
   const handleCreateSale = () => {
     console.log('🛒 [FRONTEND] Iniciando criação de venda...');
     console.log('🛒 [FRONTEND] Dados do formulário:', newSale);
@@ -271,7 +272,7 @@ export default function Sales() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Vendas</h1>
           <p className="text-gray-600">Gerencie suas vendas e faturamento</p>
@@ -286,7 +287,7 @@ export default function Sales() {
           </Link>
           <button
             onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center space-x-2 text-xs sm:text-sm px-3.5 py-2 sm:px-4 sm:py-2.5"
+            className="btn-primary flex items-center space-x-2"
           >
             <PlusIcon className="h-5 w-5" />
             <span>Nova Venda</span>
@@ -328,109 +329,58 @@ export default function Sales() {
         </div>
       </div>
 
-      {/* Lista de vendas */}
-      <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Número
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Cliente
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Pagamento
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sales?.map((sale: Sale) => (
-                <tr key={sale.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                    #{sale.saleNumber}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {sale.leadName || sale.lead?.name || 'Cliente não informado'}
-                    </div>
-                    {(sale.leadPhone || sale.lead?.phone) && (
-                      <div className="text-xs text-gray-500">
-                        {sale.leadPhone || sale.lead?.phone}
+      {/* Lista de vendas — cartões evitam rolagem horizontal e deixam as ações acessíveis. */}
+      <div className="grid gap-3">
+        {sales.map((sale: Sale) => (
+          <article key={sale.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem]">
+              <div className="p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2"><span className="font-mono text-sm font-semibold text-gray-900">#{sale.saleNumber}</span><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStatusColor(sale.status)}`}>{getStatusLabel(sale.status)}</span></div>
+                <p className="mt-2 truncate font-medium text-gray-900">{sale.leadName || sale.lead?.name || 'Cliente não informado'}</p>
+                {(sale.leadPhone || sale.lead?.phone) && <p className="text-sm text-gray-500">{sale.leadPhone || sale.lead?.phone}</p>}
+              </div>
+              <div className="sm:text-right"><p className="text-xl font-bold text-gray-900">R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p><p className="mt-1 text-sm capitalize text-gray-500">{sale.paymentMethod || 'Pagamento não informado'} · {new Date(sale.createdAt).toLocaleDateString('pt-BR')}</p></div>
+            </div>
+            <div className="mt-4 grid gap-2 border-t border-gray-100 pt-3 sm:flex sm:flex-wrap">
+              <button onClick={() => { setSelectedSale(sale); setShowModal(true); }} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 sm:flex-none"><EyeIcon className="h-4 w-4" /> Ver venda</button>
+              {sale.status === 'PAID' && <button onClick={() => beginInvoice(sale)} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 sm:flex-none"><DocumentTextIcon className="h-4 w-4" /> Emitir nota</button>}
+              {(sale.status === 'PAID' || sale.status === 'PENDING') && <button onClick={() => handleDeleteSale(sale)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100"><TrashIcon className="h-4 w-4" /> Excluir</button>}
+            </div>
+              </div>
+              <aside className="border-t border-gray-100 bg-slate-50 p-4 lg:border-l lg:border-t-0">
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Itens vendidos</p>
+                <div className="space-y-2">
+                  {sale.items?.map((item) => {
+                    const product = item.product;
+                    const image = product ? getProductCardImageUrl(product.images?.[0]?.url || product.imageUrl) : '';
+                    const itemName = product ? productDisplayName(product) : item.manualDescription || 'Peça sem cadastro';
+                    const itemContext = product
+                      ? `Código: ${product.barcode || 'não informado'}`
+                      : [item.manualCategoryName, item.manualSubcategoryName].filter(Boolean).join(' · ') || 'Peça avulsa';
+                    return (
+                      <div key={item.id} className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 bg-white p-2">
+                        {image ? (
+                          <img src={image} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+                        ) : (
+                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-slate-200 text-xs font-bold text-slate-500">{product ? 'PEÇA' : 'AVULSA'}</div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">{itemName}</p>
+                          <p className="truncate text-xs text-slate-500">{itemContext}</p>
+                        </div>
+                        <div className="shrink-0 text-right"><p className="text-xs text-slate-500">{item.quantity}x</p><p className="text-sm font-bold text-slate-900">R$ {Number(item.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
                       </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(sale.createdAt).toLocaleDateString('pt-BR')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                    {sale.paymentMethod || 'Não informado'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 text-xs font-semibold rounded-full ${getStatusColor(sale.status)}`}>
-                      {getStatusLabel(sale.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          setSelectedSale(sale);
-                          setShowModal(true);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title="Ver detalhes"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                      {sale.status === 'PAID' && (
-                        <button
-                          onClick={() => handleIssueNfce(sale)}
-                          disabled={issueNfceMutation.isPending}
-                          className="text-emerald-600 hover:text-emerald-900 disabled:opacity-50"
-                          title="Emitir nota fiscal (NFC-e)"
-                        >
-                          <DocumentTextIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                      {(sale.status === 'PAID' || sale.status === 'PENDING') && (
-                        <button
-                          onClick={() => handleDeleteSale(sale)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Excluir venda"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {(!sales || sales.length === 0) && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Nenhuma venda encontrada</p>
-          </div>
-        )}
+                    );
+                  })}
+                  {!sale.items?.length && <p className="text-sm text-slate-500">Itens não disponíveis.</p>}
+                </div>
+              </aside>
+            </div>
+          </article>
+        ))}
+        {!sales.length && <div className="rounded-lg border border-dashed border-gray-300 bg-white py-12 text-center text-gray-500">Nenhuma venda encontrada</div>}
       </div>
 
       {/* Modal de nova venda */}
@@ -517,10 +467,8 @@ export default function Sales() {
                         return (
                           <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                             <div className="flex-1">
-                              <div className="font-medium text-sm">{product?.name || 'Produto não encontrado'}</div>
+                              <div className="font-medium text-sm">{product ? productDisplayName(product) : 'Produto não encontrado'}</div>
                               <div className="text-xs text-gray-500">
-                                {product?.category?.name && `${product.category.name}`}
-                                {product?.pattern?.name && ` • ${product.pattern.name}`}
                                 {product?.barcode && ` • Código: ${product.barcode}`}
                               </div>
                             </div>
@@ -596,6 +544,22 @@ export default function Sales() {
       )}
 
       {/* Modal do Scanner */}
+      {saleForInvoice && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-gray-950/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900">Emitir nota fiscal</h3>
+            <p className="mt-1 text-sm text-gray-600">Venda #{saleForInvoice.saleNumber}. O CPF/CNPJ é opcional; deixe vazio para emitir para consumidor não identificado.</p>
+            <label className="mt-5 block text-sm font-medium text-gray-700">CPF ou CNPJ do cliente (opcional)
+              <input value={invoiceTaxId} inputMode="numeric" onChange={(event) => setInvoiceTaxId(event.target.value.replace(/\D/g, '').slice(0, 14))} placeholder="Somente números" className="input-field mt-1 font-mono" />
+            </label>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button onClick={() => { setSaleForInvoice(null); setInvoiceTaxId(''); }} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">Cancelar</button>
+              <button onClick={() => issueNfceMutation.mutate({ sale: saleForInvoice, customerTaxId: invoiceTaxId })} disabled={issueNfceMutation.isPending} className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><DocumentTextIcon className="h-4 w-4" />{issueNfceMutation.isPending ? 'Emitindo…' : 'Emitir nota'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showScanner && (
         <BarcodeScanner
           onProductFound={handleProductFound}
@@ -681,16 +645,6 @@ export default function Sales() {
               </div>
               
               <div className="flex justify-end space-x-3 mt-6">
-                {selectedSale.status === 'PAID' && (
-                  <button
-                    onClick={() => handleIssueNfce(selectedSale)}
-                    disabled={issueNfceMutation.isPending}
-                    className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <DocumentTextIcon className="h-4 w-4" />
-                    {issueNfceMutation.isPending ? 'Emitindo nota…' : 'Emitir nota fiscal'}
-                  </button>
-                )}
                 <button
                   onClick={() => {
                     setShowModal(false);
