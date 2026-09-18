@@ -4,6 +4,47 @@ import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
+function parseDateFilter(startDateStr?: any, endDateStr?: any) {
+  const createdAt: any = {};
+
+  if (startDateStr) {
+    const raw = String(startDateStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      // YYYY-MM-DD: Começo do dia no fuso de Brasília (-03:00)
+      const start = new Date(`${raw}T00:00:00.000-03:00`);
+      if (!isNaN(start.getTime())) {
+        createdAt.gte = start;
+      }
+    } else {
+      const start = new Date(raw);
+      if (!isNaN(start.getTime())) {
+        createdAt.gte = start;
+      }
+    }
+  }
+
+  if (endDateStr) {
+    const raw = String(endDateStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      // YYYY-MM-DD: Fim do dia no fuso de Brasília (-03:00)
+      const end = new Date(`${raw}T23:59:59.999-03:00`);
+      if (!isNaN(end.getTime())) {
+        createdAt.lte = end;
+      }
+    } else {
+      const end = new Date(raw);
+      if (!isNaN(end.getTime())) {
+        if (raw.length === 10) {
+          end.setHours(23, 59, 59, 999);
+        }
+        createdAt.lte = end;
+      }
+    }
+  }
+
+  return Object.keys(createdAt).length > 0 ? createdAt : undefined;
+}
+
 /**
  * @swagger
  * /api/sales:
@@ -67,14 +108,9 @@ router.get('/', authenticateToken, async (req, res, next) => {
       where.sellerId = sellerId;
     }
 
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate as string);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate as string);
-      }
+    const dateFilter = parseDateFilter(startDate, endDate);
+    if (dateFilter) {
+      where.createdAt = dateFilter;
     }
 
     const [sales, total] = await Promise.all([
@@ -171,20 +207,9 @@ router.get('/report', authenticateToken, async (req, res, next) => {
       where.sellerId = sellerId;
     }
 
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        const start = new Date(startDate as string);
-        if (!isNaN(start.getTime())) {
-          where.createdAt.gte = start;
-        }
-      }
-      if (endDate) {
-        const end = new Date(endDate as string);
-        if (!isNaN(end.getTime())) {
-          where.createdAt.lte = end;
-        }
-      }
+    const dateFilter = parseDateFilter(startDate, endDate);
+    if (dateFilter) {
+      where.createdAt = dateFilter;
     }
 
     const sales = await prisma.sale.findMany({
@@ -291,11 +316,18 @@ router.get('/report', authenticateToken, async (req, res, next) => {
       currentMethod.totalRevenue += sale.total || 0;
       paymentMethodsMap.set(method, currentMethod);
 
-      // Timeline (day)
-      const saleDate = new Date(sale.createdAt);
-      const dateKey = saleDate.toISOString().split('T')[0];
-      const dayStr = String(saleDate.getDate()).padStart(2, '0');
-      const monthStr = String(saleDate.getMonth() + 1).padStart(2, '0');
+      // Timeline (day) agrupado pelo fuso horário de Brasília
+      const brDateFormatter = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const parts = brDateFormatter.formatToParts(new Date(sale.createdAt));
+      const dayStr = parts.find((p) => p.type === 'day')?.value || '01';
+      const monthStr = parts.find((p) => p.type === 'month')?.value || '01';
+      const yearStr = parts.find((p) => p.type === 'year')?.value || '2026';
+      const dateKey = `${yearStr}-${monthStr}-${dayStr}`;
       const formattedDate = `${dayStr}/${monthStr}`;
 
       const currentDay = timelineMap.get(dateKey) || {
