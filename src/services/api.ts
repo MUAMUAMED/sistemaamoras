@@ -13,6 +13,8 @@ import {
   SimilarPatternsResponse,
   ReassignProductPayload,
   ReassignProductResponse,
+  PatternDismissedPair,
+  DismissClusterPairPayload,
   Size,
   Sale,
   SaleItem,
@@ -264,6 +266,23 @@ export const patternsApi = {
 
   reassignProduct: async (payload: ReassignProductPayload): Promise<ReassignProductResponse> => {
     const response = await api.post('/patterns/reassign-product', payload);
+    return response.data;
+  },
+
+  dismissClusterPair: async (
+    payload: DismissClusterPairPayload
+  ): Promise<{ success: boolean; dismissedCount: number; message: string }> => {
+    const response = await api.post('/patterns/dismiss-cluster-pair', payload);
+    return response.data;
+  },
+
+  getDismissedPairs: async (): Promise<{ dismissedPairs: PatternDismissedPair[] }> => {
+    const response = await api.get('/patterns/dismissed-pairs');
+    return response.data;
+  },
+
+  restoreDismissedPair: async (id: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.delete(`/patterns/dismissed-pairs/${id}`);
     return response.data;
   },
 };

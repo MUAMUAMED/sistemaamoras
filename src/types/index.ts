@@ -185,6 +185,25 @@ export interface MergePatternsResponse {
   };
 }
 
+export interface PatternDismissedPair {
+  id: string;
+  patternId1: string;
+  patternId2: string;
+  reason: string | null;
+  createdAt: string;
+  name1: string;
+  code1: string;
+  name2: string;
+  code2: string;
+}
+
+export interface DismissClusterPairPayload {
+  patternId?: string;
+  otherPatternIds?: string[];
+  patternIds?: string[];
+  reason?: string;
+}
+
 // Tipos de tamanho
 export interface Size {
   id: string;
