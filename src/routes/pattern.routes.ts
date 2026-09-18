@@ -122,6 +122,46 @@ router.get('/', authenticateToken, async (req, res, next) => {
 });
 
 // ==========================================
+// 1.1 Diagnóstico do pgvector e embeddings
+// ==========================================
+router.get('/diagnostic-status', async (req, res) => {
+  try {
+    const db = vectorDatabase();
+    let embeddingCount = -1;
+    let extensionInstalled = false;
+    let dbError = null;
+    try {
+      const ext = await db.$queryRawUnsafe<any[]>('SELECT extname FROM pg_extension WHERE extname = \'vector\'');
+      extensionInstalled = ext.length > 0;
+      const countRes = await db.$queryRawUnsafe<[{ count: bigint }]>('SELECT COUNT(*)::bigint AS count FROM product_image_embeddings');
+      embeddingCount = Number(countRes[0]?.count || 0);
+    } catch (e: any) {
+      dbError = e?.message;
+    }
+
+    const totalProducts = await prisma.product.count({ where: { active: true } });
+    const totalProductImages = await (prisma as any).productImage.count();
+    const totalPatterns = await prisma.pattern.count({ where: { active: true } });
+
+    return res.json({
+      hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY,
+      openRouterKeyLength: process.env.OPENROUTER_API_KEY?.length || 0,
+      openRouterModel: process.env.OPENROUTER_EMBEDDING_MODEL || 'default (google/gemini-embedding-2)',
+      hasVectorDbUrl: !!process.env.VECTOR_DATABASE_URL,
+      hasDbUrl: !!process.env.DATABASE_URL,
+      extensionInstalled,
+      embeddingCount,
+      totalProducts,
+      totalProductImages,
+      totalPatterns,
+      dbError,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
 // 2. Detecção e Agrupamento de Estampas Semelhantes (Clusters)
 // ==========================================
 router.get('/clusters', authenticateToken, async (req, res, next) => {
