@@ -12,7 +12,11 @@ import {
   QrCode,
   Image as ImageIcon,
   Loader2,
-  Check
+  Check,
+  ArrowLeftRight,
+  Plus,
+  RefreshCw,
+  Tag,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -24,14 +28,29 @@ interface PatternImageThumbnailProps {
   url: string;
   patternName: string;
   patternCode?: string;
+  productId?: string;
+  productName?: string;
+  productBarcode?: string | null;
   onPreviewClick: (data: { url: string; patternName: string; patternCode?: string }) => void;
+  onReassignClick?: (data: {
+    productId: string;
+    productName: string;
+    productBarcode?: string | null;
+    imageUrl: string;
+    patternName: string;
+    patternCode?: string;
+  }) => void;
 }
 
 function PatternImageThumbnail({
   url,
   patternName,
   patternCode,
+  productId,
+  productName,
+  productBarcode,
   onPreviewClick,
+  onReassignClick,
 }: PatternImageThumbnailProps) {
   const [loaded, setLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -44,70 +63,460 @@ function PatternImageThumbnail({
 
   if (!currentUrl || hasError) {
     return (
-      <div className="w-14 h-14 rounded-xl bg-purple-50 text-purple-400 border border-purple-100 flex items-center justify-center text-xs shrink-0 select-none">
+      <div className="w-16 h-16 rounded-xl bg-purple-50 text-purple-400 border border-purple-100 flex items-center justify-center text-xs shrink-0 select-none">
         <ImageIcon className="w-5 h-5 opacity-50" />
       </div>
     );
   }
 
   return (
-    <div
-      className="relative shrink-0"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <button
-        type="button"
-        onClick={() => onPreviewClick({ url, patternName, patternCode })}
-        title={`Clique para ampliar foto de ${patternName}`}
-        className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative block group hover:ring-2 hover:ring-purple-500 hover:border-purple-400 transition-all cursor-zoom-in shadow-2xs"
+    <div className="flex flex-col items-center shrink-0">
+      <div
+        className="relative shrink-0"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        {!loaded && (
-          <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-            <ImageIcon className="w-4 h-4 text-gray-400 opacity-40" />
+        <button
+          type="button"
+          onClick={() => onPreviewClick({ url, patternName, patternCode })}
+          title={`Clique para ampliar foto de ${patternName}`}
+          className="w-16 h-16 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden relative block group hover:ring-2 hover:ring-purple-500 hover:border-purple-400 transition-all cursor-zoom-in shadow-2xs"
+        >
+          {!loaded && (
+            <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+              <ImageIcon className="w-4 h-4 text-gray-400 opacity-40" />
+            </div>
+          )}
+          <img
+            src={currentUrl}
+            alt={patternName}
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            onLoad={() => setLoaded(true)}
+            onError={() => {
+              if (!useRawFallback && rawUrl && rawUrl !== optimizedUrl) {
+                setUseRawFallback(true);
+              } else {
+                setHasError(true);
+              }
+            }}
+            className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-110 ${
+              loaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+          <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Search className="w-4 h-4 text-white drop-shadow-md" />
+          </div>
+        </button>
+
+        {/* Popover flutuante rápido ao passar o mouse (desktop) */}
+        {isHovered && loaded && (
+          <div className="hidden sm:block absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-white rounded-2xl shadow-2xl border border-purple-200 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-full h-52 rounded-xl overflow-hidden bg-gray-100 mb-1.5 border border-gray-100">
+              <img
+                src={currentUrl}
+                alt={patternName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <p className="text-[11px] font-bold text-gray-900 truncate text-center px-1">
+              {patternName}
+            </p>
+            {productName && (
+              <p className="text-[10px] text-gray-500 truncate text-center px-1">
+                {productName}
+              </p>
+            )}
+            <p className="text-[10px] text-purple-600 font-medium text-center">
+              Clique para tela cheia
+            </p>
           </div>
         )}
-        <img
-          src={currentUrl}
-          alt={patternName}
-          loading="lazy"
-          decoding="async"
-          fetchPriority="low"
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            if (!useRawFallback && rawUrl && rawUrl !== optimizedUrl) {
-              setUseRawFallback(true);
-            } else {
-              setHasError(true);
-            }
-          }}
-          className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-110 ${
-            loaded ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-        <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <Search className="w-4 h-4 text-white drop-shadow-md" />
-        </div>
-      </button>
+      </div>
 
-      {/* Popover flutuante rápido ao passar o mouse (desktop) */}
-      {isHovered && loaded && (
-        <div className="hidden sm:block absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2 bg-white rounded-2xl shadow-2xl border border-purple-200 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-          <div className="w-full h-52 rounded-xl overflow-hidden bg-gray-100 mb-1.5 border border-gray-100">
-            <img
-              src={currentUrl}
-              alt={patternName}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <p className="text-[11px] font-bold text-gray-900 truncate text-center px-1">
-            {patternName}
-          </p>
-          <p className="text-[10px] text-purple-600 font-medium text-center">
-            Clique para tela cheia
-          </p>
-        </div>
+      {onReassignClick && productId && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onReassignClick({
+              productId,
+              productName: productName || 'Roupa',
+              productBarcode,
+              imageUrl: url,
+              patternName,
+              patternCode,
+            });
+          }}
+          title="Não pertence a esta estampa? Trocar estampa via IA"
+          className="mt-1 w-16 text-[10px] font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 active:scale-95 border border-purple-200 py-0.5 px-1 rounded-lg transition-all flex items-center justify-center gap-0.5 shadow-2xs cursor-pointer hover:border-purple-300"
+        >
+          <ArrowLeftRight className="w-2.5 h-2.5 shrink-0 text-purple-600" />
+          <span className="truncate">Trocar</span>
+        </button>
       )}
+    </div>
+  );
+}
+
+interface ReassignProductModalProps {
+  product: {
+    productId: string;
+    productName: string;
+    productBarcode?: string | null;
+    imageUrl: string;
+    patternName: string;
+    patternCode?: string;
+  };
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function ReassignProductModal({
+  product,
+  onClose,
+  onSuccess,
+}: ReassignProductModalProps) {
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [newPatternName, setNewPatternName] = useState('');
+
+  const queryClient = useQueryClient();
+
+  // Buscar 5 estampas mais parecidas via pgvector
+  const {
+    data: similarData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['similar-for-product', product.productId],
+    queryFn: () => patternsApi.getSimilarForProduct(product.productId),
+    staleTime: 1000 * 60 * 3,
+  });
+
+  // Mutação para reatribuir o produto
+  const reassignMutation = useMutation({
+    mutationFn: patternsApi.reassignProduct,
+    onSuccess: (res) => {
+      toast.success(res.message || 'Roupa transferida com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['pattern-clusters'] });
+      queryClient.invalidateQueries({ queryKey: ['patterns'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || err?.message || 'Erro ao trocar estampa da roupa');
+    },
+  });
+
+  const handleSelectPattern = (targetPatternId: string) => {
+    reassignMutation.mutate({
+      productId: product.productId,
+      targetPatternId,
+    });
+  };
+
+  const handleCreateNewPattern = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPatternName.trim()) {
+      toast.error('Informe o nome da nova estampa');
+      return;
+    }
+    reassignMutation.mutate({
+      productId: product.productId,
+      newPattern: {
+        name: newPatternName.trim(),
+      },
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[85] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-gray-100 overflow-hidden">
+        {/* Header */}
+        <div className="p-4 sm:p-6 border-b border-gray-100 bg-gradient-to-r from-purple-50 via-white to-pink-50 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-200">
+              <ArrowLeftRight className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900 text-lg sm:text-xl flex items-center gap-2">
+                Trocar Estampa da Roupa
+                <span className="bg-purple-100 text-purple-800 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                  pgvector IA
+                </span>
+              </h3>
+              <p className="text-xs text-gray-500">
+                Esta peça pertence a outra estampa? Escolha uma das 5 opções visuais ou crie uma nova.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={reassignMutation.isPending}
+            className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Conteúdo rolável */}
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5">
+          {/* Card da Peça Selecionada */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="w-20 h-20 rounded-2xl bg-white border border-gray-200 overflow-hidden shrink-0 shadow-sm relative group">
+              <img
+                src={getProductCardImageUrl(product.imageUrl) || getImageUrl(product.imageUrl)}
+                alt={product.productName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs font-bold uppercase tracking-wider text-purple-700 bg-purple-100/70 px-2 py-0.5 rounded-md">
+                  Peça Selecionada
+                </span>
+                {product.productBarcode && (
+                  <span className="text-xs font-mono bg-gray-200 text-gray-700 px-2 py-0.5 rounded-md font-semibold">
+                    Etiqueta: #{product.productBarcode}
+                  </span>
+                )}
+              </div>
+              <h4 className="font-bold text-gray-900 text-base truncate">
+                {product.productName}
+              </h4>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Estampa atual no sistema:{' '}
+                <strong className="text-gray-800">
+                  {product.patternName} {product.patternCode ? `(#${product.patternCode})` : ''}
+                </strong>
+              </p>
+            </div>
+          </div>
+
+          {/* Banner de Garantia de Bip */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-start gap-3 text-xs text-emerald-800">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-emerald-900 mb-0.5">
+                Garantia de leitura no leitor do caixa
+              </p>
+              <p className="leading-relaxed text-[11px] text-emerald-700">
+                Ao transferir esta roupa, a estampa é alterada no site comercial e no catálogo. O código anterior ({product.productBarcode ? `código #${product.productBarcode}` : 'etiqueta física já impressa'}) <strong>continuará funcionando perfeitamente ao ser bipado</strong> no leitor do caixa.
+              </p>
+            </div>
+          </div>
+
+          {/* Seção das 5 Estampas Mais Parecidas */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <h4 className="font-bold text-gray-900 text-sm">
+                  Top 5 Estampas Mais Parecidas (Detectadas por IA)
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="text-xs text-purple-600 hover:text-purple-800 font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Recalcular
+              </button>
+            </div>
+
+            {isLoading ? (
+              <div className="py-12 bg-white rounded-2xl border border-gray-200 flex flex-col items-center justify-center text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-3" />
+                <p className="text-sm font-semibold text-gray-700">
+                  Pesquisando no banco vetorial (pgvector)...
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Comparando as fotos para encontrar as 5 estampas visualmente mais próximas.
+                </p>
+              </div>
+            ) : error ? (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 flex items-center justify-between">
+                <span>Falha ao carregar sugestões vetoriais.</span>
+                <button
+                  type="button"
+                  onClick={() => refetch()}
+                  className="px-3 py-1 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 cursor-pointer"
+                >
+                  Tentar Novamente
+                </button>
+              </div>
+            ) : similarData?.similarPatterns && similarData.similarPatterns.length > 0 ? (
+              <div className="space-y-2.5">
+                {similarData.similarPatterns.map((candidate, idx) => (
+                  <div
+                    key={candidate.id}
+                    className="p-3 bg-white hover:bg-purple-50/50 border border-gray-200 hover:border-purple-300 rounded-2xl flex items-center justify-between gap-3 transition-all shadow-2xs group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden shrink-0 shadow-2xs">
+                        {candidate.sampleImageUrl ? (
+                          <img
+                            src={getProductCardImageUrl(candidate.sampleImageUrl) || getImageUrl(candidate.sampleImageUrl)}
+                            alt={candidate.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-300">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h5 className="font-bold text-gray-900 text-sm truncate">
+                            {candidate.name}
+                          </h5>
+                          <span className="text-[11px] font-mono bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-semibold">
+                            #{candidate.code}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                              candidate.similarity >= 80
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : candidate.similarity >= 60
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            {Math.round(candidate.similarity)}% similaridade
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={reassignMutation.isPending}
+                      onClick={() => handleSelectPattern(candidate.id)}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {reassignMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      <span>Vincular</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-500 text-center">
+                Nenhuma estampa semelhante encontrada. Crie uma nova estampa abaixo.
+              </div>
+            )}
+          </div>
+
+          {/* Seção Criar Nova Estampa Rapidamente */}
+          <div className="border border-purple-200 bg-gradient-to-r from-purple-50/50 to-pink-50/50 rounded-2xl p-4 transition-all">
+            {!isCreatingNew ? (
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h5 className="font-bold text-gray-900 text-sm">
+                    Nenhuma das 5 opções é a estampa certa?
+                  </h5>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Crie uma nova estampa exclusiva para esta peça rapidamente.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingNew(true)}
+                  className="px-3.5 py-2 bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-purple-600" />
+                  <span>+ Criar Nova Estampa</span>
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateNewPattern} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h5 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-purple-600" />
+                    Criar Nova Estampa para esta Peça
+                  </h5>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingNew(false)}
+                    className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Nome da Nova Estampa
+                  </label>
+                  <input
+                    type="text"
+                    value={newPatternName}
+                    onChange={(e) => setNewPatternName(e.target.value)}
+                    placeholder="Ex: Floral Lavanda Suave"
+                    required
+                    autoFocus
+                    className="w-full px-3.5 py-2 bg-white border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 rounded-xl text-sm outline-hidden transition-all"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Um código sequencial de 4 dígitos livre será gerado automaticamente para esta nova estampa.
+                  </p>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingNew(false)}
+                    className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-xl font-medium cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={reassignMutation.isPending || !newPatternName.trim()}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {reassignMutation.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    <span>Criar Estampa e Transferir Roupa</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between shrink-0">
+          <span className="text-xs text-gray-400">
+            A estampa anterior permanecerá intacta para as demais roupas.
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold text-xs rounded-xl transition-all cursor-pointer"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -146,6 +555,16 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
   // Estado para visualização ampliada / popup da roupa ou estampa
   const [previewImage, setPreviewImage] = useState<{
     url: string;
+    patternName: string;
+    patternCode?: string;
+  } | null>(null);
+
+  // Estado para troca individual de estampa de uma roupa via pgvector
+  const [reassigningProduct, setReassigningProduct] = useState<{
+    productId: string;
+    productName: string;
+    productBarcode?: string | null;
+    imageUrl: string;
     patternName: string;
     patternCode?: string;
   } | null>(null);
@@ -474,8 +893,22 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
                                       <ImageIcon className="w-3.5 h-3.5" />
                                       Fotos de peças com esta estampa:
                                     </div>
-                                    <div className="flex gap-2">
-                                      {p.sampleImages.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {p.sampleProducts && p.sampleProducts.length > 0 ? (
+                                        p.sampleProducts.map((sp) => (
+                                          <PatternImageThumbnail
+                                            key={sp.id}
+                                            url={sp.imageUrl}
+                                            patternName={p.name}
+                                            patternCode={p.code}
+                                            productId={sp.id}
+                                            productName={sp.name}
+                                            productBarcode={sp.barcode}
+                                            onPreviewClick={(data) => setPreviewImage(data)}
+                                            onReassignClick={(data) => setReassigningProduct(data)}
+                                          />
+                                        ))
+                                      ) : p.sampleImages && p.sampleImages.length > 0 ? (
                                         p.sampleImages.map((imgUrl, idx) => (
                                           <PatternImageThumbnail
                                             key={idx}
@@ -951,12 +1384,14 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
               </button>
             </div>
 
-            {/* Imagem Ampliada */}
+            {/* Imagem Ampliada com carregamento imediato (WebP otimizado) */}
             <div className="p-4 sm:p-6 bg-slate-50 flex items-center justify-center">
               <div className="max-h-[65vh] w-full flex items-center justify-center overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-inner">
                 <img
-                  src={getImageUrl(previewImage.url)}
+                  src={getProductCardImageUrl(previewImage.url) || getImageUrl(previewImage.url)}
                   alt={previewImage.patternName}
+                  loading="eager"
+                  decoding="async"
                   className="max-h-[65vh] w-auto max-w-full object-contain rounded-2xl"
                 />
               </div>
@@ -964,7 +1399,7 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
 
             {/* Footer */}
             <div className="p-3 sm:p-4 bg-white border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-              <span>Foto real da peça vinculada a esta estampa.</span>
+              <span>Foto otimizada em alta velocidade (WebP).</span>
               <button
                 type="button"
                 onClick={() => setPreviewImage(null)}
@@ -975,6 +1410,18 @@ export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal para Trocar Estampa de Roupa Individual (pgvector) */}
+      {reassigningProduct && (
+        <ReassignProductModal
+          product={reassigningProduct}
+          onClose={() => setReassigningProduct(null)}
+          onSuccess={() => {
+            setReassigningProduct(null);
+            refetchClusters();
+          }}
+        />
       )}
     </div>
   );

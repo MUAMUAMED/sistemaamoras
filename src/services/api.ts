@@ -10,6 +10,9 @@ import {
   PatternRedirect,
   MergePatternsPayload,
   MergePatternsResponse,
+  SimilarPatternsResponse,
+  ReassignProductPayload,
+  ReassignProductResponse,
   Size,
   Sale,
   SaleItem,
@@ -251,6 +254,16 @@ export const patternsApi = {
 
   getRedirects: async (): Promise<PatternRedirect[]> => {
     const response = await api.get('/patterns/redirects');
+    return response.data;
+  },
+
+  getSimilarForProduct: async (productId: string): Promise<SimilarPatternsResponse> => {
+    const response = await api.get(`/patterns/similar-for-product/${productId}`);
+    return response.data;
+  },
+
+  reassignProduct: async (payload: ReassignProductPayload): Promise<ReassignProductResponse> => {
+    const response = await api.post('/patterns/reassign-product', payload);
     return response.data;
   },
 };

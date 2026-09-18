@@ -78,6 +78,13 @@ export interface Pattern {
   };
 }
 
+export interface SampleProductItem {
+  id: string;
+  name: string;
+  barcode?: string | null;
+  imageUrl: string;
+}
+
 export interface PatternClusterItem {
   id: string;
   name: string;
@@ -87,6 +94,7 @@ export interface PatternClusterItem {
   createdAt: string;
   productsCount: number;
   sampleImages: string[];
+  sampleProducts?: SampleProductItem[];
 }
 
 export interface PatternCluster {
@@ -96,6 +104,50 @@ export interface PatternCluster {
   averageSimilarity: number;
   suggestedPrincipalId: string;
   patterns: PatternClusterItem[];
+}
+
+export interface SimilarPatternItem {
+  id: string;
+  name: string;
+  code: string;
+  similarity: number;
+  sampleImageUrl?: string;
+  isVectorMatch: boolean;
+}
+
+export interface SimilarPatternsResponse {
+  product: {
+    id: string;
+    name: string;
+    barcode: string | null;
+    imageUrl: string;
+    pattern: {
+      id: string;
+      name: string;
+      code: string;
+    } | null;
+  };
+  similarPatterns: SimilarPatternItem[];
+}
+
+export interface ReassignProductPayload {
+  productId: string;
+  targetPatternId?: string;
+  newPattern?: {
+    name: string;
+    code?: string;
+  };
+}
+
+export interface ReassignProductResponse {
+  success: boolean;
+  message: string;
+  data: {
+    product: Product;
+    oldBarcode?: string | null;
+    oldPattern?: Pattern | null;
+    targetPattern: Pattern;
+  };
 }
 
 export interface PatternRedirect {
