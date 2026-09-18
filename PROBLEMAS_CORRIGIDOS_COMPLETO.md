@@ -136,7 +136,7 @@ Error: EBUSY: resource busy or locked, open 'C:\Users\isaqu\sistemaamoras\backen
 - [x] Banco de dados configurado
 
 ### 🚀 Sistema Funcional
-- ✅ Backend: http://localhost:3001
+- ✅ Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 - ✅ Frontend: http://localhost:3000
 - ✅ Login funcionando com redirecionamento
 - ✅ Vendas funcionando sem erros TypeScript

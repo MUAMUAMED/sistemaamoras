@@ -6,7 +6,7 @@ O usuário reportou que ao tentar criar uma venda com nome e telefone do cliente
 
 **Logs do Frontend:**
 ```
-POST http://localhost:3001/api/sales 500 (Internal Server Error)
+POST http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/sales 500 (Internal Server Error)
 ```
 
 ## ✅ Solução Implementada

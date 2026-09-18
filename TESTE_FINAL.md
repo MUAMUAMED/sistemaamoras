@@ -13,7 +13,7 @@
 #### **1. Backend (✅ Funcionando)**
 ```
 Status: 200 OK
-URL: http://localhost:3001/health
+URL: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
 Resposta: {"status":"OK","timestamp":"2025-07-03T22:14:50.035Z","environment":"development","version":"1.0.0"}
 ```
 
@@ -83,8 +83,8 @@ Aplicação React carregando corretamente
 
 3. **Acessar:**
    - Frontend: http://localhost:3000
-   - Backend: http://localhost:3001
-   - API Docs: http://localhost:3001/api-docs
+   - Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+   - API Docs: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 4. **Login:**
    - Admin: admin@amorascapital.com / admin123

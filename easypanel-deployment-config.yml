@@ -1,0 +1,142 @@
+# 🚀 EasyPanel Deployment Configuration
+# Sistema Amoras Capital - CRM & ERP
+# Configuração para deploy como aplicação unificada
+
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: amoras-postgres
+    environment:
+      POSTGRES_DB: amoras_capital
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d amoras_capital"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: amoras-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.easypanel
+      args:
+        NODE_ENV: production
+    container_name: amoras-backend
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres123}@postgres:5432/amoras_capital
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 7d
+      PORT: 3001
+      CORS_ORIGINS: ${FRONTEND_URL:-https://amoras-sistema-gew1.gbl2yq.easypanel.host}
+      APP_URL: ${BACKEND_URL:-https://amoras-sistema-gew1.gbl2yq.easypanel.host}
+      UPLOAD_DIR: /app/uploads
+      LOG_LEVEL: info
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 500
+    volumes:
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.easypanel
+      args:
+        REACT_APP_API_URL: ${BACKEND_URL:-https://amoras-sistema-gew1.gbl2yq.easypanel.host}/api
+        NODE_ENV: production
+    container_name: amoras-frontend
+    environment:
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Proxy
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile.easypanel
+    container_name: amoras-nginx
+    ports:
+      - "${PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    environment:
+      BACKEND_HOST: backend
+      FRONTEND_HOST: frontend
+      SERVER_NAME: ${DOMAIN:-localhost}
+    volumes:
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local
+  logs_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

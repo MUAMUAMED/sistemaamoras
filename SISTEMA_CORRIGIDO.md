@@ -117,8 +117,8 @@ cd frontend && npm start
 
 #### URLs de Acesso
 - **Frontend:** http://localhost:3000
-- **Backend:** http://localhost:3001
-- **API Docs:** http://localhost:3001/api-docs
+- **Backend:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- **API Docs:** http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 #### Usuários Padrão
 ```

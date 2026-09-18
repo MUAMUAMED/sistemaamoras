@@ -1,0 +1,5 @@
+[33m86ec42f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdeploy-inicial[m[33m, [m[1;31morigin/deploy-inicial[m[33m)[m 🐛 Fix: Corrigir erro 500 ao deletar categorias com subcategorias
+[33m8907037[m fix: Corrige URLs de imagens removendo protocolo duplicado
+[33m514c085[m fix: Evita corte de informações permitindo quebra de linha e reduz fonte de SUB/EST
+[33m56c06ab[m fix: Maximiza espaço para texto reduzindo margens ao mínimo
+[33mc464637[m feat: Melhora layout da etiqueta com melhor aproveitamento do espaço

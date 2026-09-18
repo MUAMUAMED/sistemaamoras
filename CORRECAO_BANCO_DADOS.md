@@ -55,9 +55,9 @@ O sistema não estava iniciando o banco de dados PostgreSQL junto com o sistema.
 
 #### URLs de Acesso
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
+- **Backend API**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 - **Nginx**: http://localhost:80
-- **API Docs**: http://localhost:3001/api-docs
+- **API Docs**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ## 🚀 Como Usar o Sistema Corrigido
 

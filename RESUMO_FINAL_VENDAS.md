@@ -107,12 +107,12 @@ node teste-vendas.js
 #### Via API
 ```bash
 # Login
-curl -X POST http://localhost:3001/api/auth/login \
+curl -X POST http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@amorascapital.com","password":"admin123"}'
 
 # Criar venda
-curl -X POST http://localhost:3001/api/sales \
+curl -X POST http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/sales \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

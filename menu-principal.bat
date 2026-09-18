@@ -113,10 +113,10 @@ echo    ATENDENTE: atendente@amorascapital.com / atendente123
 echo    GERENTE: gerente@amorascapital.com / gerente123
 echo.
 echo 🌐 LINKS DO SISTEMA:
-echo    Backend: http://localhost:3001
+echo    Backend: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
 echo    Frontend: http://localhost:3000
-echo    Documentação API: http://localhost:3001/api-docs
-echo    Health Check: http://localhost:3001/health
+echo    Documentação API: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
+echo    Health Check: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
 echo.
 pause
 goto menu

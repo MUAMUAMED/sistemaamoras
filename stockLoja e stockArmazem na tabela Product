@@ -1,0 +1,37 @@
+[1mdiff --git a/backend/prisma/schema.prisma b/backend/prisma/schema.prisma[m
+[1mindex bd41b49..6398775 100644[m
+[1m--- a/backend/prisma/schema.prisma[m
+[1m+++ b/backend/prisma/schema.prisma[m
+[36m@@ -106,7 +106,9 @@[m [mmodel Product {[m
+   sizeId        String   // Relação com o modelo Size[m
+   patternId     String[m
+   price         Float[m
+[31m-  stock         Int      @default(0)[m
+[32m+[m[32m  stock         Int      @default(0) // Estoque total (para compatibilidade)[m
+[32m+[m[32m  stockLoja     Int      @default(0) // Estoque na Loja[m
+[32m+[m[32m  stockArmazem  Int      @default(0) // Estoque no Armazém[m
+   minStock      Int      @default(5)[m
+   barcode       String   @unique[m
+   qrcodeUrl     String?[m
+[36m@@ -232,6 +234,9 @@[m [mmodel StockMovement {[m
+   reason      String[m
+   reference   String?           // Referência (ID da venda, nota fiscal, etc.)[m
+   userId      String?           // Usuário responsável pela movimentação[m
+[32m+[m[32m  location    StockLocation?    // Localização do estoque (para ENTRY/EXIT/ADJUSTMENT)[m
+[32m+[m[32m  fromLocation StockLocation?   // Localização de origem (para TRANSFER)[m
+[32m+[m[32m  toLocation  StockLocation?    // Localização de destino (para TRANSFER)[m
+   createdAt   DateTime          @default(now())[m
+ [m
+   // Relacionamentos[m
+[36m@@ -334,5 +339,10 @@[m [menum StockMovementType {[m
+   SALE              // Venda[m
+   RETURN            // Devolução[m
+   LOSS              // Perda[m
+[31m-  TRANSFER          // Transferência[m
+[32m+[m[32m  TRANSFER          // Transferência entre estoques[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32menum StockLocation {[m
+[32m+[m[32m  LOJA              // Estoque da Loja[m
+[32m+[m[32m  ARMAZEM           // Estoque do Armazém[m
+ }[m

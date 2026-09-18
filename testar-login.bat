@@ -7,7 +7,7 @@ echo ========================================
 echo.
 
 echo Verificando se o servidor backend está rodando...
-curl -s -o nul -w "%%{http_code}" "http://localhost:3001/api/health" > temp_response.txt
+curl -s -o nul -w "%%{http_code}" "http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/health" > temp_response.txt
 set /p response=<temp_response.txt
 del temp_response.txt
 
@@ -32,7 +32,7 @@ echo ========================================
 echo.
 
 echo 🔑 Testando conta ADMIN...
-curl -s -X POST "http://localhost:3001/api/auth/login" ^
+curl -s -X POST "http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login" ^
 -H "Content-Type: application/json" ^
 -d "{\"email\":\"admin@amorascapital.com\",\"password\":\"admin123\"}" > admin_response.txt
 
@@ -48,7 +48,7 @@ if %errorlevel%==0 (
 echo.
 
 echo 🔑 Testando conta ATENDENTE...
-curl -s -X POST "http://localhost:3001/api/auth/login" ^
+curl -s -X POST "http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login" ^
 -H "Content-Type: application/json" ^
 -d "{\"email\":\"atendente@amorascapital.com\",\"password\":\"atendente123\"}" > atendente_response.txt
 
@@ -64,7 +64,7 @@ if %errorlevel%==0 (
 echo.
 
 echo 🔑 Testando conta GERENTE...
-curl -s -X POST "http://localhost:3001/api/auth/login" ^
+curl -s -X POST "http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/auth/login" ^
 -H "Content-Type: application/json" ^
 -d "{\"email\":\"gerente@amorascapital.com\",\"password\":\"gerente123\"}" > gerente_response.txt
 

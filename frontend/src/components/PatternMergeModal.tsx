@@ -1,0 +1,792 @@
+import React, { useState } from 'react';
+import {
+  X,
+  Sparkles,
+  Layers,
+  Crown,
+  CheckCircle2,
+  AlertTriangle,
+  ArrowRight,
+  Search,
+  History,
+  QrCode,
+  Image as ImageIcon,
+  Loader2,
+  Check
+} from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { Pattern, PatternCluster, PatternRedirect } from '../types';
+import { patternsApi } from '../services/api';
+import { getImageUrl } from '../utils/imageUrl';
+
+interface PatternMergeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  patterns: Pattern[];
+}
+
+export const PatternMergeModal: React.FC<PatternMergeModalProps> = ({
+  isOpen,
+  onClose,
+  patterns,
+}) => {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'suggestions' | 'manual' | 'history'>('suggestions');
+
+  // Estado para seleção no grupo sugerido
+  // clusterId -> { principalId: string, selectedIds: string[] }
+  const [clusterSelections, setClusterSelections] = useState<
+    Record<string, { principalId: string; selectedIds: string[] }>
+  >({});
+
+  // Estado para unificação manual
+  const [manualSearch, setManualSearch] = useState('');
+  const [manualSelectedIds, setManualSelectedIds] = useState<string[]>([]);
+  const [manualPrincipalId, setManualPrincipalId] = useState<string | null>(null);
+
+  // Estado do diálogo de confirmação
+  const [confirmData, setConfirmData] = useState<{
+    principalPattern: Pattern | { id: string; name: string; code: string };
+    secondaryPatterns: Array<Pattern | { id: string; name: string; code: string }>;
+  } | null>(null);
+
+  // Queries
+  const {
+    data: clustersData,
+    isLoading: isLoadingClusters,
+    refetch: refetchClusters,
+  } = useQuery({
+    queryKey: ['pattern-clusters'],
+    queryFn: () => patternsApi.getClusters(),
+    enabled: isOpen,
+  });
+
+  const { data: redirects = [], isLoading: isLoadingRedirects } = useQuery({
+    queryKey: ['pattern-redirects'],
+    queryFn: () => patternsApi.getRedirects(),
+    enabled: isOpen && activeTab === 'history',
+  });
+
+  // Mutação para executar a unificação
+  const mergeMutation = useMutation({
+    mutationFn: patternsApi.merge,
+    onSuccess: (data) => {
+      toast.success(data.message || 'Estampas unificadas com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['patterns'] });
+      queryClient.invalidateQueries({ queryKey: ['pattern-clusters'] });
+      queryClient.invalidateQueries({ queryKey: ['pattern-redirects'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setConfirmData(null);
+      setManualSelectedIds([]);
+      setManualPrincipalId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || error?.message || 'Erro ao unificar estampas');
+    },
+  });
+
+  if (!isOpen) return null;
+
+  const clusters = clustersData?.clusters || [];
+
+  // Helper para obter configuração de um cluster
+  const getClusterConfig = (cluster: PatternCluster) => {
+    const existing = clusterSelections[cluster.id];
+    if (existing) return existing;
+
+    const initialPrincipal = cluster.suggestedPrincipalId || cluster.patterns[0]?.id;
+    return {
+      principalId: initialPrincipal,
+      selectedIds: cluster.patterns.map((p) => p.id),
+    };
+  };
+
+  const handleSelectPrincipal = (clusterId: string, patternId: string) => {
+    const current = clusterSelections[clusterId] || {
+      principalId: patternId,
+      selectedIds: [],
+    };
+    // Garantir que a estampa principal esteja inclusa na lista
+    const newSelected = current.selectedIds.includes(patternId)
+      ? current.selectedIds
+      : [...current.selectedIds, patternId];
+
+    setClusterSelections((prev) => ({
+      ...prev,
+      [clusterId]: {
+        principalId: patternId,
+        selectedIds: newSelected,
+      },
+    }));
+  };
+
+  const handleTogglePatternInCluster = (clusterId: string, patternId: string, isPrincipal: boolean) => {
+    if (isPrincipal) return; // Não pode desmarcar a principal
+    const current = clusterSelections[clusterId] || {
+      principalId: '',
+      selectedIds: [],
+    };
+
+    const isSelected = current.selectedIds.includes(patternId);
+    const newSelected = isSelected
+      ? current.selectedIds.filter((id) => id !== patternId)
+      : [...current.selectedIds, patternId];
+
+    setClusterSelections((prev) => ({
+      ...prev,
+      [clusterId]: {
+        ...current,
+        selectedIds: newSelected,
+      },
+    }));
+  };
+
+  const handlePrepareClusterMerge = (cluster: PatternCluster) => {
+    const config = getClusterConfig(cluster);
+    const principal = cluster.patterns.find((p) => p.id === config.principalId);
+    if (!principal) {
+      toast.error('Selecione uma estampa principal.');
+      return;
+    }
+
+    const secondaries = cluster.patterns.filter(
+      (p) => p.id !== config.principalId && config.selectedIds.includes(p.id)
+    );
+
+    if (secondaries.length === 0) {
+      toast.error('Selecione ao menos uma estampa secundária para ser unificada.');
+      return;
+    }
+
+    setConfirmData({
+      principalPattern: principal,
+      secondaryPatterns: secondaries,
+    });
+  };
+
+  const handlePrepareManualMerge = () => {
+    if (!manualPrincipalId) {
+      toast.error('Escolha qual das estampas selecionadas será a Principal.');
+      return;
+    }
+
+    const principal = patterns.find((p) => p.id === manualPrincipalId);
+    if (!principal) return;
+
+    const secondaries = patterns.filter(
+      (p) => p.id !== manualPrincipalId && manualSelectedIds.includes(p.id)
+    );
+
+    if (secondaries.length === 0) {
+      toast.error('Selecione ao menos duas estampas para realizar a unificação.');
+      return;
+    }
+
+    setConfirmData({
+      principalPattern: principal,
+      secondaryPatterns: secondaries,
+    });
+  };
+
+  const handleExecuteMerge = () => {
+    if (!confirmData) return;
+    mergeMutation.mutate({
+      principalPatternId: confirmData.principalPattern.id,
+      mergedPatternIds: confirmData.secondaryPatterns.map((p) => p.id),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-gray-100 animate-fade-in-up">
+        {/* Cabeçalho do Modal */}
+        <div className="bg-gradient-to-r from-purple-700 via-purple-600 to-pink-600 text-white p-6 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-5 right-5 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md">
+              <Layers className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                Unificação de Estampas Semelhantes
+                <span className="bg-yellow-400 text-purple-950 text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  IA & Códigos
+                </span>
+              </h2>
+              <p className="text-purple-100 text-sm mt-0.5">
+                Junte estampas repetidas, escolha a <strong>Principal</strong> e mantenha QR Codes e etiquetas físicas funcionando por redirecionamento.
+              </p>
+            </div>
+          </div>
+
+          {/* Abas */}
+          <div className="flex gap-2 mt-6">
+            <button
+              onClick={() => setActiveTab('suggestions')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                activeTab === 'suggestions'
+                  ? 'bg-white text-purple-700 shadow-md font-semibold'
+                  : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              Sugestões Automáticas
+              {clusters.length > 0 && (
+                <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-pink-500 text-white font-bold">
+                  {clusters.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('manual')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                activeTab === 'manual'
+                  ? 'bg-white text-purple-700 shadow-md font-semibold'
+                  : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              Unificação Manual
+            </button>
+
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                activeTab === 'history'
+                  ? 'bg-white text-purple-700 shadow-md font-semibold'
+                  : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <History className="w-4 h-4" />
+              Histórico de Redirecionamentos
+            </button>
+          </div>
+        </div>
+
+        {/* Conteúdo das Abas */}
+        <div className="p-6 overflow-y-auto flex-1 bg-gray-50/70">
+          {/* ABA 1: SUGESTÕES AUTOMÁTICAS */}
+          {activeTab === 'suggestions' && (
+            <div className="space-y-6">
+              {isLoadingClusters ? (
+                <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                  <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-3" />
+                  <p className="font-medium text-gray-700">Analisando similaridade de nomes e fotos vetoriais...</p>
+                  <p className="text-xs text-gray-400 mt-1">Comparando embeddings de fotos e variações de texto.</p>
+                </div>
+              ) : clusters.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center max-w-lg mx-auto shadow-sm">
+                  <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Nenhuma estampa duplicada detectada!</h3>
+                  <p className="text-gray-600 text-sm mb-6">
+                    Todas as suas estampas ativas possuem nomes e características visuais bem diferenciadas.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('manual')}
+                    className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-xl font-medium text-sm shadow transition-all"
+                  >
+                    <Search className="w-4 h-4" />
+                    Fazer unificação manual de estampas
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-600">
+                      Encontramos <strong>{clusters.length} grupo(s)</strong> de estampas que são muito parecidas. Escolha a <strong>Principal 👑</strong> de cada grupo e confirme a unificação.
+                    </p>
+                    <button
+                      onClick={() => refetchClusters()}
+                      className="text-xs text-purple-600 hover:text-purple-800 font-semibold underline"
+                    >
+                      Atualizar análise
+                    </button>
+                  </div>
+
+                  {clusters.map((cluster) => {
+                    const config = getClusterConfig(cluster);
+
+                    return (
+                      <div
+                        key={cluster.id}
+                        className="bg-white rounded-2xl border border-purple-100 shadow-sm hover:shadow-md transition-all overflow-hidden"
+                      >
+                        {/* Header do Cluster */}
+                        <div className="bg-gradient-to-r from-purple-50 via-white to-pink-50 px-6 py-3.5 border-b border-purple-100 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <span className="bg-purple-600 text-white text-xs px-2.5 py-1 rounded-full font-bold">
+                              {cluster.patterns.length} estampas
+                            </span>
+                            <h4 className="font-bold text-gray-900 text-base">{cluster.title}</h4>
+                          </div>
+
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full font-medium flex items-center gap-1">
+                              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                              {cluster.primaryReason}
+                            </span>
+                            <span className="bg-green-100 text-green-800 px-2.5 py-1 rounded-full font-bold">
+                              {cluster.averageSimilarity}% similaridade
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Cards de Estampas no Grupo */}
+                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {cluster.patterns.map((p) => {
+                            const isPrincipal = config.principalId === p.id;
+                            const isSelected = config.selectedIds.includes(p.id);
+
+                            return (
+                              <div
+                                key={p.id}
+                                className={`rounded-2xl border-2 p-4 transition-all relative flex flex-col justify-between ${
+                                  isPrincipal
+                                    ? 'border-purple-600 bg-purple-50/50 shadow-md ring-2 ring-purple-400/30'
+                                    : isSelected
+                                    ? 'border-gray-300 bg-white hover:border-purple-300'
+                                    : 'border-gray-200 bg-gray-50 opacity-60'
+                                }`}
+                              >
+                                {isPrincipal && (
+                                  <div className="absolute -top-3 left-4 bg-purple-600 text-white text-xs font-bold px-3 py-0.5 rounded-full shadow flex items-center gap-1">
+                                    <Crown className="w-3.5 h-3.5 text-yellow-300" />
+                                    ESTAMPA PRINCIPAL
+                                  </div>
+                                )}
+
+                                <div>
+                                  {/* Fotos de Amostra das Roupas com essa Estampa */}
+                                  <div className="mb-3">
+                                    <div className="text-xs text-gray-500 mb-1.5 flex items-center gap-1">
+                                      <ImageIcon className="w-3.5 h-3.5" />
+                                      Fotos de peças com esta estampa:
+                                    </div>
+                                    <div className="flex gap-2">
+                                      {p.sampleImages.length > 0 ? (
+                                        p.sampleImages.map((imgUrl, idx) => (
+                                          <img
+                                            key={idx}
+                                            src={getImageUrl(imgUrl)}
+                                            alt={p.name}
+                                            className="w-14 h-14 object-cover rounded-xl border border-gray-200 shadow-2xs"
+                                            onError={(e) => {
+                                              (e.target as HTMLElement).style.display = 'none';
+                                            }}
+                                          />
+                                        ))
+                                      ) : (
+                                        <div className="w-full h-12 bg-gray-100 rounded-xl flex items-center justify-center text-xs text-gray-400 italic">
+                                          Sem fotos de roupas associadas
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Nome e Código */}
+                                  <h5 className="font-bold text-gray-900 text-base leading-tight mb-1">
+                                    {p.name}
+                                  </h5>
+
+                                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                                    <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-700 font-semibold">
+                                      Código: #{p.code}
+                                    </span>
+                                    <span>•</span>
+                                    <span className="font-semibold text-purple-700">
+                                      {p.productsCount} produto(s)
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Botão para Definir como Principal ou Checkbox para Mesclar */}
+                                <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2 mt-2">
+                                  {isPrincipal ? (
+                                    <span className="text-xs text-purple-700 font-bold flex items-center gap-1">
+                                      <Check className="w-4 h-4" />
+                                      Definida como Principal
+                                    </span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectPrincipal(cluster.id, p.id)}
+                                      className="text-xs bg-white border border-purple-300 text-purple-700 hover:bg-purple-600 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition-colors flex items-center gap-1 shadow-2xs"
+                                    >
+                                      <Crown className="w-3.5 h-3.5 text-yellow-500" />
+                                      Tornar Principal
+                                    </button>
+                                  )}
+
+                                  {!isPrincipal && (
+                                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={() =>
+                                          handleTogglePatternInCluster(cluster.id, p.id, isPrincipal)
+                                        }
+                                        className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500 border-gray-300"
+                                      />
+                                      <span>Mesclar</span>
+                                    </label>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Ações do Cluster */}
+                        <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                          <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                            <QrCode className="w-4 h-4 text-purple-600" />
+                            <span>
+                              Ao unificar, os códigos antigos serão redirecionados automaticamente para a estampa principal.
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handlePrepareClusterMerge(cluster)}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                          >
+                            <Layers className="w-4 h-4" />
+                            Unificar Este Grupo
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ABA 2: UNIFICAÇÃO MANUAL */}
+          {activeTab === 'manual' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold mb-1">Unificação Manual Livre</p>
+                  <p className="text-blue-700 text-xs leading-relaxed">
+                    Pesquise e selecione duas ou mais estampas do sistema para juntar. Depois, marque qual delas será a <strong>Principal 👑</strong>. Todas as outras estampas terão seus produtos migrados e seus códigos antigos redirecionados.
+                  </p>
+                </div>
+              </div>
+
+              {/* Barra de Busca */}
+              <div className="relative">
+                <Search className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Pesquisar por nome ou código da estampa..."
+                  value={manualSearch}
+                  onChange={(e) => setManualSearch(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none shadow-2xs"
+                />
+              </div>
+
+              {/* Lista Selecionada */}
+              {manualSelectedIds.length > 0 && (
+                <div className="bg-purple-50/60 border border-purple-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-bold text-purple-900 text-sm flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-purple-600" />
+                      Estampas Selecionadas para Unificação ({manualSelectedIds.length})
+                    </h4>
+                    <span className="text-xs text-purple-700">
+                      Escolha a <strong>Estampa Principal 👑</strong> abaixo:
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {manualSelectedIds.map((id) => {
+                      const p = patterns.find((item) => item.id === id);
+                      if (!p) return null;
+                      const isPrincipal = manualPrincipalId === id;
+
+                      return (
+                        <div
+                          key={id}
+                          onClick={() => setManualPrincipalId(id)}
+                          className={`cursor-pointer rounded-xl p-3 border-2 transition-all relative ${
+                            isPrincipal
+                              ? 'border-purple-600 bg-white shadow-md ring-2 ring-purple-300'
+                              : 'border-gray-200 bg-white/80 hover:border-purple-300'
+                          }`}
+                        >
+                          {isPrincipal && (
+                            <div className="absolute -top-2.5 right-3 bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow">
+                              <Crown className="w-3 h-3 text-yellow-300" />
+                              PRINCIPAL
+                            </div>
+                          )}
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="font-bold text-gray-900 text-sm">{p.name}</p>
+                              <p className="text-xs font-mono text-gray-500">Código: #{p.code}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setManualSelectedIds((prev) => prev.filter((item) => item !== id));
+                                if (manualPrincipalId === id) setManualPrincipalId(null);
+                              }}
+                              className="text-gray-400 hover:text-red-500 p-1"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      type="button"
+                      disabled={manualSelectedIds.length < 2 || !manualPrincipalId}
+                      onClick={handlePrepareManualMerge}
+                      className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow transition-all flex items-center gap-2"
+                    >
+                      <Layers className="w-4 h-4" />
+                      Unificar Estampas Selecionadas
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de Todas as Estampas Disponíveis */}
+              <div>
+                <h5 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Selecione as estampas para agrupar:
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {patterns
+                    .filter((p) => p.active)
+                    .filter(
+                      (p) =>
+                        p.name.toLowerCase().includes(manualSearch.toLowerCase()) ||
+                        p.code.includes(manualSearch)
+                    )
+                    .map((p) => {
+                      const isSelected = manualSelectedIds.includes(p.id);
+
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => {
+                            if (isSelected) {
+                              setManualSelectedIds((prev) => prev.filter((id) => id !== p.id));
+                              if (manualPrincipalId === p.id) setManualPrincipalId(null);
+                            } else {
+                              const next = [...manualSelectedIds, p.id];
+                              setManualSelectedIds(next);
+                              if (!manualPrincipalId) setManualPrincipalId(p.id);
+                            }
+                          }}
+                          className={`cursor-pointer rounded-xl p-3 border text-left transition-all ${
+                            isSelected
+                              ? 'border-purple-600 bg-purple-50 text-purple-900 font-semibold'
+                              : 'border-gray-200 bg-white hover:border-gray-300 text-gray-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold text-sm truncate">{p.name}</p>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              readOnly
+                              className="w-4 h-4 text-purple-600 rounded border-gray-300"
+                            />
+                          </div>
+                          <p className="text-xs font-mono text-gray-500 mt-1">Código: #{p.code}</p>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ABA 3: HISTÓRICO DE REDIRECIONAMENTOS */}
+          {activeTab === 'history' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-gray-900 text-base">Redirecionamentos Ativos de Estampas</h4>
+                  <p className="text-xs text-gray-500">
+                    Sempre que um QR Code ou código de barras antigo for bipado, o sistema o encaminhará para a estampa principal correspondente.
+                  </p>
+                </div>
+              </div>
+
+              {isLoadingRedirects ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                </div>
+              ) : redirects.length === 0 ? (
+                <div className="bg-white rounded-2xl p-12 text-center border border-gray-200">
+                  <History className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">Nenhum redirecionamento registrado ainda.</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Ao unificar estampas, os vínculos anteriores aparecerão nesta tabela.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-2xs">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50 text-gray-600 font-semibold">
+                      <tr>
+                        <th className="px-6 py-3 text-left">Código Antigo (Impresso)</th>
+                        <th className="px-6 py-3 text-left">Estampa Anterior</th>
+                        <th className="px-6 py-3 text-center"></th>
+                        <th className="px-6 py-3 text-left">Código Novo</th>
+                        <th className="px-6 py-3 text-left">Estampa Principal</th>
+                        <th className="px-6 py-3 text-right">Data Unificação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {redirects.map((r: PatternRedirect) => (
+                        <tr key={r.id} className="hover:bg-purple-50/30 transition-colors">
+                          <td className="px-6 py-3 font-mono font-bold text-gray-700">
+                            #{r.sourcePatternCode}
+                          </td>
+                          <td className="px-6 py-3 text-gray-600 line-through">
+                            {r.sourcePatternName}
+                          </td>
+                          <td className="px-6 py-3 text-center text-purple-600">
+                            <ArrowRight className="w-4 h-4 mx-auto" />
+                          </td>
+                          <td className="px-6 py-3 font-mono font-bold text-purple-700 bg-purple-50/50">
+                            #{r.targetPatternCode}
+                          </td>
+                          <td className="px-6 py-3 font-semibold text-gray-900">
+                            {r.targetPatternName}
+                          </td>
+                          <td className="px-6 py-3 text-right text-xs text-gray-500">
+                            {new Date(r.createdAt).toLocaleDateString('pt-BR')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Rodapé do Modal */}
+        <div className="bg-gray-100 px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+          <div className="text-xs text-gray-500 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            <span>Redirecionamento automático garantido para o PDV e estoque.</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors"
+          >
+            Fechar
+          </button>
+        </div>
+      </div>
+
+      {/* DIÁLOGO DE CONFIRMAÇÃO DE UNIFICAÇÃO */}
+      {confirmData && (
+        <div className="fixed inset-0 z-60 bg-black bg-opacity-70 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border border-purple-100 animate-fade-in-up">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-yellow-100 text-yellow-700 p-3 rounded-2xl">
+                <Crown className="w-6 h-6 text-purple-700" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Confirmar Unificação de Estampas</h3>
+                <p className="text-xs text-gray-500">Revise as alterações antes de aplicar</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 my-4">
+              {/* Estampa Principal */}
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4">
+                <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block mb-1">
+                  👑 Estampa que será a Principal:
+                </span>
+                <p className="font-bold text-gray-900 text-base">{confirmData.principalPattern.name}</p>
+                <p className="text-xs font-mono text-purple-700">Código Oficial: #{confirmData.principalPattern.code}</p>
+              </div>
+
+              {/* Estampas que serão unificadas */}
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4">
+                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
+                  🔄 Estampas que serão incorporadas ({confirmData.secondaryPatterns.length}):
+                </span>
+                <ul className="divide-y divide-gray-100 text-xs text-gray-700">
+                  {confirmData.secondaryPatterns.map((p) => (
+                    <li key={p.id} className="py-1.5 flex items-center justify-between">
+                      <span className="font-medium">{p.name}</span>
+                      <span className="font-mono text-gray-400">#{p.code}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Aviso sobre QR Codes e Etiquetas */}
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-3.5 text-xs text-green-900 flex items-start gap-2.5">
+                <QrCode className="w-4 h-4 text-green-700 mt-0.5 shrink-0" />
+                <p>
+                  <strong>Etiquetas Físicas e QR Codes Preservados:</strong> As roupas já etiquetadas continuarão funcionando normalmente quando bipadas. O sistema direcionará o código antigo para esta nova estampa principal.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                type="button"
+                disabled={mergeMutation.isPending}
+                onClick={() => setConfirmData(null)}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={mergeMutation.isPending}
+                onClick={handleExecuteMerge}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all flex items-center gap-2"
+              >
+                {mergeMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Unificando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Confirmar e Unificar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PatternMergeModal;

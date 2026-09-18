@@ -36,8 +36,8 @@ npm run dev
 
 ## 🌐 Acesso
 - Frontend: http://localhost:3000
-- API: http://localhost:3001
-- Documentação: http://localhost:3001/api-docs
+- API: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- Documentação: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api-docs
 
 ## 👤 Credenciais
 - Admin: admin@amorascapital.com / admin123

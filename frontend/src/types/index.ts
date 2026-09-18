@@ -64,8 +64,72 @@ export interface Pattern {
   code: string;
   description?: string;
   active: boolean;
+  canonicalPatternId?: string | null;
+  canonicalPattern?: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    products?: number;
+    mergedPatterns?: number;
+  };
+}
+
+export interface PatternClusterItem {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  active: boolean;
+  createdAt: string;
+  productsCount: number;
+  sampleImages: string[];
+}
+
+export interface PatternCluster {
+  id: string;
+  title: string;
+  primaryReason: string;
+  averageSimilarity: number;
+  suggestedPrincipalId: string;
+  patterns: PatternClusterItem[];
+}
+
+export interface PatternRedirect {
+  id: string;
+  sourcePatternId: string;
+  sourcePatternCode: string;
+  sourcePatternName: string;
+  targetPatternId: string;
+  targetPatternCode: string;
+  targetPatternName: string;
+  createdAt: string;
+  sourcePattern?: { id: string; name: string; code: string; active: boolean };
+  targetPattern?: { id: string; name: string; code: string; active: boolean };
+}
+
+export interface MergePatternsPayload {
+  principalPatternId: string;
+  mergedPatternIds: string[];
+}
+
+export interface MergePatternsResponse {
+  success: boolean;
+  message: string;
+  result: {
+    principalPattern: Pattern;
+    secondaryPatternsCount: number;
+    productsUpdatedCount: number;
+    redirectedCodes: Array<{
+      fromCode: string;
+      fromName: string;
+      toCode: string;
+      toName: string;
+    }>;
+  };
 }
 
 // Tipos de tamanho
@@ -85,17 +149,24 @@ export interface Product {
   description?: string;
   price: number;
   cost?: number;
-  stock: number;
+  stock: number; // Estoque total (para compatibilidade)
+  stockLoja: number; // Estoque na Loja
+  stockArmazem: number; // Estoque no Armazém
   minStock: number;
   barcode: string;
   qrcodeUrl?: string;
+  ncm?: string;
+  cfop?: string;
   imageUrl?: string;
+  images?: ProductImage[]; // Galeria de imagens
   categoryId: string;
   subcategoryId?: string; // Opcional
+  sizeId: string; // ID do tamanho
   patternId: string;
-  size: string; // Campo string para compatibilidade com SQLite
-  sizeCode: string; // Campo string para compatibilidade com SQLite
   active: boolean;
+  inProduction: boolean; // Status de produção (mantido para compatibilidade)
+  status: ProductStatus; // Status do produto
+  commercialProduct?: CommercialProductSummary | null;
   createdAt: string;
   updatedAt: string;
   
@@ -103,7 +174,35 @@ export interface Product {
   category?: Category;
   subcategory?: Subcategory;
   pattern?: Pattern;
+  size?: Size; // Relação completa do tamanho
 }
+
+export interface CommercialProductSummary {
+  id: string;
+  erpProductId: string;
+  title: string;
+  slug: string;
+  published: boolean;
+  featured: boolean;
+  categoryId?: string;
+}
+
+export type ProductImageType = 'ROUPA' | 'IA';
+
+export interface ProductImage {
+  id: string;
+  productId: string;
+  url: string;
+  type: ProductImageType;
+  position: number;
+  createdAt: string;
+}
+
+// Enums de localização de estoque
+export type StockLocation = 'LOJA' | 'ARMAZEM';
+
+// Enums de status de produto
+export type ProductStatus = 'PROCESSANDO' | 'ATIVO' | 'INATIVO';
 
 // Tipos de movimentação de estoque
 export interface StockMovement {
@@ -113,7 +212,10 @@ export interface StockMovement {
   quantity: number;
   reason: string;
   reference?: string;
-  userId: string;
+  userId?: string;
+  location?: StockLocation; // Para ENTRY/EXIT/ADJUSTMENT
+  fromLocation?: StockLocation; // Para TRANSFER
+  toLocation?: StockLocation; // Para TRANSFER
   createdAt: string;
   
   // Relações
@@ -319,6 +421,9 @@ export interface ProductFormData {
   sizeId: string; // ID do tamanho para buscar dados
   active?: boolean;
   imageFile?: File;
+  imageFilesRoupa?: File[]; // novas imagens tipo roupa
+  imageFilesIA?: File[];    // novas imagens tipo IA
+  initialLocation?: 'LOJA' | 'ARMAZEM'; // Localização inicial do estoque
 }
 
 export interface SubcategoryFormData {
@@ -384,6 +489,7 @@ export interface ProductFilters {
   minStock?: number;
   maxStock?: number;
   active?: boolean;
+  isDraft?: boolean;
   page?: number;
   limit?: number;
 }
@@ -445,6 +551,111 @@ export interface LeadsReport {
   }>;
 }
 
+export type FiscalDocumentStatus = 'PENDING' | 'PROCESSING' | 'AUTHORIZED' | 'REJECTED' | 'DENIED' | 'CONTINGENCY' | 'CANCELLED' | 'VOIDED' | 'ERROR';
+
+export interface FiscalDocument {
+  id: string;
+  saleId: string;
+  model: number;
+  series: number;
+  number: number;
+  accessKey?: string;
+  status: FiscalDocumentStatus;
+  statusCode?: number;
+  statusMessage?: string;
+  totalAmount: number;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  issuedAt: string;
+  authorizedAt?: string;
+  cancelledAt?: string;
+  sale?: Pick<Sale, 'saleNumber' | 'leadName' | 'paymentMethod'>;
+}
+
+export interface FiscalDanfe {
+  id: string;
+  model: number;
+  series: number;
+  number: number;
+  accessKey: string;
+  protocolNumber?: string;
+  status: FiscalDocumentStatus;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  operationNature: string;
+  issuedAt: string;
+  authorizedAt?: string;
+  recipientName?: string;
+  recipientTaxId?: string;
+  totalAmount: number;
+  qrCodeUrl?: string;
+  consultationUrl?: string;
+  issuer: {
+    companyName: string;
+    tradeName?: string;
+    taxId: string;
+    stateTaxId: string;
+    stateCode: string;
+    cityName: string;
+    street: string;
+    streetNumber: string;
+    district: string;
+    zipCode: string;
+    addressComplement?: string;
+  };
+  sale: {
+    saleNumber: string;
+    leadName?: string;
+    customerTaxId?: string;
+    paymentMethod: string;
+    subtotal: number;
+    discount: number;
+    total: number;
+  };
+  items: Array<{
+    id: string;
+    itemNumber: number;
+    productCode: string;
+    description: string;
+    ncm: string;
+    cfop: string;
+    unitOfMeasure: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
+}
+
+export interface FiscalConfig {
+  id?: string;
+  active: boolean;
+  companyName: string;
+  tradeName?: string;
+  taxId: string;
+  stateTaxId: string;
+  taxRegime: number;
+  stateCode: string;
+  cityCode: string;
+  cityName: string;
+  street: string;
+  streetNumber: string;
+  district: string;
+  zipCode: string;
+  addressComplement?: string;
+  environment: 'HOMOLOGATION' | 'PRODUCTION';
+  nfeSeries: number;
+  nfceSeries: number;
+  nextNfeNumber: number;
+  nextNfceNumber: number;
+  cscId?: string;
+  certificateValidUntil?: string;
+  defaultNcm?: string;
+  defaultCfop?: string;
+  defaultIcmsCst?: string;
+  defaultPisCst?: string;
+  defaultCofinsCst?: string;
+  hasCscToken?: boolean;
+  hasCertificate?: boolean;
+}
+
 export interface StockReport {
   totalProducts: number;
   totalValue: number;
@@ -459,4 +670,82 @@ export interface StockReport {
     count: number;
     totalQuantity: number;
   }>;
-} 
+}
+
+// Relatório de Vendas
+export interface SalesReportSummary {
+  totalRevenue: number;
+  totalSales: number;
+  totalItemsSold: number;
+  averageTicket: number;
+  totalDiscount: number;
+}
+
+export interface PatternSalesRankingItem {
+  id: string;
+  name: string;
+  code: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  sampleImage?: string | null;
+  percentageOfTotal: number;
+}
+
+export interface CategorySalesRankingItem {
+  id: string;
+  name: string;
+  code: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  percentageOfTotal: number;
+}
+
+export interface SubcategorySalesRankingItem {
+  id: string;
+  name: string;
+  code: string;
+  categoryName: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  percentageOfTotal: number;
+}
+
+export interface PaymentMethodStats {
+  method: string;
+  count: number;
+  totalRevenue: number;
+  percentage: number;
+}
+
+export interface DailySalesTimelinePoint {
+  date: string;
+  formattedDate: string;
+  totalRevenue: number;
+  salesCount: number;
+  itemsCount: number;
+}
+
+export interface TopProductSalesItem {
+  id: string;
+  name: string;
+  categoryName?: string;
+  patternName?: string;
+  sizeName?: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  imageUrl?: string | null;
+}
+
+export interface SalesReportData {
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  summary: SalesReportSummary;
+  patternsRanking: PatternSalesRankingItem[];
+  categoriesRanking: CategorySalesRankingItem[];
+  subcategoriesRanking: SubcategorySalesRankingItem[];
+  paymentMethods: PaymentMethodStats[];
+  timeline: DailySalesTimelinePoint[];
+  topProducts: TopProductSalesItem[];
+}

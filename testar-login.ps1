@@ -1,7 +1,7 @@
 Write-Host "🔐 Testando login das contas criadas..." -ForegroundColor Green
 Write-Host ""
 
-$API_URL = "http://localhost:3001/api"
+$API_URL = "http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api"
 
 $contas = @(
     @{email="admin@amorascapital.com"; senha="admin123"; nome="Administrador"},

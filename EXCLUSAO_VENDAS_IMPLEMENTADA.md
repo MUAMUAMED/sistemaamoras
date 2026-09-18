@@ -189,7 +189,7 @@ node teste-excluir-vendas.js
 ### Via API
 ```bash
 # Excluir venda
-curl -X DELETE http://localhost:3001/api/sales/{ID_DA_VENDA} \
+curl -X DELETE http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/api/sales/{ID_DA_VENDA} \
   -H "Authorization: Bearer TOKEN"
 ```
 

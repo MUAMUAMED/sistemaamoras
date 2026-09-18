@@ -21,6 +21,7 @@ import patternRoutes from './routes/pattern.routes';
 import saleRoutes from './routes/sale.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import webhookRoutes from './routes/webhook.routes';
+import commercialRoutes from './routes/commercial.routes';
 
 // Importar novas rotas ERP
 import sizesRoutes from './routes/sizes';
@@ -29,6 +30,7 @@ import stockMovementsRoutes from './routes/stock-movements';
 import interactionsRoutes from './routes/interactions';
 import barcodeRoutes from './routes/barcode';
 import automationRoutes from './routes/automation.routes';
+import productionRoutes from './routes/production.routes';
 
 // Importar middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -92,7 +94,7 @@ app.use(cors({
     ? (process.env.CORS_ORIGINS?.split(',') || ['https://app.exemplo.com'])
     : true, // Permitir todas as origens em desenvolvimento
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   maxAge: 86400
 }));
@@ -148,6 +150,7 @@ app.use('/api/patterns', patternRoutes);
 app.use('/api/sales', saleRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/commercial', commercialRoutes);
 
 // Novas rotas ERP
 app.use('/api/sizes', sizesRoutes);
@@ -156,6 +159,7 @@ app.use('/api/stock-movements', stockMovementsRoutes);
 app.use('/api/interactions', interactionsRoutes);
 app.use('/api/barcode', barcodeRoutes);
 app.use('/api/automation', automationRoutes);
+app.use('/api/production', productionRoutes);
 
 // Rota de pagamento Mercado Pago
 app.use('/api/payment-gateway', paymentGatewayRoutes);

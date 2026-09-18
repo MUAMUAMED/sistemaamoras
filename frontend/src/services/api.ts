@@ -6,10 +6,15 @@ import {
   Category,
   Subcategory,
   Pattern,
+  PatternCluster,
+  PatternRedirect,
+  MergePatternsPayload,
+  MergePatternsResponse,
   Size,
   Sale,
   SaleItem,
   StockMovement,
+  StockLocation,
   Interaction,
   SystemConfig,
   DashboardMetrics,
@@ -29,14 +34,18 @@ import {
   SaleFilters,
   PaginatedResponse,
   ApiResponse,
+  FiscalConfig,
+  FiscalDocument,
+  FiscalDanfe,
+  SalesReportData,
 } from '../types';
 
 // Configuração base do Axios
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || (
     process.env.NODE_ENV === 'production' 
-      ? 'https://api.exemplo.com/api'
-      : 'http://localhost:3001/api'
+      ? 'https://amorasbackenddd.zeabur.app/api'
+      : 'https://amorasbackenddd.zeabur.app/api'
   ),
   timeout: parseInt(process.env.REACT_APP_API_TIMEOUT || '30000'),
 });
@@ -229,6 +238,21 @@ export const patternsApi = {
     const params = force ? { force: 'true' } : {};
     await api.delete(`/patterns/${id}`, { params });
   },
+
+  getClusters: async (): Promise<{ clusters: PatternCluster[]; totalDuplicatesFound: number }> => {
+    const response = await api.get('/patterns/clusters');
+    return response.data;
+  },
+
+  merge: async (data: MergePatternsPayload): Promise<MergePatternsResponse> => {
+    const response = await api.post('/patterns/merge', data);
+    return response.data;
+  },
+
+  getRedirects: async (): Promise<PatternRedirect[]> => {
+    const response = await api.get('/patterns/redirects');
+    return response.data;
+  },
 };
 
 // Serviços de produtos
@@ -279,6 +303,20 @@ export const productsApi = {
     });
     return response.data;
   },
+
+  uploadImages: async (id: string, images: File[], type: 'ROUPA' | 'IA'): Promise<{ message: string }> => {
+    const formData = new FormData();
+    images.forEach((file) => formData.append('images', file));
+    const response = await api.post(`/products/${id}/images?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  
+  finishProduction: async (id: string): Promise<Product> => {
+    const response = await api.put(`/products/${id}/finish-production`);
+    return response.data;
+  },
   
   addStock: async (id: string, quantity: number, reason?: string): Promise<{
     message: string;
@@ -314,6 +352,70 @@ export const productsApi = {
     totalMovements: number;
   }> => {
     const response = await api.get(`/products/${id}/stock/history`);
+    return response.data;
+  },
+  
+  addStockLocation: async (id: string, quantity: number, location: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/add-location`, {
+      quantity,
+      location,
+      reason: reason || `Adição manual de estoque - ${location}`
+    });
+    return response.data;
+  },
+  
+  removeStockLocation: async (id: string, quantity: number, location: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/remove-location`, {
+      quantity,
+      location,
+      reason: reason || `Retirada manual de estoque - ${location}`
+    });
+    return response.data;
+  },
+  
+  transferStock: async (id: string, quantity: number, fromLocation: StockLocation, toLocation: StockLocation, reason?: string): Promise<{
+    message: string;
+    product: Product;
+    transferDetails: {
+      quantity: number;
+      fromLocation: StockLocation;
+      toLocation: StockLocation;
+      previousFromStock: number;
+      newFromStock: number;
+      previousToStock: number;
+      newToStock: number;
+    };
+  }> => {
+    const response = await api.patch(`/products/${id}/stock/transfer`, {
+      quantity,
+      fromLocation,
+      toLocation,
+      reason: reason || `Transferência de estoque: ${fromLocation} → ${toLocation}`
+    });
+    return response.data;
+  },
+
+  publishToCommercialSite: async (id: string, data?: {
+    title?: string;
+    slug?: string;
+    description?: string;
+    shortDescription?: string;
+    categoryId?: string | null;
+    featured?: boolean;
+    position?: number;
+  }): Promise<Product['commercialProduct']> => {
+    const response = await api.post(`/commercial/admin/products/publish/${id}`, data || {});
+    return response.data;
+  },
+
+  unpublishFromCommercialSite: async (commercialProductId: string): Promise<Product['commercialProduct']> => {
+    const response = await api.put(`/commercial/admin/products/${commercialProductId}/unpublish`);
     return response.data;
   },
 };
@@ -511,6 +613,254 @@ export const salesApi = {
     const response = await api.delete(`/sales/${id}`);
     return response.data;
   },
+
+  /** Emite (ou consulta, se já existir) a NFC-e da venda já concluída. */
+  issueNfce: async (id: string): Promise<{ id: string; number: number; series: number; status: string; statusMessage?: string | null }> => {
+    const response = await api.post(`/fiscal/sales/${id}/issue-nfce`);
+    return response.data;
+  },
+
+  getReport: async (params?: {
+    startDate?: string;
+    endDate?: string;
+    status?: string;
+    sellerId?: string;
+  }): Promise<SalesReportData> => {
+    try {
+      const response = await api.get('/sales/report', { params });
+      return response.data;
+    } catch (err: any) {
+      console.warn('Backend /sales/report fallback triggered:', err);
+      // Fallback em caso de atraso na propagação do deploy
+      const salesRes = await salesApi.list({ limit: 500 });
+      const sales = salesRes.data || [];
+
+      const start = params?.startDate ? new Date(params.startDate) : null;
+      const end = params?.endDate ? new Date(params.endDate) : null;
+      if (end) end.setHours(23, 59, 59, 999);
+
+      const filtered = sales.filter((s: Sale) => {
+        if (params?.status && params.status !== 'ALL' && s.status !== params.status) return false;
+        const d = new Date(s.createdAt);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        return true;
+      });
+
+      let totalRevenue = 0;
+      let totalDiscount = 0;
+      let totalItemsSold = 0;
+
+      const patternsMap = new Map<string, any>();
+      const categoriesMap = new Map<string, any>();
+      const subcategoriesMap = new Map<string, any>();
+      const paymentMethodsMap = new Map<string, any>();
+      const timelineMap = new Map<string, any>();
+      const productsMap = new Map<string, any>();
+
+      for (const sale of filtered) {
+        totalRevenue += sale.total || 0;
+        totalDiscount += sale.discount || 0;
+
+        const method = sale.paymentMethod || 'OUTRO';
+        const currentMethod = paymentMethodsMap.get(method) || { method, count: 0, totalRevenue: 0 };
+        currentMethod.count += 1;
+        currentMethod.totalRevenue += sale.total || 0;
+        paymentMethodsMap.set(method, currentMethod);
+
+        const saleDate = new Date(sale.createdAt);
+        const dateKey = saleDate.toISOString().split('T')[0];
+        const formattedDate = `${String(saleDate.getDate()).padStart(2, '0')}/${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
+        const currentDay = timelineMap.get(dateKey) || { date: dateKey, formattedDate, totalRevenue: 0, salesCount: 0, itemsCount: 0 };
+        currentDay.totalRevenue += sale.total || 0;
+        currentDay.salesCount += 1;
+
+        for (const item of sale.items || []) {
+          const qty = item.quantity || 0;
+          const itemRev = item.total || (qty * (item.unitPrice || 0));
+          totalItemsSold += qty;
+          currentDay.itemsCount += qty;
+
+          const p = item.product;
+          if (p) {
+            const pat = p.pattern;
+            const patId = pat?.id || 'sem-estampa';
+            const patName = pat?.name || 'Sem Estampa';
+            const patCode = pat?.code || '0000';
+            const img = p.images?.[0]?.url || p.imageUrl;
+            const curPat = patternsMap.get(patId) || { id: patId, name: patName, code: patCode, totalQuantity: 0, totalRevenue: 0, sampleImage: img };
+            curPat.totalQuantity += qty;
+            curPat.totalRevenue += itemRev;
+            if (!curPat.sampleImage && img) curPat.sampleImage = img;
+            patternsMap.set(patId, curPat);
+
+            const cat = p.category;
+            const catId = cat?.id || 'sem-categoria';
+            const catName = cat?.name || 'Sem Categoria';
+            const catCode = cat?.code || '00';
+            const curCat = categoriesMap.get(catId) || { id: catId, name: catName, code: catCode, totalQuantity: 0, totalRevenue: 0 };
+            curCat.totalQuantity += qty;
+            curCat.totalRevenue += itemRev;
+            categoriesMap.set(catId, curCat);
+
+            const sub = p.subcategory;
+            if (sub) {
+              const curSub = subcategoriesMap.get(sub.id) || { id: sub.id, name: sub.name, code: sub.code, categoryName: catName, totalQuantity: 0, totalRevenue: 0 };
+              curSub.totalQuantity += qty;
+              curSub.totalRevenue += itemRev;
+              subcategoriesMap.set(sub.id, curSub);
+            }
+
+            const curProd = productsMap.get(p.id) || { id: p.id, name: p.name, categoryName: catName, patternName: patName, sizeName: p.size?.name, totalQuantity: 0, totalRevenue: 0, imageUrl: img };
+            curProd.totalQuantity += qty;
+            curProd.totalRevenue += itemRev;
+            productsMap.set(p.id, curProd);
+          }
+        }
+        timelineMap.set(dateKey, currentDay);
+      }
+
+      return {
+        period: {
+          startDate: params?.startDate || '',
+          endDate: params?.endDate || '',
+        },
+        summary: {
+          totalRevenue: Math.round(totalRevenue * 100) / 100,
+          totalSales: filtered.length,
+          totalItemsSold,
+          averageTicket: filtered.length > 0 ? Math.round((totalRevenue / filtered.length) * 100) / 100 : 0,
+          totalDiscount: Math.round(totalDiscount * 100) / 100,
+        },
+        patternsRanking: Array.from(patternsMap.values())
+          .map((p: any) => ({
+            ...p,
+            totalRevenue: Math.round(p.totalRevenue * 100) / 100,
+            percentageOfTotal: totalItemsSold > 0 ? Math.round((p.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalQuantity - a.totalQuantity),
+        categoriesRanking: Array.from(categoriesMap.values())
+          .map((c: any) => ({
+            ...c,
+            totalRevenue: Math.round(c.totalRevenue * 100) / 100,
+            percentageOfTotal: totalItemsSold > 0 ? Math.round((c.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalQuantity - a.totalQuantity),
+        subcategoriesRanking: Array.from(subcategoriesMap.values())
+          .map((s: any) => ({
+            ...s,
+            totalRevenue: Math.round(s.totalRevenue * 100) / 100,
+            percentageOfTotal: totalItemsSold > 0 ? Math.round((s.totalQuantity / totalItemsSold) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalQuantity - a.totalQuantity),
+        paymentMethods: Array.from(paymentMethodsMap.values())
+          .map((m: any) => ({
+            ...m,
+            totalRevenue: Math.round(m.totalRevenue * 100) / 100,
+            percentage: totalRevenue > 0 ? Math.round((m.totalRevenue / totalRevenue) * 1000) / 10 : 0,
+          }))
+          .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue),
+        timeline: Array.from(timelineMap.values()).sort((a: any, b: any) => a.date.localeCompare(b.date)),
+        topProducts: Array.from(productsMap.values()).sort((a: any, b: any) => b.totalQuantity - a.totalQuantity).slice(0, 20),
+      };
+    }
+  },
+};
+
+export const fiscalApi = {
+  getConfig: async (): Promise<FiscalConfig | null> => (await api.get('/fiscal/config')).data,
+  updateConfig: async (data: Partial<FiscalConfig> & { cscToken?: string; certificatePfxBase64?: string; certificatePassword?: string }): Promise<FiscalConfig> =>
+    (await api.put('/fiscal/config', data)).data,
+  listDocuments: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    environment?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<PaginatedResponse<FiscalDocument>> =>
+    (await api.get('/fiscal/documents', { params })).data,
+  issueNfce: async (saleId: string): Promise<FiscalDocument> => (await api.post(`/fiscal/sales/${saleId}/issue-nfce`)).data,
+  issueManualNfce: async (data: {
+    recipientName?: string;
+    recipientTaxId?: string;
+    paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+    notes?: string;
+    items: Array<{
+      productCode?: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      ncm?: string;
+      cfop?: string;
+    }>;
+  }): Promise<FiscalDocument> => (await api.post('/fiscal/manual/issue-nfce', data)).data,
+    getAiProviders: async (): Promise<{
+      providers: Array<{
+        id: 'gemini' | 'groq' | 'openrouter';
+        label: string;
+        model: string;
+        configured: boolean;
+        enabled: boolean;
+        isDefault: boolean;
+        source: 'database' | 'environment' | null;
+      }>;
+      defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
+    }> => (await api.get('/fiscal/ai/providers')).data,
+    saveAiProvider: async (
+      provider: 'gemini' | 'groq' | 'openrouter',
+      data: {
+        apiKey?: string;
+        model: string;
+        enabled: boolean;
+        isDefault: boolean;
+        clearKey?: boolean;
+      }
+    ): Promise<{
+      providers: Array<{
+        id: 'gemini' | 'groq' | 'openrouter';
+        label: string;
+        model: string;
+        configured: boolean;
+        enabled: boolean;
+        isDefault: boolean;
+        source: 'database' | 'environment' | null;
+      }>;
+      defaultProvider: 'gemini' | 'groq' | 'openrouter' | null;
+    }> => (await api.put(`/fiscal/ai/providers/${provider}`, data)).data,
+    testAiProvider: async (
+      provider: 'gemini' | 'groq' | 'openrouter'
+    ): Promise<{ success: boolean; provider: string; model: string; message: string }> =>
+      (await api.post(`/fiscal/ai/providers/${provider}/test`)).data,
+    parseManualDraft: async (data: {
+    provider: 'gemini' | 'groq' | 'openrouter';
+    prompt: string;
+  }): Promise<{
+    provider: 'gemini' | 'groq' | 'openrouter';
+    model: string;
+    warnings: string[];
+    draft: {
+      recipientName: string;
+      recipientTaxId: string;
+      paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+      notes: string;
+      items: Array<{
+        productCode: string;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        ncm: string;
+        cfop: string;
+      }>;
+    };
+  }> => (await api.post('/fiscal/ai/parse-draft', data)).data,
+  retry: async (id: string): Promise<FiscalDocument> => (await api.post(`/fiscal/documents/${id}/retry`)).data,
+  cancel: async (id: string, reason: string) => (await api.post(`/fiscal/documents/${id}/cancel`, { reason })).data,
+  checkStatus: async () => (await api.get('/fiscal/status')).data,
+  getDanfe: async (id: string): Promise<FiscalDanfe> => (await api.get(`/fiscal/documents/${id}/danfe`)).data,
+  downloadXml: async (id: string): Promise<Blob> =>
+    (await api.get(`/fiscal/documents/${id}/xml`, { responseType: 'blob' })).data,
 };
 
 // Serviços de códigos de barras
@@ -662,6 +1012,8 @@ export const saleService = {
   cancel: salesApi.cancel,
   generatePayment: salesApi.generatePayment,
   processPayment: salesApi.processPayment,
+  issueNfce: salesApi.issueNfce,
+  getReport: salesApi.getReport,
 };
 
 export const categoryService = categoriesApi;

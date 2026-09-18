@@ -64,8 +64,8 @@ iniciar-sistema-local.bat
 
 ### URLs de Acesso:
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:3001
-- **Health Check**: http://localhost:3001/health
+- **Backend API**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host
+- **Health Check**: http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
 
 ## 🔧 Comandos Úteis
 
@@ -76,7 +76,7 @@ netstat -ano | findstr :3000
 netstat -ano | findstr :3001
 
 # Testar API
-curl http://localhost:3001/health
+curl http://https://amoras-sistema-gew1.gbl2yq.easypanel.host/health
 ```
 
 ### Parar Sistema:
