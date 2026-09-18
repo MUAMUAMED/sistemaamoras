@@ -319,7 +319,7 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
             barcode: true,
             images: {
               take: 1,
-              where: { type: 'ROUPA' },
+              orderBy: { position: 'asc' },
               select: { id: true, url: true }
             }
           }
@@ -347,54 +347,19 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
     const uf = new DisjointSet();
     const pairwiseMatches = new Map<string, { reason: string; score: number }>();
 
-    // A. Comparação Textual (Nome exato, fonético e similaridade de bigramas)
-    for (let i = 0; i < patterns.length; i++) {
-      for (let j = i + 1; j < patterns.length; j++) {
-        const p1 = patterns[i];
-        const p2 = patterns[j];
-
-        // Se este par foi descartado pelo usuário, ignorar
-        if (dismissedSet.has(`${p1.id}:${p2.id}`)) {
-          continue;
-        }
-
-        const norm1 = normalizeText(p1.name);
-        const norm2 = normalizeText(p2.name);
-        const root1 = extractPrintRoot(p1.name);
-        const root2 = extractPrintRoot(p2.name);
-
-        let matchReason = '';
-        let score = 0;
-
-        if (norm1 === norm2) {
-          matchReason = 'Nome idêntico (diferença apenas de maiúsculas/acentos)';
-          score = 1.0;
-        } else if (root1 && root2 && root1 === root2) {
-          matchReason = 'Radical do nome idêntico';
-          score = 0.95;
-        } else {
-          const sim = stringSimilarity(p1.name, p2.name);
-          if (sim >= 0.75) {
-            matchReason = `Nome com alta similaridade (${Math.round(sim * 100)}%)`;
-            score = sim;
-          }
-        }
-
-        if (score > 0) {
-          const merged = uf.union(p1.id, p2.id, dismissedSet);
-          if (merged) {
-            const pairKey = [p1.id, p2.id].sort().join(':');
-            pairwiseMatches.set(pairKey, { reason: matchReason, score });
-          }
-        }
-      }
-    }
-
-    // B. Comparação Visual por Vetores (pgvector) das fotos de roupas associadas
+    // Agrupamento Exclusivo por Vetores Visuais (pgvector)
+    // Nomes são arbitrários no catálogo; o agrupamento de sugestões é 100% visual via embeddings das fotos das roupas
     try {
-      const visualPairs = await prisma.$queryRaw<
+      await ensureVisualSearchSetup();
+      const db = vectorDatabase();
+
+      const minSimilarity = req.query.minSimilarity
+        ? Math.max(0.7, Math.min(1.0, Number(req.query.minSimilarity)))
+        : 0.85;
+
+      const visualPairs = await db.$queryRawUnsafe<
         Array<{ id1: string; id2: string; similarity: number }>
-      >(Prisma.sql`
+      >(`
         SELECT
           p1."patternId" AS id1,
           p2."patternId" AS id2,
@@ -403,15 +368,17 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
         INNER JOIN product_images pi1 ON pi1.id = pie1."productImageId"
         INNER JOIN products p1 ON p1.id = pi1."productId"
         INNER JOIN patterns pat1 ON pat1.id = p1."patternId"
-        INNER JOIN product_image_embeddings pie2 ON pie1."productImageId" < pie2."productImageId"
+        INNER JOIN product_image_embeddings pie2 ON pie1."productImageId" != pie2."productImageId"
         INNER JOIN product_images pi2 ON pi2.id = pie2."productImageId"
         INNER JOIN products p2 ON p2.id = pi2."productId"
         INNER JOIN patterns pat2 ON pat2.id = p2."patternId"
-        WHERE p1."patternId" != p2."patternId"
+        WHERE p1."patternId" < p2."patternId"
           AND pat1.active = true AND pat2.active = true
+          AND p1.active = true AND p2.active = true
         GROUP BY p1."patternId", p2."patternId"
-        HAVING MAX(1 - (pie1.embedding <=> pie2.embedding)) >= 0.82
-      `);
+        HAVING MAX(1 - (pie1.embedding <=> pie2.embedding)) >= $1
+        ORDER BY similarity DESC
+      `, minSimilarity);
 
       for (const pair of visualPairs) {
         if (dismissedSet.has(`${pair.id1}:${pair.id2}`)) {
@@ -422,25 +389,16 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
         if (!merged) continue;
 
         const pairKey = [pair.id1, pair.id2].sort().join(':');
-        const existing = pairwiseMatches.get(pairKey);
         const visualScore = Number(pair.similarity);
-        const visualReason = `Similaridade visual por foto (${Math.round(visualScore * 100)}%)`;
+        const visualReason = `Similaridade visual por foto via IA (${Math.round(visualScore * 100)}%)`;
 
-        if (existing) {
-          pairwiseMatches.set(pairKey, {
-            reason: `${existing.reason} + ${visualReason}`,
-            score: Math.max(existing.score, visualScore)
-          });
-        } else {
-          pairwiseMatches.set(pairKey, {
-            reason: visualReason,
-            score: visualScore
-          });
-        }
+        pairwiseMatches.set(pairKey, {
+          reason: visualReason,
+          score: visualScore
+        });
       }
     } catch (e: any) {
-      // Caso pgvector não esteja populado ou tabela vazia, a similaridade textual continua operando
-      console.warn('Busca visual de clusters não retornou dados vetoriais:', e?.message || e);
+      console.warn('Busca visual de clusters no pgvector falhou:', e?.message || e);
     }
 
     // Agrupar elementos pelo representante da floresta
@@ -487,8 +445,8 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       const suggestedPrincipal = sortedByWeight[0];
 
       // Calcular o motivo predominante no grupo
-      let primaryReason = 'Semelhança de nome e características';
-      let highestScore = 0.8;
+      let primaryReason = 'Similaridade visual por foto via IA';
+      let highestScore = 0.85;
 
       for (let i = 0; i < groupPatterns.length; i++) {
         for (let j = i + 1; j < groupPatterns.length; j++) {
