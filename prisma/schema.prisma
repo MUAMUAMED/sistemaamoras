@@ -107,6 +107,19 @@ model PatternRedirect {
   @@map("pattern_redirects")
 }
 
+// Pares de estampas descartadas/ignoradas da unificação automática
+model PatternDismissedPair {
+  id         String   @id @default(cuid())
+  patternId1 String
+  patternId2 String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@unique([patternId1, patternId2], map: "pattern_dismissed_pairs_unique")
+  @@index([patternId1, patternId2], map: "pattern_dismissed_pairs_idx")
+  @@map("pattern_dismissed_pairs")
+}
+
 // Tamanhos dos produtos
 model Size {
   id        String   @id @default(cuid())
