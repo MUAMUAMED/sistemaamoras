@@ -222,40 +222,31 @@ export default function SalesReport() {
   const handleDayClick = (dayStr: string) => {
     const clickedDate = parseDateKey(dayStr);
 
-    if (mode === 'DAILY') {
-      setDailyPeriod(clickedDate);
-      return;
-    }
-
-    if (mode === 'WEEKLY') {
-      setWeeklyPeriod(clickedDate);
-      return;
-    }
-
-    if (mode === 'MONTHLY') {
-      setMonthlyPeriod(clickedDate);
-      return;
-    }
-
     // Modo CUSTOMIZADO: Seleção ou junção de dias
-    if (!rangeSelectionStart) {
-      // Primeiro clique: inicia seleção de intervalo
-      setRangeSelectionStart(dayStr);
-      setStartDate(dayStr);
-      setEndDate(dayStr);
-    } else {
-      // Segundo clique: junta os dias selecionados
-      const first = parseDateKey(rangeSelectionStart);
-      const second = clickedDate;
-      if (first <= second) {
-        setStartDate(formatDateKey(first));
-        setEndDate(formatDateKey(second));
+    if (mode === 'CUSTOM') {
+      if (!rangeSelectionStart) {
+        // Primeiro clique: inicia seleção de intervalo
+        setRangeSelectionStart(dayStr);
+        setStartDate(dayStr);
+        setEndDate(dayStr);
       } else {
-        setStartDate(formatDateKey(second));
-        setEndDate(formatDateKey(first));
+        // Segundo clique: junta os dias selecionados
+        const first = parseDateKey(rangeSelectionStart);
+        const second = clickedDate;
+        if (first <= second) {
+          setStartDate(formatDateKey(first));
+          setEndDate(formatDateKey(second));
+        } else {
+          setStartDate(formatDateKey(second));
+          setEndDate(formatDateKey(first));
+        }
+        setRangeSelectionStart(null);
       }
-      setRangeSelectionStart(null);
+      return;
     }
+
+    // Ao clicar em um dia específico, foca diretamente naquele dia (modo Diário)
+    setDailyPeriod(clickedDate);
   };
 
   // Gerar dias da grade do calendário para o mês exibido
@@ -310,6 +301,40 @@ export default function SalesReport() {
 
     return [...prevDays, ...currentMonthDays, ...nextDays];
   }, [calendarMonth]);
+
+  // Período total visível na grade do calendário para carregar quantidades de peças de cada dia
+  const calendarGridRange = useMemo(() => {
+    if (!calendarDays.length) return { start: '', end: '' };
+    return {
+      start: calendarDays[0].dateKey,
+      end: calendarDays[calendarDays.length - 1].dateKey,
+    };
+  }, [calendarDays]);
+
+  const { data: calendarReport } = useQuery<SalesReportData>({
+    queryKey: ['sales-report-calendar-grid', calendarGridRange.start, calendarGridRange.end, statusFilter],
+    queryFn: () => salesApi.getReport({
+      startDate: calendarGridRange.start,
+      endDate: calendarGridRange.end,
+      status: statusFilter,
+    }),
+    enabled: Boolean(calendarGridRange.start && calendarGridRange.end),
+    staleTime: 30 * 1000,
+  });
+
+  const calendarDaysStatsMap = useMemo(() => {
+    const map = new Map<string, { itemsCount: number; totalSales: number; totalRevenue: number }>();
+    if (calendarReport?.timeline) {
+      for (const t of calendarReport.timeline) {
+        map.set(t.date, {
+          itemsCount: t.itemsCount || 0,
+          totalSales: t.totalSales || 0,
+          totalRevenue: t.totalRevenue || 0,
+        });
+      }
+    }
+    return map;
+  }, [calendarReport?.timeline]);
 
   // Verificar se um dia está no intervalo selecionado
   const isDaySelected = (dayKey: string) => {
@@ -562,6 +587,7 @@ export default function SalesReport() {
               const isStart = isDayStart(item.dateKey);
               const isEnd = isDayEnd(item.dateKey);
               const todayFlag = isToday(item.dateKey);
+              const dayStats = calendarDaysStatsMap.get(item.dateKey);
 
               let buttonStyle = 'text-gray-700 hover:bg-pink-50 hover:text-pink-600';
 
@@ -582,16 +608,37 @@ export default function SalesReport() {
                   key={idx}
                   type="button"
                   onClick={() => handleDayClick(item.dateKey)}
-                  className={`relative flex flex-col items-center justify-center min-h-[42px] sm:min-h-[48px] rounded-lg text-xs sm:text-sm font-medium transition-all focus:outline-none ${buttonStyle}`}
+                  title={
+                    dayStats && dayStats.itemsCount > 0
+                      ? `${item.dayNum}: ${dayStats.itemsCount} ${dayStats.itemsCount === 1 ? 'peça' : 'peças'} vendidas (${dayStats.totalSales} ${dayStats.totalSales === 1 ? 'venda' : 'vendas'} - ${formatCurrency(dayStats.totalRevenue)})`
+                      : `${item.dayNum}: nenhuma venda registrada`
+                  }
+                  className={`relative flex flex-col items-center justify-center p-1 min-h-[46px] sm:min-h-[52px] rounded-lg text-xs sm:text-sm font-medium transition-all focus:outline-none ${buttonStyle}`}
                 >
-                  <span>{item.dayNum}</span>
+                  <span className="leading-tight">{item.dayNum}</span>
+
+                  {dayStats && dayStats.itemsCount > 0 ? (
+                    <span
+                      className={`mt-0.5 text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded-full leading-none tracking-tight ${
+                        isSelected && (isStart || isEnd)
+                          ? 'bg-white/30 text-white'
+                          : isSelected
+                          ? 'bg-pink-200 text-pink-900'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}
+                    >
+                      {dayStats.itemsCount} un
+                    </span>
+                  ) : (
+                    <span className="h-3 sm:h-3.5" />
+                  )}
 
                   {/* Indicador de Hoje */}
                   {todayFlag && !isSelected && (
-                    <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-pink-500" />
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-pink-500" />
                   )}
                   {todayFlag && isSelected && (isStart || isEnd) && (
-                    <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-white" />
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-white" />
                   )}
                 </button>
               );
