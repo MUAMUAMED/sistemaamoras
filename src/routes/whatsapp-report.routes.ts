@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth';
 import { prisma } from '../config/database';
 import {
-  connectWhatsapp,
+  beginWhatsappQrLink,
   getWhatsappReportStatus,
   listWhatsappGroups,
   requestWhatsappPairingCode,
@@ -45,7 +45,7 @@ router.get('/status', ...adminsOnly, (_req, res) => res.json(getWhatsappReportSt
 
 router.post('/connect', ...adminsOnly, async (_req, res, next) => {
   try {
-    await connectWhatsapp();
+    await beginWhatsappQrLink();
     res.json(getWhatsappReportStatus());
   } catch (error) { next(error); }
 });

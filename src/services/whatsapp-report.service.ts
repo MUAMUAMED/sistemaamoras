@@ -186,6 +186,29 @@ export async function connectWhatsapp(): Promise<void> {
   return connectPromise;
 }
 
+async function discardIncompleteWhatsappLink() {
+  if (connectionStatus === 'CONNECTED' || authRegistered) {
+    throw new Error('Já existe um WhatsApp vinculado. Desconecte a sessão atual antes de vincular outro número.');
+  }
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  socket?.end(undefined);
+  socket = null;
+  connectPromise = null;
+  connectionStatus = 'DISCONNECTED';
+  qrCodeDataUrl = null;
+  lastError = null;
+  // Uma tentativa não concluída pode conter pre-keys. Não reutilizá-las evita
+  // que o WhatsApp rejeite um pairing code de uma conexão anterior.
+  await prisma.whatsappAuthKey.deleteMany();
+  await prisma.whatsappAuthCredential.deleteMany();
+}
+
+export async function beginWhatsappQrLink(): Promise<void> {
+  await discardIncompleteWhatsappLink();
+  await connectWhatsapp();
+}
+
 export async function listWhatsappGroups() {
   if (connectionStatus !== 'CONNECTED' || !socket) {
     throw new Error('WhatsApp ainda não está conectado. Leia o QR Code primeiro.');
@@ -201,15 +224,12 @@ export async function requestWhatsappPairingCode(rawPhoneNumber: string): Promis
   if (phoneNumber.length < 10 || phoneNumber.length > 15) {
     throw new Error('Informe o número completo com DDI e DDD. Exemplo: 5561999999999.');
   }
-  if (connectionStatus === 'CONNECTED' || authRegistered) {
-    throw new Error('Já existe um WhatsApp vinculado. Para vincular outro número, desconecte a sessão atual primeiro.');
-  }
-
+  await discardIncompleteWhatsappLink();
   await connectWhatsapp();
   if (!socket) throw new Error('Não foi possível iniciar a conexão do WhatsApp. Tente novamente.');
 
   // O socket precisa concluir o handshake antes de aceitar o pedido de código.
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
   qrCodeDataUrl = null;
   connectionStatus = 'CONNECTING';
   const code = await socket.requestPairingCode(phoneNumber);
