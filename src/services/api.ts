@@ -952,6 +952,32 @@ export const systemConfigApi = {
   },
 };
 
+export type WhatsappReportConfig = {
+  id: string;
+  enabled: boolean;
+  groupJid: string | null;
+  groupName: string | null;
+  scheduledHour: number;
+  timezone: string;
+};
+
+export type WhatsappReportStatus = {
+  status: 'DISCONNECTED' | 'CONNECTING' | 'WAITING_QR' | 'CONNECTED' | 'ERROR';
+  connected: boolean;
+  waitingForQr: boolean;
+  qrCodeDataUrl: string | null;
+  lastError: string | null;
+};
+
+export const whatsappReportApi = {
+  getConfig: async (): Promise<WhatsappReportConfig> => (await api.get('/whatsapp-report/config')).data,
+  updateConfig: async (data: Partial<WhatsappReportConfig>): Promise<WhatsappReportConfig> => (await api.put('/whatsapp-report/config', data)).data,
+  getStatus: async (): Promise<WhatsappReportStatus> => (await api.get('/whatsapp-report/status')).data,
+  connect: async (): Promise<WhatsappReportStatus> => (await api.post('/whatsapp-report/connect')).data,
+  getGroups: async (): Promise<Array<{ jid: string; name: string }>> => (await api.get('/whatsapp-report/groups')).data,
+  sendTest: async (): Promise<{ sent?: boolean; skipped?: boolean; reason?: string }> => (await api.post('/whatsapp-report/send-test')).data,
+};
+
 // Serviços de dashboard
 export const dashboardApi = {
   getMetrics: async (): Promise<DashboardMetrics> => {

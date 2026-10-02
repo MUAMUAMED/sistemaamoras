@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { CogIcon, UserIcon, KeyIcon, BellIcon } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
+import { whatsappReportApi } from '../services/api';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -12,12 +13,38 @@ export default function Settings() {
     { id: 'profile', name: 'Perfil', icon: UserIcon },
     { id: 'security', name: 'Segurança', icon: KeyIcon },
     { id: 'notifications', name: 'Notificações', icon: BellIcon },
+    { id: 'whatsapp', name: 'Relatórios WhatsApp', icon: BellIcon },
     { id: 'system', name: 'Sistema', icon: CogIcon },
   ];
 
   const handleSave = () => {
     toast.success('Configurações salvas com sucesso!');
   };
+
+  const reportConfigQuery = useQuery({ queryKey: ['whatsapp-report-config'], queryFn: whatsappReportApi.getConfig });
+  const reportStatusQuery = useQuery({
+    queryKey: ['whatsapp-report-status'], queryFn: whatsappReportApi.getStatus,
+    refetchInterval: activeTab === 'whatsapp' ? 3000 : false,
+  });
+  const groupsQuery = useQuery({
+    queryKey: ['whatsapp-report-groups'], queryFn: whatsappReportApi.getGroups,
+    enabled: activeTab === 'whatsapp' && Boolean(reportStatusQuery.data?.connected),
+  });
+  const saveReportConfig = useMutation({
+    mutationFn: whatsappReportApi.updateConfig,
+    onSuccess: () => { reportConfigQuery.refetch(); toast.success('Configuração do relatório salva'); },
+    onError: () => toast.error('Não foi possível salvar a configuração do WhatsApp.'),
+  });
+  const connectWhatsapp = useMutation({
+    mutationFn: whatsappReportApi.connect,
+    onSuccess: () => { reportStatusQuery.refetch(); toast.success('QR Code solicitado. Leia-o no WhatsApp do número da Amoras.'); },
+    onError: () => toast.error('Não foi possível iniciar a conexão do WhatsApp.'),
+  });
+  const sendTest = useMutation({
+    mutationFn: whatsappReportApi.sendTest,
+    onSuccess: () => toast.success('Relatório de teste enviado ao grupo.'),
+    onError: (error: any) => toast.error(error?.response?.data?.error || 'Não foi possível enviar o teste.'),
+  });
 
   return (
     <div>
@@ -200,6 +227,75 @@ export default function Settings() {
             </div>
           )}
 
+          {activeTab === 'whatsapp' && (
+            <div className="space-y-6 max-w-2xl">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Relatório diário no WhatsApp</h3>
+                <p className="text-sm text-gray-500">O resumo das vendas será enviado todos os dias às 18h, no horário de Brasília.</p>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Conexão do número da Amoras</h4>
+                    <p className="text-sm text-gray-500">
+                      {reportStatusQuery.data?.connected ? 'WhatsApp conectado e pronto para enviar.' : 'Conecte o número que participa do grupo de relatórios.'}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${reportStatusQuery.data?.connected ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                    {reportStatusQuery.data?.connected ? 'Conectado' : reportStatusQuery.data?.waitingForQr ? 'Aguardando QR' : 'Desconectado'}
+                  </span>
+                </div>
+                {!reportStatusQuery.data?.connected && (
+                  <button type="button" className="btn-primary mt-4" onClick={() => connectWhatsapp.mutate()} disabled={connectWhatsapp.isPending}>
+                    {connectWhatsapp.isPending ? 'Gerando QR Code...' : 'Conectar WhatsApp'}
+                  </button>
+                )}
+                {reportStatusQuery.data?.qrCodeDataUrl && (
+                  <div className="mt-4 rounded border bg-white p-4 text-center">
+                    <p className="mb-3 text-sm text-gray-600">No WhatsApp: Dispositivos conectados → Conectar dispositivo.</p>
+                    <img src={reportStatusQuery.data.qrCodeDataUrl} alt="QR Code para conectar WhatsApp" className="mx-auto h-64 w-64" />
+                  </div>
+                )}
+                {reportStatusQuery.data?.lastError && <p className="mt-3 text-sm text-red-600">{reportStatusQuery.data.lastError}</p>}
+              </div>
+
+              <div className="space-y-4 rounded-lg border p-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Grupo que receberá o relatório</label>
+                  <select
+                    className="input-field mt-1"
+                    value={reportConfigQuery.data?.groupJid || ''}
+                    disabled={!reportStatusQuery.data?.connected || groupsQuery.isLoading}
+                    onChange={(event) => {
+                      const group = groupsQuery.data?.find((item) => item.jid === event.target.value);
+                      saveReportConfig.mutate({ groupJid: group?.jid || null, groupName: group?.name || null });
+                    }}
+                  >
+                    <option value="">{reportStatusQuery.data?.connected ? 'Selecione o grupo' : 'Conecte o WhatsApp primeiro'}</option>
+                    {groupsQuery.data?.map((group) => <option key={group.jid} value={group.jid}>{group.name}</option>)}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">Escolha “Relatórios Amoras Capital” após conectar o número ao grupo.</p>
+                </div>
+
+                <label className="flex items-center gap-3 text-sm font-medium text-gray-800">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-primary-600"
+                    checked={Boolean(reportConfigQuery.data?.enabled)}
+                    disabled={!reportConfigQuery.data?.groupJid || saveReportConfig.isPending}
+                    onChange={(event) => saveReportConfig.mutate({ enabled: event.target.checked })}
+                  />
+                  Ativar envio automático todos os dias às 18h
+                </label>
+
+                <button type="button" className="btn-outline" disabled={!reportStatusQuery.data?.connected || !reportConfigQuery.data?.groupJid || sendTest.isPending} onClick={() => sendTest.mutate()}>
+                  {sendTest.isPending ? 'Enviando...' : 'Enviar relatório de teste'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'system' && (
             <div className="space-y-6">
               <div>
@@ -290,4 +386,4 @@ export default function Settings() {
       </div>
     </div>
   );
-} 
+}
