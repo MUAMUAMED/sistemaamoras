@@ -357,30 +357,59 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
         ? Math.max(0.7, Math.min(1.0, Number(req.query.minSimilarity)))
         : 0.85;
 
+      // Os vetores ficam em um PostgreSQL separado do banco operacional. Portanto,
+      // aqui só comparamos IDs de imagens no banco vetorial; a associação
+      // imagem -> produto -> estampa é feita logo abaixo no banco principal.
       const visualPairs = await db.$queryRawUnsafe<
-        Array<{ id1: string; id2: string; similarity: number }>
+        Array<{ imageId1: string; imageId2: string; similarity: number }>
       >(`
         SELECT
-          p1."patternId" AS id1,
-          p2."patternId" AS id2,
-          MAX(1 - (pie1.embedding <=> pie2.embedding))::float AS similarity
+          pie1."productImageId" AS "imageId1",
+          pie2."productImageId" AS "imageId2",
+          (1 - (pie1.embedding <=> pie2.embedding))::float AS similarity
         FROM product_image_embeddings pie1
-        INNER JOIN product_images pi1 ON pi1.id = pie1."productImageId"
-        INNER JOIN products p1 ON p1.id = pi1."productId"
-        INNER JOIN patterns pat1 ON pat1.id = p1."patternId"
-        INNER JOIN product_image_embeddings pie2 ON pie1."productImageId" != pie2."productImageId"
-        INNER JOIN product_images pi2 ON pi2.id = pie2."productImageId"
-        INNER JOIN products p2 ON p2.id = pi2."productId"
-        INNER JOIN patterns pat2 ON pat2.id = p2."patternId"
-        WHERE p1."patternId" < p2."patternId"
-          AND pat1.active = true AND pat2.active = true
-          AND p1.active = true AND p2.active = true
-        GROUP BY p1."patternId", p2."patternId"
-        HAVING MAX(1 - (pie1.embedding <=> pie2.embedding)) >= $1
+        INNER JOIN product_image_embeddings pie2
+          ON pie1."productImageId" < pie2."productImageId"
+        WHERE (1 - (pie1.embedding <=> pie2.embedding)) >= $1
         ORDER BY similarity DESC
       `, minSimilarity);
 
-      for (const pair of visualPairs) {
+      const imageIds = [...new Set(visualPairs.flatMap((pair) => [pair.imageId1, pair.imageId2]))];
+      const indexedImages = imageIds.length > 0
+        ? await (prisma as any).productImage.findMany({
+            where: {
+              id: { in: imageIds },
+              product: { active: true, pattern: { active: true } },
+            },
+            select: {
+              id: true,
+              product: { select: { patternId: true } },
+            },
+          })
+        : [];
+
+      const patternByImageId = new Map<string, string>(
+        indexedImages
+          .filter((image: any) => Boolean(image.product?.patternId))
+          .map((image: any) => [image.id, image.product.patternId])
+      );
+
+      // Uma estampa pode ter mais de uma foto. Mantemos somente a melhor
+      // similaridade de cada par de estampas antes de montar os grupos.
+      const strongestPatternPairs = new Map<string, { id1: string; id2: string; similarity: number }>();
+      for (const imagePair of visualPairs) {
+        const id1 = patternByImageId.get(imagePair.imageId1);
+        const id2 = patternByImageId.get(imagePair.imageId2);
+        if (!id1 || !id2 || id1 === id2) continue;
+
+        const pairKey = [id1, id2].sort().join(':');
+        const existing = strongestPatternPairs.get(pairKey);
+        if (!existing || Number(imagePair.similarity) > existing.similarity) {
+          strongestPatternPairs.set(pairKey, { id1, id2, similarity: Number(imagePair.similarity) });
+        }
+      }
+
+      for (const pair of strongestPatternPairs.values()) {
         if (dismissedSet.has(`${pair.id1}:${pair.id2}`)) {
           continue;
         }
