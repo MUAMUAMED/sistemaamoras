@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import QRCode from 'qrcode';
 import P from 'pino';
 import makeWASocket, {
@@ -7,7 +5,9 @@ import makeWASocket, {
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
-  useMultiFileAuthState,
+  BufferJSON,
+  initAuthCreds,
+  proto,
   WASocket,
 } from '@whiskeysockets/baileys';
 import { prisma } from '../config/database';
@@ -29,12 +29,52 @@ let schedulerTimer: NodeJS.Timeout | null = null;
 let checkingSchedule = false;
 let authRegistered = false;
 
-function authDirectory(): string {
-  const configured = process.env.BAILEYS_AUTH_DIR;
-  const defaultDirectory = process.env.NODE_ENV === 'production'
-    ? '/data/whatsapp-auth'
-    : path.join(process.cwd(), 'data', 'whatsapp-auth');
-  return path.resolve(configured || defaultDirectory);
+const serializeAuth = (value: unknown) => JSON.parse(JSON.stringify(value, BufferJSON.replacer));
+const deserializeAuth = <T>(value: unknown): T => JSON.parse(JSON.stringify(value), BufferJSON.reviver) as T;
+
+// Baileys recomenda um store SQL/NoSQL para produção. O estado não pode ficar
+// no filesystem efêmero do container, pois todo deploy perderia a vinculação.
+async function useDatabaseAuthState() {
+  const savedCredentials = await prisma.whatsappAuthCredential.findUnique({ where: { id: 'default' } });
+  const creds = savedCredentials ? deserializeAuth<any>(savedCredentials.data) : initAuthCreds();
+
+  return {
+    state: {
+      creds,
+      keys: {
+        get: async (type: string, ids: string[]) => {
+          const rows = await prisma.whatsappAuthKey.findMany({
+            where: { category: type, keyId: { in: ids } },
+          });
+          const found = new Map(rows.map((row) => [row.keyId, row.data]));
+          const result: Record<string, any> = {};
+          for (const id of ids) {
+            const data = found.get(id);
+            let value = data ? deserializeAuth<any>(data) : undefined;
+            if (type === 'app-state-sync-key' && value) value = proto.Message.AppStateSyncKeyData.fromObject(value);
+            result[id] = value;
+          }
+          return result;
+        },
+        set: async (data: Record<string, Record<string, unknown | null>>) => {
+          await Promise.all(Object.entries(data).flatMap(([category, entries]) => Object.entries(entries).map(async ([keyId, value]) => {
+            if (value === null) {
+              await prisma.whatsappAuthKey.deleteMany({ where: { category, keyId } });
+            } else {
+              await prisma.whatsappAuthKey.upsert({
+                where: { category_keyId: { category, keyId } },
+                update: { data: serializeAuth(value) },
+                create: { category, keyId, data: serializeAuth(value) },
+              });
+            }
+          })));
+        },
+      },
+    },
+    saveCreds: async () => prisma.whatsappAuthCredential.upsert({
+      where: { id: 'default' }, update: { data: serializeAuth(creds) }, create: { id: 'default', data: serializeAuth(creds) },
+    }),
+  };
 }
 
 function brazilDateParts(date = new Date()) {
@@ -73,7 +113,7 @@ export function getWhatsappReportStatus() {
     waitingForQr: connectionStatus === 'WAITING_QR',
     qrCodeDataUrl,
     lastError,
-    authDirectory: authDirectory(),
+    sessionStorage: 'PostgreSQL',
   };
 }
 
@@ -85,9 +125,7 @@ export async function connectWhatsapp(): Promise<void> {
   connectPromise = (async () => {
     connectionStatus = 'CONNECTING';
     lastError = null;
-    const directory = authDirectory();
-    fs.mkdirSync(directory, { recursive: true });
-    const { state, saveCreds } = await useMultiFileAuthState(directory);
+    const { state, saveCreds } = await useDatabaseAuthState();
     authRegistered = state.creds.registered;
     const { version } = await fetchLatestBaileysVersion();
 
@@ -286,19 +324,15 @@ export function startWhatsappReportAutomation() {
   if (schedulerTimer) return;
   schedulerTimer = setInterval(() => void checkDailySchedule(), 30_000);
   void checkDailySchedule();
-  // Se o volume contém uma sessão já vinculada, restaura o canal após qualquer
-  // reinicialização do Zeabur, sem exibir QR novamente.
-  try {
-    const credentialsPath = path.join(authDirectory(), 'creds.json');
-    const credentials = fs.existsSync(credentialsPath)
-      ? JSON.parse(fs.readFileSync(credentialsPath, 'utf8'))
-      : null;
-    if (credentials?.registered) {
+  // A sessão vinculada fica no Postgres, portanto sobrevive a deploys.
+  void prisma.whatsappAuthCredential.findUnique({ where: { id: 'default' } })
+    .then((credential) => {
+      const credentials = credential ? deserializeAuth<any>(credential.data) : null;
+      if (credentials?.registered) {
       void connectWhatsapp().catch((error) => logger.error('Falha ao restaurar WhatsApp:', error));
-    }
-  } catch (error) {
-    logger.warn(`Não foi possível restaurar a sessão do WhatsApp: ${error}`);
-  }
+      }
+    })
+    .catch((error) => logger.warn(`Não foi possível restaurar a sessão do WhatsApp: ${error}`));
   logger.info('Automação de relatório diário WhatsApp inicializada (18h, America/Sao_Paulo)');
 }
 

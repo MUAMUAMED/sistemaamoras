@@ -496,6 +496,26 @@ model WhatsappReportLog {
   @@map("whatsapp_report_logs")
 }
 
+// Estado criptográfico do dispositivo vinculado do Baileys. É persistido no
+// Postgres porque o filesystem do container do Zeabur é descartado em deploys.
+model WhatsappAuthCredential {
+  id        String   @id @default("default")
+  data      Json
+  updatedAt DateTime @updatedAt
+
+  @@map("whatsapp_auth_credentials")
+}
+
+model WhatsappAuthKey {
+  id       String @id @default(cuid())
+  category String
+  keyId    String
+  data     Json?
+
+  @@unique([category, keyId])
+  @@map("whatsapp_auth_keys")
+}
+
 // Configuracao fiscal do emitente. Segredos sao armazenados cifrados pela aplicacao.
 model FiscalConfig {
   id                           String            @id @default("default")
