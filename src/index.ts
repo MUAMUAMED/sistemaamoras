@@ -454,8 +454,12 @@ async function startServer() {
     await prisma.$connect();
     logger.info("Conexão com banco de dados estabelecida");
 
-    logger.info("🤖 Automações programadas inicializadas");
-    startWhatsappReportAutomation();
+    if (!process.env.WHATSAPP_WORKER_URL) {
+      logger.info("🤖 Automações programadas inicializadas");
+      startWhatsappReportAutomation();
+    } else {
+      logger.info("📱 Automação WhatsApp delegada ao serviço independente");
+    }
 
     // Inicialização da busca visual com pgvector
     ensureVisualSearchSetup()

@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import axios from 'axios';
+import { NextFunction, Request, Response, Router } from 'express';
 import { authenticateToken, authorizeRoles } from '../middleware/auth';
 import { prisma } from '../config/database';
 import {
@@ -12,7 +13,42 @@ import {
 const router = Router();
 const adminsOnly = [authenticateToken, authorizeRoles('ADMIN', 'MANAGER')];
 
+// Quando configurado, o Baileys roda em um serviço independente. O ERP mantém
+// estas mesmas rotas públicas e apenas encaminha a chamada pela rede interna.
+// Isso evita derrubar a sessão do WhatsApp a cada deploy do backend principal.
+function whatsappWorkerUrl() {
+  return process.env.WHATSAPP_WORKER_URL?.replace(/\/$/, '') || null;
+}
+
+async function proxyToWhatsappWorker(req: Request, res: Response, next: NextFunction) {
+  const baseUrl = whatsappWorkerUrl();
+  const token = process.env.WHATSAPP_WORKER_TOKEN;
+  if (!baseUrl) return false;
+  if (!token) {
+    res.status(503).json({ error: 'Serviço de relatórios WhatsApp ainda não foi configurado.' });
+    return true;
+  }
+
+  try {
+    const response = await axios.request({
+      baseURL: baseUrl,
+      url: `/internal/whatsapp-report${req.path}`,
+      method: req.method,
+      params: req.query,
+      data: req.body,
+      headers: { 'x-amoras-worker-token': token },
+      validateStatus: () => true,
+      timeout: 25_000,
+    });
+    res.status(response.status).json(response.data);
+  } catch (error: any) {
+    next(new Error(`Serviço de relatórios WhatsApp indisponível: ${error?.message || error}`));
+  }
+  return true;
+}
+
 router.get('/config', ...adminsOnly, async (_req, res, next) => {
+  if (await proxyToWhatsappWorker(_req, res, next)) return;
   try {
     const config = await prisma.whatsappReportConfig.upsert({
       where: { id: 'default' }, update: {}, create: { id: 'default' },
@@ -22,6 +58,7 @@ router.get('/config', ...adminsOnly, async (_req, res, next) => {
 });
 
 router.put('/config', ...adminsOnly, async (req, res, next) => {
+  if (await proxyToWhatsappWorker(req, res, next)) return;
   try {
     const { enabled, groupJid, groupName, scheduledHour } = req.body;
     if (scheduledHour !== undefined && (!Number.isInteger(scheduledHour) || scheduledHour < 0 || scheduledHour > 23)) {
@@ -41,9 +78,13 @@ router.put('/config', ...adminsOnly, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-router.get('/status', ...adminsOnly, (_req, res) => res.json(getWhatsappReportStatus()));
+router.get('/status', ...adminsOnly, async (req, res, next) => {
+  if (await proxyToWhatsappWorker(req, res, next)) return;
+  res.json(getWhatsappReportStatus());
+});
 
 router.post('/connect', ...adminsOnly, async (_req, res, next) => {
+  if (await proxyToWhatsappWorker(_req, res, next)) return;
   try {
     await beginWhatsappQrLink();
     res.json(getWhatsappReportStatus());
@@ -51,6 +92,7 @@ router.post('/connect', ...adminsOnly, async (_req, res, next) => {
 });
 
 router.post('/pairing-code', ...adminsOnly, async (req, res, next) => {
+  if (await proxyToWhatsappWorker(req, res, next)) return;
   try {
     const pairingCode = await requestWhatsappPairingCode(req.body?.phoneNumber);
     res.json({ pairingCode });
@@ -58,10 +100,12 @@ router.post('/pairing-code', ...adminsOnly, async (req, res, next) => {
 });
 
 router.get('/groups', ...adminsOnly, async (_req, res, next) => {
+  if (await proxyToWhatsappWorker(_req, res, next)) return;
   try { res.json(await listWhatsappGroups()); } catch (error) { next(error); }
 });
 
 router.post('/send-test', ...adminsOnly, async (req, res, next) => {
+  if (await proxyToWhatsappWorker(req, res, next)) return;
   try {
     let reportFor: Date | undefined;
     if (req.body?.date) {
@@ -74,6 +118,7 @@ router.post('/send-test', ...adminsOnly, async (req, res, next) => {
 });
 
 router.get('/logs', ...adminsOnly, async (_req, res, next) => {
+  if (await proxyToWhatsappWorker(_req, res, next)) return;
   try {
     const logs = await prisma.whatsappReportLog.findMany({ orderBy: { attemptedAt: 'desc' }, take: 30 });
     res.json(logs);

@@ -36,4 +36,4 @@ EXPOSE 8080
 # O banco de produção possui dados e evolui por migrações aditivas revisadas.
 # A aplicação não tenta sincronizar schema no boot: esse passo pode bloquear
 # a inicialização ou aplicar uma mudança fora da revisão explicitamente aprovada.
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "if [ \"$SERVICE_MODE\" = \"whatsapp-worker\" ]; then node dist/whatsapp-worker.js; else node dist/index.js; fi"]
