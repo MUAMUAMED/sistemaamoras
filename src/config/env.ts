@@ -79,6 +79,7 @@ export const env = {
   CHATWOOT_URL: process.env.CHATWOOT_URL || '',
   CHATWOOT_TOKEN: process.env.CHATWOOT_TOKEN || '',
   N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL || '',
+  BAILEYS_AUTH_DIR: process.env.BAILEYS_AUTH_DIR || '',
   MP_ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN || process.env.MERCADO_PAGO_ACCESS_TOKEN || '',
   MP_PUBLIC_KEY: process.env.MP_PUBLIC_KEY || process.env.MERCADO_PAGO_PUBLIC_KEY || '',
   YAMPI_ALIAS: process.env.YAMPI_ALIAS || '',

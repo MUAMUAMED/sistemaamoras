@@ -34,6 +34,8 @@ import interactionsRoutes from "./routes/interactions";
 import barcodeRoutes from "./routes/barcode";
 import automationRoutes from "./routes/automation.routes";
 import productionRoutes from "./routes/production.routes";
+import whatsappReportRoutes from "./routes/whatsapp-report.routes";
+import { closeWhatsappConnection, startWhatsappReportAutomation } from './services/whatsapp-report.service';
 
 // Pagamento
 import paymentGatewayRoutes from "./routes/payment-gateway.service";
@@ -437,6 +439,7 @@ app.use("/api/interactions", interactionsRoutes);
 app.use("/api/barcode", barcodeRoutes);
 app.use("/api/automation", automationRoutes);
 app.use("/api/production", productionRoutes);
+app.use("/api/whatsapp-report", whatsappReportRoutes);
 
 // Pagamento
 app.use("/api/payment-gateway", paymentGatewayRoutes);
@@ -452,6 +455,7 @@ async function startServer() {
     logger.info("Conexão com banco de dados estabelecida");
 
     logger.info("🤖 Automações programadas inicializadas");
+    startWhatsappReportAutomation();
 
     // Inicialização da busca visual com pgvector
     ensureVisualSearchSetup()
@@ -485,12 +489,14 @@ async function startServer() {
 // === Shutdown gracioso ===
 process.on("SIGTERM", async () => {
   logger.info("Recebido SIGTERM, encerrando servidor...");
+  await closeWhatsappConnection();
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on("SIGINT", async () => {
   logger.info("Recebido SIGINT, encerrando servidor...");
+  await closeWhatsappConnection();
   await prisma.$disconnect();
   process.exit(0);
 });

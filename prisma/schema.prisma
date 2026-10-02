@@ -463,6 +463,39 @@ model SystemConfig {
   @@map("system_config")
 }
 
+// Configuração do resumo diário enviado pelo WhatsApp da Amoras.
+// A sessão do WhatsApp nunca fica no banco: ela permanece no volume privado
+// configurado em BAILEYS_AUTH_DIR.
+model WhatsappReportConfig {
+  id            String   @id @default("default")
+  enabled       Boolean  @default(false)
+  groupJid      String?
+  groupName     String?
+  scheduledHour Int      @default(18)
+  timezone      String   @default("America/Sao_Paulo")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("whatsapp_report_config")
+}
+
+// Auditoria e trava de idempotência: um mesmo relatório diário não pode ser
+// reenviado após uma reinicialização do servidor.
+model WhatsappReportLog {
+  id          String   @id @default(cuid())
+  reportDate  DateTime
+  kind        String   @default("DAILY_SALES")
+  status      String
+  message     String
+  error       String?
+  attemptedAt DateTime @default(now())
+  sentAt      DateTime?
+
+  @@unique([reportDate, kind])
+  @@index([status, attemptedAt])
+  @@map("whatsapp_report_logs")
+}
+
 // Configuracao fiscal do emitente. Segredos sao armazenados cifrados pela aplicacao.
 model FiscalConfig {
   id                           String            @id @default("default")
