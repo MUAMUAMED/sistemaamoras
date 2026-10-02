@@ -27,6 +27,7 @@ let qrCodeDataUrl: string | null = null;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let schedulerTimer: NodeJS.Timeout | null = null;
 let checkingSchedule = false;
+let authRegistered = false;
 
 function authDirectory(): string {
   const configured = process.env.BAILEYS_AUTH_DIR;
@@ -85,6 +86,7 @@ export async function connectWhatsapp(): Promise<void> {
     const directory = authDirectory();
     fs.mkdirSync(directory, { recursive: true });
     const { state, saveCreds } = await useMultiFileAuthState(directory);
+    authRegistered = state.creds.registered;
     const { version } = await fetchLatestBaileysVersion();
 
     socket = makeWASocket({
@@ -149,6 +151,26 @@ export async function listWhatsappGroups() {
   return Object.values(groups)
     .map((group: any) => ({ jid: group.id, name: group.subject || group.id }))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+}
+
+export async function requestWhatsappPairingCode(rawPhoneNumber: string): Promise<string> {
+  const phoneNumber = String(rawPhoneNumber || '').replace(/\D/g, '');
+  if (phoneNumber.length < 10 || phoneNumber.length > 15) {
+    throw new Error('Informe o número completo com DDI e DDD. Exemplo: 5561999999999.');
+  }
+  if (connectionStatus === 'CONNECTED' || authRegistered) {
+    throw new Error('Já existe um WhatsApp vinculado. Para vincular outro número, desconecte a sessão atual primeiro.');
+  }
+
+  await connectWhatsapp();
+  if (!socket) throw new Error('Não foi possível iniciar a conexão do WhatsApp. Tente novamente.');
+
+  // O socket precisa concluir o handshake antes de aceitar o pedido de código.
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  qrCodeDataUrl = null;
+  connectionStatus = 'CONNECTING';
+  const code = await socket.requestPairingCode(phoneNumber);
+  return code.replace(/(.{4})/g, '$1 ').trim();
 }
 
 export async function buildDailySalesReport(now = new Date()): Promise<{ message: string; reportDate: Date }> {

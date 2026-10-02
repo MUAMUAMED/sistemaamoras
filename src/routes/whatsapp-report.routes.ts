@@ -5,6 +5,7 @@ import {
   connectWhatsapp,
   getWhatsappReportStatus,
   listWhatsappGroups,
+  requestWhatsappPairingCode,
   sendDailySalesReport,
 } from '../services/whatsapp-report.service';
 
@@ -46,6 +47,13 @@ router.post('/connect', ...adminsOnly, async (_req, res, next) => {
   try {
     await connectWhatsapp();
     res.json(getWhatsappReportStatus());
+  } catch (error) { next(error); }
+});
+
+router.post('/pairing-code', ...adminsOnly, async (req, res, next) => {
+  try {
+    const pairingCode = await requestWhatsappPairingCode(req.body?.phoneNumber);
+    res.json({ pairingCode });
   } catch (error) { next(error); }
 });
 
