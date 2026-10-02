@@ -155,6 +155,10 @@ export async function connectWhatsapp(): Promise<void> {
         connectionStatus = 'CONNECTED';
         qrCodeDataUrl = null;
         lastError = null;
+        // Além do evento creds.update, persiste explicitamente ao concluir a
+        // vinculação. Assim a sessão não depende do timing dos eventos e
+        // sobrevive ao próximo reinício do serviço.
+        await saveCreds();
         logger.info('WhatsApp de relatórios conectado');
       }
 
