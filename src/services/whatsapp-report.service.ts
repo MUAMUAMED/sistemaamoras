@@ -286,7 +286,7 @@ export async function buildDailySalesReport(now = new Date()): Promise<{ message
   };
 }
 
-export async function sendDailySalesReport(options: { manual?: boolean } = {}) {
+export async function sendDailySalesReport(options: { manual?: boolean; reportFor?: Date } = {}) {
   const config = await prisma.whatsappReportConfig.upsert({
     where: { id: 'default' },
     update: {},
@@ -296,7 +296,7 @@ export async function sendDailySalesReport(options: { manual?: boolean } = {}) {
   if (!config.groupJid) throw new Error('Selecione o grupo que receberá o relatório.');
   if (connectionStatus !== 'CONNECTED' || !socket) throw new Error('WhatsApp não conectado. Leia o QR Code e tente novamente.');
 
-  const { message, reportDate } = await buildDailySalesReport();
+  const { message, reportDate } = await buildDailySalesReport(options.reportFor || new Date());
   const kind = options.manual ? `DAILY_SALES_TEST_${Date.now()}` : REPORT_KIND;
 
   if (!options.manual) {

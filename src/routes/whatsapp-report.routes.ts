@@ -61,8 +61,16 @@ router.get('/groups', ...adminsOnly, async (_req, res, next) => {
   try { res.json(await listWhatsappGroups()); } catch (error) { next(error); }
 });
 
-router.post('/send-test', ...adminsOnly, async (_req, res, next) => {
-  try { res.json(await sendDailySalesReport({ manual: true })); } catch (error) { next(error); }
+router.post('/send-test', ...adminsOnly, async (req, res, next) => {
+  try {
+    let reportFor: Date | undefined;
+    if (req.body?.date) {
+      const raw = String(req.body.date);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return res.status(400).json({ error: 'Data inválida. Use AAAA-MM-DD.' });
+      reportFor = new Date(`${raw}T12:00:00-03:00`);
+    }
+    res.json(await sendDailySalesReport({ manual: true, reportFor }));
+  } catch (error) { next(error); }
 });
 
 router.get('/logs', ...adminsOnly, async (_req, res, next) => {
