@@ -45,7 +45,8 @@
     "src/services/**/*",
     "src/types/**/*",
     "src/scripts/**/*",
-    "src/index.ts"
+    "src/index.ts",
+    "src/whatsapp-worker.ts"
   ],
   "exclude": [
     "node_modules",
