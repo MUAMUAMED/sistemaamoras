@@ -78,7 +78,9 @@ export function getWhatsappReportStatus() {
 }
 
 export async function connectWhatsapp(): Promise<void> {
-  if (connectionStatus === 'CONNECTED' || connectPromise) return connectPromise || Promise.resolve();
+  // Não crie dois sockets para a mesma sessão. Dois sockets concorrentes fazem
+  // o evento "close" da conexão antiga derrubar a conexão que acabou de abrir.
+  if (socket || connectionStatus === 'CONNECTED' || connectPromise) return connectPromise || Promise.resolve();
 
   connectPromise = (async () => {
     connectionStatus = 'CONNECTING';
@@ -89,7 +91,7 @@ export async function connectWhatsapp(): Promise<void> {
     authRegistered = state.creds.registered;
     const { version } = await fetchLatestBaileysVersion();
 
-    socket = makeWASocket({
+    const currentSocket = makeWASocket({
       version,
       auth: {
         creds: state.creds,
@@ -102,9 +104,10 @@ export async function connectWhatsapp(): Promise<void> {
       syncFullHistory: false,
       generateHighQualityLinkPreview: false,
     });
+    socket = currentSocket;
 
-    socket.ev.on('creds.update', saveCreds);
-    socket.ev.on('connection.update', async (update) => {
+    currentSocket.ev.on('creds.update', saveCreds);
+    currentSocket.ev.on('connection.update', async (update) => {
       if (update.qr) {
         qrCodeDataUrl = await QRCode.toDataURL(update.qr, { margin: 1, width: 320 });
         connectionStatus = 'WAITING_QR';
@@ -118,6 +121,8 @@ export async function connectWhatsapp(): Promise<void> {
       }
 
       if (update.connection === 'close') {
+        // Ignore eventos atrasados de um socket que já foi substituído.
+        if (socket !== currentSocket) return;
         const statusCode = (update.lastDisconnect?.error as any)?.output?.statusCode;
         socket = null;
         qrCodeDataUrl = null;
@@ -281,6 +286,19 @@ export function startWhatsappReportAutomation() {
   if (schedulerTimer) return;
   schedulerTimer = setInterval(() => void checkDailySchedule(), 30_000);
   void checkDailySchedule();
+  // Se o volume contém uma sessão já vinculada, restaura o canal após qualquer
+  // reinicialização do Zeabur, sem exibir QR novamente.
+  try {
+    const credentialsPath = path.join(authDirectory(), 'creds.json');
+    const credentials = fs.existsSync(credentialsPath)
+      ? JSON.parse(fs.readFileSync(credentialsPath, 'utf8'))
+      : null;
+    if (credentials?.registered) {
+      void connectWhatsapp().catch((error) => logger.error('Falha ao restaurar WhatsApp:', error));
+    }
+  } catch (error) {
+    logger.warn(`Não foi possível restaurar a sessão do WhatsApp: ${error}`);
+  }
   logger.info('Automação de relatório diário WhatsApp inicializada (18h, America/Sao_Paulo)');
 }
 
