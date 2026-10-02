@@ -974,6 +974,7 @@ export const whatsappReportApi = {
   updateConfig: async (data: Partial<WhatsappReportConfig>): Promise<WhatsappReportConfig> => (await api.put('/whatsapp-report/config', data)).data,
   getStatus: async (): Promise<WhatsappReportStatus> => (await api.get('/whatsapp-report/status')).data,
   connect: async (): Promise<WhatsappReportStatus> => (await api.post('/whatsapp-report/connect')).data,
+  requestPairingCode: async (phoneNumber: string): Promise<{ pairingCode: string }> => (await api.post('/whatsapp-report/pairing-code', { phoneNumber })).data,
   getGroups: async (): Promise<Array<{ jid: string; name: string }>> => (await api.get('/whatsapp-report/groups')).data,
   sendTest: async (): Promise<{ sent?: boolean; skipped?: boolean; reason?: string }> => (await api.post('/whatsapp-report/send-test')).data,
 };

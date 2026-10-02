@@ -7,6 +7,8 @@ import { whatsappReportApi } from '../services/api';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
+  const [pairingPhone, setPairingPhone] = useState('');
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const { user } = useAuthStore();
 
   const tabs = [
@@ -39,6 +41,14 @@ export default function Settings() {
     mutationFn: whatsappReportApi.connect,
     onSuccess: () => { reportStatusQuery.refetch(); toast.success('QR Code solicitado. Leia-o no WhatsApp do número da Amoras.'); },
     onError: () => toast.error('Não foi possível iniciar a conexão do WhatsApp.'),
+  });
+  const requestPairingCode = useMutation({
+    mutationFn: whatsappReportApi.requestPairingCode,
+    onSuccess: (data) => {
+      setPairingCode(data.pairingCode);
+      toast.success('Código de vinculação gerado. Digite-o no WhatsApp.');
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.error || 'Não foi possível gerar o código de vinculação.'),
   });
   const sendTest = useMutation({
     mutationFn: whatsappReportApi.sendTest,
@@ -247,9 +257,33 @@ export default function Settings() {
                   </span>
                 </div>
                 {!reportStatusQuery.data?.connected && (
-                  <button type="button" className="btn-primary mt-4" onClick={() => connectWhatsapp.mutate()} disabled={connectWhatsapp.isPending}>
-                    {connectWhatsapp.isPending ? 'Gerando QR Code...' : 'Conectar WhatsApp'}
-                  </button>
+                  <div className="mt-4 space-y-4">
+                    <button type="button" className="btn-primary" onClick={() => connectWhatsapp.mutate()} disabled={connectWhatsapp.isPending || requestPairingCode.isPending}>
+                      {connectWhatsapp.isPending ? 'Gerando QR Code...' : 'Conectar por QR Code'}
+                    </button>
+                    <div className="rounded-md bg-gray-50 p-3">
+                      <p className="text-sm font-medium text-gray-800">Ou conectar por número de telefone</p>
+                      <p className="mt-1 text-xs text-gray-500">Digite com DDI e DDD, sem espaços. Ex.: 5561999999999.</p>
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <input
+                          className="input-field flex-1"
+                          inputMode="tel"
+                          placeholder="5561999999999"
+                          value={pairingPhone}
+                          onChange={(event) => setPairingPhone(event.target.value)}
+                        />
+                        <button type="button" className="btn-outline" disabled={!pairingPhone.trim() || requestPairingCode.isPending || connectWhatsapp.isPending} onClick={() => requestPairingCode.mutate(pairingPhone)}>
+                          {requestPairingCode.isPending ? 'Gerando...' : 'Gerar código'}
+                        </button>
+                      </div>
+                      {pairingCode && (
+                        <div className="mt-3 rounded border border-primary-200 bg-white p-3 text-center">
+                          <p className="text-xs text-gray-500">No WhatsApp: Dispositivos conectados → Conectar dispositivo → Conectar com número de telefone.</p>
+                          <p className="mt-2 font-mono text-2xl font-bold tracking-widest text-primary-700">{pairingCode}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
                 {reportStatusQuery.data?.qrCodeDataUrl && (
                   <div className="mt-4 rounded border bg-white p-4 text-center">
