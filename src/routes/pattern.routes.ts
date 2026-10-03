@@ -344,7 +344,6 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       dismissedSet.add(`${row.patternId2}:${row.patternId1}`);
     }
 
-    const uf = new DisjointSet();
     const pairwiseMatches = new Map<string, { reason: string; score: number }>();
 
     // Agrupamento Exclusivo por Vetores Visuais (pgvector)
@@ -353,9 +352,13 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       await ensureVisualSearchSetup();
       const db = vectorDatabase();
 
+      // Embeddings de fotos de roupas são bons para encontrar candidatos, mas
+      // não são uma prova de identidade. Para a sugestão automática exigimos
+      // uma pontuação alta; comparações menos rígidas continuam disponíveis na
+      // busca manual, onde a decisão é sempre humana.
       const minSimilarity = req.query.minSimilarity
-        ? Math.max(0.7, Math.min(1.0, Number(req.query.minSimilarity)))
-        : 0.85;
+        ? Math.max(0.90, Math.min(1.0, Number(req.query.minSimilarity)))
+        : 0.92;
 
       // Os vetores ficam em um PostgreSQL separado do banco operacional. Portanto,
       // aqui só comparamos IDs de imagens no banco vetorial; a associação
@@ -409,38 +412,44 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
         }
       }
 
+      // Não montamos componentes transitivos (A~B, B~C => A/B/C). Em fotos
+      // de catálogo, isso cria grupos enormes de peças visualmente distintas.
+      // Em vez disso só propomos pares que são a melhor correspondência um do
+      // outro, e cada estampa aparece em no máximo uma sugestão automática.
+      const bestMatchByPattern = new Map<string, { id1: string; id2: string; similarity: number }>();
       for (const pair of strongestPatternPairs.values()) {
-        if (dismissedSet.has(`${pair.id1}:${pair.id2}`)) {
-          continue;
+        if (dismissedSet.has(`${pair.id1}:${pair.id2}`)) continue;
+        for (const [patternId, otherPatternId] of [[pair.id1, pair.id2], [pair.id2, pair.id1]] as const) {
+          const current = bestMatchByPattern.get(patternId);
+          if (!current || pair.similarity > current.similarity) {
+            bestMatchByPattern.set(patternId, { id1: patternId, id2: otherPatternId, similarity: pair.similarity });
+          }
         }
+      }
 
-        const merged = uf.union(pair.id1, pair.id2, dismissedSet);
-        if (!merged) continue;
+      const usedPatternIds = new Set<string>();
+      for (const pair of [...strongestPatternPairs.values()].sort((a, b) => b.similarity - a.similarity)) {
+        if (dismissedSet.has(`${pair.id1}:${pair.id2}`)) continue;
+        const bestForFirst = bestMatchByPattern.get(pair.id1);
+        const bestForSecond = bestMatchByPattern.get(pair.id2);
+        const isMutualBestMatch = bestForFirst?.id2 === pair.id2 && bestForSecond?.id2 === pair.id1;
+        if (!isMutualBestMatch || usedPatternIds.has(pair.id1) || usedPatternIds.has(pair.id2)) continue;
 
+        usedPatternIds.add(pair.id1);
+        usedPatternIds.add(pair.id2);
         const pairKey = [pair.id1, pair.id2].sort().join(':');
         const visualScore = Number(pair.similarity);
-        const visualReason = `Similaridade visual por foto via IA (${Math.round(visualScore * 100)}%)`;
-
         pairwiseMatches.set(pairKey, {
-          reason: visualReason,
-          score: visualScore
+          reason: `Melhor correspondência visual mútua (${Math.round(visualScore * 100)}%)`,
+          score: visualScore,
         });
       }
     } catch (e: any) {
       console.warn('Busca visual de clusters no pgvector falhou:', e?.message || e);
     }
 
-    // Agrupar elementos pelo representante da floresta
-    const groupMap = new Map<string, typeof patterns>();
-    for (const p of patterns) {
-      const rootId = uf.find(p.id);
-      if (!groupMap.has(rootId)) {
-        groupMap.set(rootId, []);
-      }
-      groupMap.get(rootId)!.push(p);
-    }
-
-    // Filtrar apenas grupos com 2 ou mais estampas semelhantes
+    // Cada sugestão automática contém exatamente duas estampas. Isso impede
+    // que uma cadeia de resultados diferentes vire uma unificação em massa.
     const clusters: Array<{
       id: string;
       title: string;
@@ -459,12 +468,14 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
       }>;
     }> = [];
 
+    const patternById = new Map(patterns.map((pattern) => [pattern.id, pattern]));
     let clusterIndex = 1;
-    for (const [, groupPatterns] of groupMap.entries()) {
-      if (groupPatterns.length < 2) continue;
+    for (const [pairKey, match] of pairwiseMatches.entries()) {
+      const [firstId, secondId] = pairKey.split(':');
+      const groupPatterns = [patternById.get(firstId), patternById.get(secondId)].filter(Boolean) as typeof patterns;
+      if (groupPatterns.length !== 2) continue;
 
-      // Escolher a estampa sugerida como principal:
-      // Prioridade: maior número de produtos cadastrados > data de criação mais antiga
+      // Prioridade: maior número de produtos cadastrados > data de criação mais antiga.
       const sortedByWeight = [...groupPatterns].sort((a, b) => {
         const prodDiff = b._count.products - a._count.products;
         if (prodDiff !== 0) return prodDiff;
@@ -473,26 +484,11 @@ router.get('/clusters', authenticateToken, async (req, res, next) => {
 
       const suggestedPrincipal = sortedByWeight[0];
 
-      // Calcular o motivo predominante no grupo
-      let primaryReason = 'Similaridade visual por foto via IA';
-      let highestScore = 0.85;
-
-      for (let i = 0; i < groupPatterns.length; i++) {
-        for (let j = i + 1; j < groupPatterns.length; j++) {
-          const key = [groupPatterns[i].id, groupPatterns[j].id].sort().join(':');
-          const match = pairwiseMatches.get(key);
-          if (match && match.score > highestScore) {
-            highestScore = match.score;
-            primaryReason = match.reason;
-          }
-        }
-      }
-
       clusters.push({
         id: `cluster-${clusterIndex++}`,
-        title: `Grupo de estampas: ${suggestedPrincipal.name}`,
-        primaryReason,
-        averageSimilarity: Math.round(highestScore * 100),
+        title: `Possível duplicidade: ${suggestedPrincipal.name}`,
+        primaryReason: match.reason,
+        averageSimilarity: Math.round(match.score * 100),
         suggestedPrincipalId: suggestedPrincipal.id,
         patterns: groupPatterns.map((p) => ({
           id: p.id,
