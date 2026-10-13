@@ -1,3 +1,4 @@
+import { validateCfop, validateOperation, validateNfeTax, type FiscalOperationInput } from './fiscal-operation';
 import { PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { decryptFiscalSecret } from './fiscal-crypto.service';
@@ -54,6 +55,9 @@ export interface ManualNfceItemInput {
   ncm?: string;
   cest?: string;
   cfop?: string;
+  pisRate?: number;
+  cofinsRate?: number;
+  difal?: { base: number; internalRate: number; interstateRate: number; fcpRate: number };
   unitOfMeasure?: string;
   fiscalOrigin?: string;
   icmsCst?: string;
@@ -62,7 +66,7 @@ export interface ManualNfceItemInput {
   cofinsCst?: string;
 }
 
-export interface ManualNfceInput {
+export interface ManualNfceInput extends FiscalOperationInput {
   recipientName?: string;
   recipientTaxId?: string;
   paymentMethod: PaymentMethod;
@@ -77,8 +81,8 @@ const paymentType = (method: string) => ({
   PIX: PAYMENT_TYPES.pix_static,
   CREDIT_CARD: PAYMENT_TYPES.credit_card,
   DEBIT_CARD: PAYMENT_TYPES.debit_card,
-  BANK_SLIP: PAYMENT_TYPES.other,
-  BANK_TRANSFER: PAYMENT_TYPES.other,
+  BANK_SLIP: '15',
+  BANK_TRANSFER: '18',
 }[method] || PAYMENT_TYPES.other);
 
 const publicConfig = (config: any) => config ? ({
@@ -94,13 +98,13 @@ export const getPublicFiscalConfig = async () => publicConfig(await prisma.fisca
   where: { id: 'default' },
 }));
 
-const loadFiscalSettings = async (): Promise<FiscalSettings> => {
+const loadFiscalSettings = async (model: number = 65): Promise<FiscalSettings> => {
   const config = await prisma.fiscalConfig.findUnique({ where: { id: 'default' } });
   if (!config || !config.active) throw new Error('Emissao fiscal ainda nao esta ativada');
   if (!config.certificatePfxEncrypted || !config.certificatePasswordEncrypted) {
     throw new Error('Certificado digital A1 nao configurado');
   }
-  if (!config.cscId || !config.cscTokenEncrypted) throw new Error('CSC da NFC-e nao configurado');
+  if (model === 65 && (!config.cscId || !config.cscTokenEncrypted)) throw new Error('CSC da NFC-e nao configurado');
 
   return {
     id: 1,
@@ -124,7 +128,7 @@ const loadFiscalSettings = async (): Promise<FiscalSettings> => {
     nextNfeNumber: config.nextNfeNumber,
     nextNfceNumber: config.nextNfceNumber,
     cscId: config.cscId,
-    cscToken: decryptFiscalSecret(config.cscTokenEncrypted).toString('utf8'),
+    cscToken: config.cscTokenEncrypted ? decryptFiscalSecret(config.cscTokenEncrypted).toString('utf8') : null,
     certificatePfx: decryptFiscalSecret(config.certificatePfxEncrypted),
     certificatePassword: decryptFiscalSecret(config.certificatePasswordEncrypted).toString('utf8'),
     certificateValidUntil: config.certificateValidUntil,
@@ -152,6 +156,10 @@ const validateFiscalProducts = (sale: any, settings: FiscalSettings) => {
 
 const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData => {
   const sale = document.sale;
+  const snapshot = document.paymentSnapshot || {};
+  const operation = snapshot.operation;
+  if (snapshot.issuer) settings = { ...settings, ...snapshot.issuer };
+  if (document.model === 55 && !operation) throw new Error('Dados de destino da NF-e ausentes');
   const grossTotal = document.items.reduce((sum: number, item: any) => sum + moneyToCents(item.totalPrice), 0);
   const documentTotal = moneyToCents(document.totalAmount);
   let remainingDiscount = Math.max(0, grossTotal - documentTotal);
@@ -166,7 +174,24 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
         : Math.round((grossTotal ? totalPrice / grossTotal : 0) * Math.max(0, grossTotal - documentTotal)))
       : 0;
     remainingDiscount -= itemDiscount;
+    validateCfop(item.cfop, document.model, operation?.destination ?? 1);
+    const tax = snapshot.itemTaxes?.[index] || {};
+    if (document.model === 55) validateNfeTax({ ...item, ...tax }, settings.taxRegime, operation.difal.applies);
+    const base = totalPrice - itemDiscount;
+    const uf = tax.difal;
     return {
+      icmsBase: base,
+      icmsModBC: document.model === 55 ? 3 : undefined,
+      pisVBC: base, pisPPIS: Math.round(Number(tax.pisRate || 0) * 10000), pisVPIS: Math.round(base * Number(tax.pisRate || 0) / 100),
+      cofinsVBC: base, cofinsPCOFINS: Math.round(Number(tax.cofinsRate || 0) * 10000), cofinsVCOFINS: Math.round(base * Number(tax.cofinsRate || 0) / 100),
+      icmsUfDest: operation?.difal.applies && uf ? {
+        taxRegime: settings.taxRegime, orig: item.fiscalOrigin,
+        vBCUFDest: moneyToCents(uf.base), vBCFCPUFDest: moneyToCents(uf.base),
+        pICMSUFDest: Math.round(uf.internalRate * 100), pICMSInter: Math.round(uf.interstateRate * 100),
+        pFCPUFDest: Math.round(uf.fcpRate * 100),
+        vICMSUFDest: Math.round(moneyToCents(uf.base) * (uf.internalRate - uf.interstateRate) / 100),
+        vFCPUFDest: Math.round(moneyToCents(uf.base) * uf.fcpRate / 100), vICMSUFRemet: 0,
+      } : undefined,
       itemNumber: item.itemNumber,
       productCode: item.productCode,
       description: item.description,
@@ -181,7 +206,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
       orig: item.fiscalOrigin,
       icmsCst: item.icmsCst,
       icmsRate: Math.round(icmsPercent * 100),
-      icmsAmount: Math.round(totalPrice * icmsPercent / 100),
+      icmsAmount: Math.round(base * icmsPercent / 100),
       pisCst: item.pisCst,
       cofinsCst: item.cofinsCst,
     };
@@ -193,7 +218,8 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
   const isCardPayment = ['CREDIT_CARD', 'DEBIT_CARD'].includes(sale.paymentMethod);
 
   return {
-    model: 65,
+    model: document.model,
+    destination: operation?.destination ?? 1,
     series: document.series,
     number: document.number,
     emissionType: 1,
@@ -204,9 +230,11 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     purposeCode: 1,
     intermediaryIndicator: '0',
     emissionProcess: '0',
-    consumerType: '1',
-    buyerPresence: '1',
-    printFormat: '4',
+    consumerType: operation ? (operation.finalConsumer ? '1' : '0') : '1',
+    buyerPresence: document.model === 55 ? '9' : '1',
+    printFormat: document.model === 55 ? '1' : '4',
+    transport: operation ? { freightMode: operation.freightMode } : undefined,
+    additionalInfo: snapshot.notes || operation?.difal.reason ? { taxpayerNote: [snapshot.notes, operation?.difal.reason].filter(Boolean).join(' - ') } : undefined,
     issuer: {
       taxId: settings.taxId,
       stateTaxId: settings.stateTaxId,
@@ -223,6 +251,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
       addressComplement: settings.addressComplement,
     },
     recipient: document.recipientTaxId ? {
+      ...(operation?.address || {}),
       taxId: onlyDigits(document.recipientTaxId),
       name: settings.environment === 2
         ? HOMOLOGATION_RECIPIENT_NAME
@@ -242,10 +271,14 @@ const fullDocument = (id: string) => prisma.fiscalDocument.findUnique({
 });
 
 export const transmitFiscalDocument = async (documentId: string) => {
-  const settings = await loadFiscalSettings();
   const document = await fullDocument(documentId);
   if (!document) throw new Error('Documento fiscal nao encontrado');
+  const settings = await loadFiscalSettings(document.model);
+  if ((document.environment === 'PRODUCTION' ? 1 : 2) !== settings.environment) throw new Error('Ambiente atual diferente do documento; restaure o ambiente antes do reenvio');
   if (document.status === 'AUTHORIZED') return document;
+  if (!['PENDING', 'ERROR', 'REJECTED'].includes(document.status)) throw new Error('Documento não pode ser retransmitido neste status');
+  const snapshot = document.paymentSnapshot as any;
+  if (snapshot?.issuer?.taxId && snapshot.issuer.taxId !== settings.taxId) throw new Error('CNPJ atual diferente do emitente original');
 
   const issuedAt = new Date();
   await prisma.fiscalDocument.update({
@@ -257,22 +290,24 @@ export const transmitFiscalDocument = async (documentId: string) => {
     const built = buildInvoiceXml(data);
     const certificate = loadCertificate(settings.certificatePfx!, settings.certificatePassword!);
     let signedXml = signXml(built.xml, certificate.privateKey, certificate.certificate);
-    const rawConsultationUrl = getNfceConsultationUri(settings.stateCode, settings.environment);
-    const consultationUrl = /^https?:\/\//i.test(rawConsultationUrl)
-      ? rawConsultationUrl
-      : `https://${rawConsultationUrl}`;
-    if (settings.stateCode !== 'DF') {
-      throw new Error('A URL de QR Code deve ser homologada para a UF antes da primeira emissao');
+    if (document.model === 65) {
+      const rawConsultationUrl = getNfceConsultationUri(settings.stateCode, settings.environment);
+      const consultationUrl = /^https?:\/\//i.test(rawConsultationUrl)
+        ? rawConsultationUrl
+        : `https://${rawConsultationUrl}`;
+      if (settings.stateCode !== 'DF') {
+        throw new Error('A URL de QR Code deve ser homologada para a UF antes da primeira emissao');
+      }
+      signedXml = await putQRTag({
+        xml: signedXml,
+        cscToken: settings.cscToken!,
+        cscId: settings.cscId!,
+        version: '300',
+        qrCodeBaseUrl: DF_NFCE_QRCODE_URL,
+        urlChave: consultationUrl,
+      });
     }
-    signedXml = await putQRTag({
-      xml: signedXml,
-      cscToken: settings.cscToken!,
-      cscId: settings.cscId!,
-      version: '300',
-      qrCodeBaseUrl: DF_NFCE_QRCODE_URL,
-      urlChave: consultationUrl,
-    });
-    const url = getSefazUrl(settings.stateCode, 'NfeAutorizacao', settings.environment, false, 65);
+    const url = getSefazUrl(settings.stateCode, 'NfeAutorizacao', settings.environment, false, document.model as 55 | 65);
     const response = await sefazRequest({
       url,
       service: 'NfeAutorizacao',
@@ -329,6 +364,7 @@ export const issueNfceForSale = async (saleId: string) => {
   if (!sale) throw new Error('Venda nao encontrada');
   if (sale.status !== 'PAID') throw new Error('A NFC-e so pode ser emitida para venda paga');
   validateFiscalProducts(sale, settings);
+  for (const item of sale.items) validateCfop(item.product?.cfop || settings.defaultCfop, 65, 1);
 
   const document = await prisma.$transaction(async (tx) => {
     const config = await tx.fiscalConfig.update({
@@ -374,11 +410,17 @@ export const issueNfceForSale = async (saleId: string) => {
   return transmitFiscalDocument(document.id);
 };
 
-export const issueManualNfce = async (input: ManualNfceInput, adminUserId: string) => {
-  const settings = await loadFiscalSettings();
+export const issueManualNfce = (input: ManualNfceInput, adminUserId: string) => issueManualDocument(input, adminUserId, 65);
+export const issueManualNfe = (input: ManualNfceInput, adminUserId: string) => issueManualDocument(input, adminUserId, 55);
+const issueManualDocument = async (input: ManualNfceInput, adminUserId: string, model: 55 | 65) => {
+  const settings = await loadFiscalSettings(model);
+  const operation = model === 55 ? validateOperation(input, settings.stateCode, settings.taxRegime) : undefined;
+  if (model === 55 && operation?.destination !== 2) throw new Error('Este fluxo de NF-e é exclusivo para envio interestadual; para venda local use NFC-e');
+  if (model === 65 && input.recipientAddress && input.recipientAddress.stateCode !== settings.stateCode) throw new Error('Envio interestadual exige NF-e');
   const recipientName = fiscalText(input.recipientName);
   const recipientTaxId = onlyDigits(input.recipientTaxId);
-  const notes = String(input.notes || '').trim();
+  const notes = String(input.notes || '').trim().slice(0, 4000);
+  if (model === 55 && (!recipientName || ![11, 14].includes(recipientTaxId.length))) throw new Error('NF-e exige nome e CPF/CNPJ do destinatário');
 
   if (!MANUAL_PAYMENT_METHODS.has(input.paymentMethod)) {
     throw new Error('Forma de pagamento invalida');
@@ -417,7 +459,12 @@ export const issueManualNfce = async (input: ManualNfceInput, adminUserId: strin
       throw new Error(`Item ${index + 1}: preco unitario invalido`);
     }
     if (!/^\d{8}$/.test(ncm)) throw new Error(`Item ${index + 1}: NCM invalido`);
-    if (!/^\d{4}$/.test(cfop)) throw new Error(`Item ${index + 1}: CFOP invalido`);
+    validateCfop(cfop, model, operation?.destination ?? 1);
+    if (model === 55) {
+      const allowed = operation!.address.taxpayerIndicator === '9' ? ['6107', '6108'] : ['6101', '6102'];
+      if (!allowed.includes(cfop)) throw new Error('Este fluxo suporta venda de produção própria ou revenda: confira CFOP e condição de contribuinte com o contador');
+    }
+    if (model === 55) validateNfeTax({ ...rawItem, icmsCst, pisCst, cofinsCst, fiscalOrigin }, settings.taxRegime, operation!.difal.applies);
     if (!icmsCst || !pisCst || !cofinsCst) {
       throw new Error(`Item ${index + 1}: tributacao incompleta na Central Fiscal`);
     }
@@ -425,7 +472,7 @@ export const issueManualNfce = async (input: ManualNfceInput, adminUserId: strin
       throw new Error(`Item ${index + 1}: unidade de medida invalida`);
     }
 
-    const totalPrice = roundMoney(quantity * unitPrice);
+    const totalPrice = roundMoney(quantity * roundMoney(unitPrice));
     return {
       productCode: String(rawItem.productCode || fallbackProductCode)
         .trim()
@@ -453,10 +500,11 @@ export const issueManualNfce = async (input: ManualNfceInput, adminUserId: strin
   const document = await prisma.$transaction(async (tx) => {
     const config = await tx.fiscalConfig.update({
       where: { id: 'default' },
-      data: { nextNfceNumber: { increment: 1 } },
-      select: { nfceSeries: true, nextNfceNumber: true, environment: true },
+      data: model === 55 ? { nextNfeNumber: { increment: 1 } } : { nextNfceNumber: { increment: 1 } },
+      select: { nfceSeries: true, nfeSeries: true, nextNfceNumber: true, nextNfeNumber: true, environment: true },
     });
-    const number = config.nextNfceNumber - 1;
+    if ((config.environment === 'PRODUCTION' ? 1 : 2) !== settings.environment) throw new Error('Ambiente fiscal alterado durante emissão; revise antes de emitir');
+    const number = (model === 55 ? config.nextNfeNumber : config.nextNfceNumber) - 1;
     const saleNumber = `FA${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
     const sale = await tx.sale.create({
       data: {
@@ -477,20 +525,27 @@ export const issueManualNfce = async (input: ManualNfceInput, adminUserId: strin
     return tx.fiscalDocument.create({
       data: {
         saleId: sale.id,
-        model: 65,
-        series: config.nfceSeries,
+        model,
+        series: model === 55 ? config.nfeSeries : config.nfceSeries,
         number,
         environment: config.environment,
         operationNature: 'VENDA',
         recipientTaxId: recipientTaxId || null,
         recipientName: recipientName || null,
         totalAmount: new Prisma.Decimal(total),
-        paymentSnapshot: {
+        paymentSnapshot: JSON.parse(JSON.stringify({
           method: input.paymentMethod,
           total,
           source: 'MANUAL_ADMIN',
+          notes,
+          issuer: Object.fromEntries(['companyName', 'tradeName', 'taxId', 'stateTaxId', 'taxRegime', 'stateCode', 'cityCode', 'cityName', 'street', 'streetNumber', 'district', 'zipCode', 'addressComplement'].map(key => [key, (settings as any)[key]])),
+          ...(operation ? { operation, itemTaxes: input.items.map(item => ({
+            ...(item.pisRate != null ? { pisRate: Number(item.pisRate) } : {}),
+            ...(item.cofinsRate != null ? { cofinsRate: Number(item.cofinsRate) } : {}),
+            ...(operation.difal.applies && item.difal ? { difal: item.difal } : {}),
+          })) } : {}),
           issuedBy: adminUserId,
-        },
+        })),
         items: {
           create: items.map((item, index) => ({
             itemNumber: index + 1,
@@ -532,11 +587,12 @@ export const checkSefaz = async () => {
 
 export const cancelFiscalDocument = async (documentId: string, reason: string) => {
   if (!reason || reason.trim().length < 15) throw new Error('A justificativa deve ter pelo menos 15 caracteres');
-  const settings = await loadFiscalSettings();
   const document = await fullDocument(documentId);
   if (!document || document.status !== 'AUTHORIZED' || !document.accessKey || !document.protocolNumber) {
     throw new Error('Somente uma NFC-e autorizada pode ser cancelada');
   }
+  const settings = await loadFiscalSettings(document.model);
+  if ((document.environment === 'PRODUCTION' ? 1 : 2) !== settings.environment) throw new Error('Ambiente atual diferente do documento');
   const certificate = loadCertificate(settings.certificatePfx!, settings.certificatePassword!);
   const eventXml = buildCancellationXml(
     document.accessKey,
@@ -547,7 +603,7 @@ export const cancelFiscalDocument = async (documentId: string, reason: string) =
   );
   const signedEvent = signEventXml(eventXml, certificate.privateKey, certificate.certificate);
   const response = await sefazRequest({
-    url: getSefazUrl(settings.stateCode, 'RecepcaoEvento', settings.environment, false, 65),
+    url: getSefazUrl(settings.stateCode, 'RecepcaoEvento', settings.environment, false, document.model as 55 | 65),
     service: 'RecepcaoEvento',
     xmlContent: signedEvent,
     pfx: settings.certificatePfx!,

@@ -3,7 +3,7 @@ import { NFE_NAMESPACE, NFE_VERSION, PAYMENT_TYPES } from "./constants";
 import { formatCents, formatDecimal } from "./format-utils";
 import { tag, escapeXml } from "./xml-utils";
 export { tag, escapeXml } from "./xml-utils";
-import { buildIcmsXml, createIcmsTotals, mergeIcmsTotals, type IcmsTotals } from "./tax-icms";
+import { buildIcmsUfDestXml, buildIcmsXml, createIcmsTotals, mergeIcmsTotals, type IcmsTotals } from "./tax-icms";
 import { buildPisXml, buildCofinsXml, buildIpiXml, buildIiXml } from "./tax-pis-cofins-ipi";
 import { TaxId } from "./value-objects/tax-id";
 import { AccessKey } from "./value-objects/access-key";
@@ -33,6 +33,17 @@ export function buildInvoiceXml(data: InvoiceBuildData): {
   xml: string;
   accessKey: string;
 } {
+  if (data.model === 65 && (data.destination ?? 1) !== 1) throw new Error('NFC-e não permite operação interestadual');
+  if (data.model === 55) {
+    if (!data.recipient || !['street', 'streetNumber', 'district', 'cityCode', 'cityName', 'stateCode', 'zipCode'].every(key => Boolean((data.recipient as any)[key]))) throw new Error('NF-e exige endereço completo do destinatário');
+    const expected = data.recipient.stateCode === data.issuer.stateCode ? 1 : 2;
+    if (data.destination !== expected) throw new Error('Destino incompatível com UF do destinatário');
+  }
+  for (const item of data.items) {
+    const prefix = (data.destination ?? 1) === 2 ? '6' : '5';
+    if (!/^\d{4}$/.test(item.cfop) || item.cfop[0] !== prefix) throw new Error('CFOP incompatível com destino');
+    if (item.icmsUfDest && (data.model !== 55 || data.destination !== 2 || data.consumerType !== '1' || (data.recipient?.taxpayerIndicator ?? '9') !== '9')) throw new Error('ICMSUFDest incompatível com operação');
+  }
   const stateIbge = STATE_IBGE_CODES[data.issuer.stateCode];
   if (!stateIbge) {
     throw new Error(`Unknown state code: ${data.issuer.stateCode}`);
@@ -134,7 +145,7 @@ function buildIde(
     tag("nNF", {}, String(data.number)),
     tag("dhEmi", {}, formatDateTimeNfe(data.issuedAt, data.issuer.stateCode)),
     tag("tpNF", {}, String(data.operationType ?? 1)),
-    tag("idDest", {}, "1"),
+    tag("idDest", {}, String(data.destination ?? 1)),
     tag("cMunFG", {}, data.issuer.cityCode),
     tag("tpImp", {}, data.printFormat ?? "1"),
     tag("tpEmis", {}, String(data.emissionType)),
@@ -176,7 +187,7 @@ function buildEmit(data: InvoiceBuildData): string {
     ...(data.issuer.tradeName ? [tag("xFant", {}, data.issuer.tradeName)] : []),
     tag("enderEmit", {}, buildAddressFields({
       street: data.issuer.street, number: data.issuer.streetNumber,
-      complement: data.issuer.addressComplement, district: data.issuer.district,
+      complement: data.issuer.addressComplement || undefined, district: data.issuer.district,
       cityCode: data.issuer.cityCode, cityName: data.issuer.cityName,
       stateCode: data.issuer.stateCode, zipCode: data.issuer.zipCode,
       includeCountry: true,
@@ -216,7 +227,7 @@ function buildDest(data: InvoiceBuildData): string {
           ]),
         ]
       : []),
-    tag("indIEDest", {}, r.stateTaxId ? "1" : "9"),
+    tag("indIEDest", {}, r.taxpayerIndicator ?? (r.stateTaxId ? "1" : "9")),
     ...(r.stateTaxId ? [tag("IE", {}, r.stateTaxId)] : []),
   ]);
 }
@@ -237,14 +248,14 @@ function buildDet(item: InvoiceItemData, data: InvoiceBuildData): DetResult {
       : item.description;
 
   // Build ICMS using the full tax module
-  const isSimples = data.issuer.taxRegime === 1 || data.issuer.taxRegime === 2;
+  const isSimples = data.issuer.taxRegime === 1;
   const icmsResult = buildIcmsXml({
     taxRegime: data.issuer.taxRegime,
     orig: item.orig ?? "0",
     CST: isSimples ? undefined : item.icmsCst,
     CSOSN: isSimples ? (item.icmsCst || "102") : undefined,
     modBC: item.icmsModBC != null ? String(item.icmsModBC) : undefined,
-    vBC: item.totalPrice,
+    vBC: item.icmsBase ?? item.totalPrice,
     pICMS: item.icmsRate,
     vICMS: item.icmsAmount,
     pRedBC: item.icmsRedBC,
@@ -266,6 +277,9 @@ function buildDet(item: InvoiceItemData, data: InvoiceBuildData): DetResult {
     vCredICMSSN: item.icmsVCredICMSSN,
     vICMSSubstituto: item.icmsVICMSSubstituto,
   });
+
+  const ufDest = item.icmsUfDest ? buildIcmsUfDestXml(item.icmsUfDest) : undefined;
+  if (ufDest) mergeIcmsTotals(icmsResult.totals, ufDest.totals);
 
   // Build PIS
   const pisXml = buildPisXml({
@@ -452,6 +466,7 @@ function buildDet(item: InvoiceItemData, data: InvoiceBuildData): DetResult {
       pisXml,
       cofinsXml,
       iiXml,
+      ufDest?.xml || "",
     ].filter(Boolean)),
     ...detExtras,
   ]);

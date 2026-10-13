@@ -319,7 +319,7 @@ export function createIcmsTotals(): IcmsTotals {
 export function calculateIcms(data: IcmsData): { element: TaxElement; totals: IcmsTotals } {
   const totals = createIcmsTotals();
 
-  if (data.taxRegime === 1 || data.taxRegime === 2) {
+  if (data.taxRegime === 1) {
     const csosn = data.CSOSN;
     if (!csosn) throw new Error("CSOSN is required for Simples Nacional tax regime");
     const inner = calculateCsosn(data, totals);

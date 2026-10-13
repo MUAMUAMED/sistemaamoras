@@ -15,6 +15,7 @@ import {
   checkSefaz,
   getPublicFiscalConfig,
   issueManualNfce,
+  issueManualNfe,
   issueNfceForSale,
   transmitFiscalDocument,
 } from '../services/fiscal.service';
@@ -102,6 +103,7 @@ router.put('/config', ...fiscalManagers, async (req: AuthenticatedRequest, res, 
     if (digits(taxId).length !== 14) return res.status(400).json({ error: 'CNPJ invalido', message: 'O CNPJ deve ter 14 digitos' });
     if (![1, 2, 3].includes(Number(taxRegime))) return res.status(400).json({ error: 'Regime tributario invalido' });
     if (!['HOMOLOGATION', 'PRODUCTION'].includes(environment)) return res.status(400).json({ error: 'Ambiente fiscal invalido' });
+    if (![nfeSeries, nfceSeries].every(value => Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 999) || ![nextNfeNumber, nextNfceNumber].every(value => Number.isInteger(Number(value)) && Number(value) >= 1 && Number(value) <= 999999999)) return res.status(400).json({ error: 'Série ou numeração fiscal inválida' });
     if (String(stateCode).toUpperCase() !== 'DF') {
       return res.status(400).json({ error: 'UF ainda nao homologada', message: 'Esta primeira versao fiscal esta restrita ao Distrito Federal' });
     }
@@ -279,10 +281,12 @@ router.get('/documents/:id/danfe', authenticateToken, async (req, res, next) => 
       authorizedAt: document.authorizedAt,
       recipientName: document.recipientName,
       recipientTaxId: document.recipientTaxId,
+      fiscalSnapshot: document.paymentSnapshot,
+      fiscalTotals: Object.fromEntries(['vBC', 'vICMS', 'vBCST', 'vST', 'vProd', 'vFrete', 'vSeg', 'vDesc', 'vIPI', 'vNF', 'vICMSUFDest', 'vFCPUFDest'].map(tag => [tag, Number(extractXmlTag(extractXmlTag(document.protocolXml, 'ICMSTot'), tag) || 0)])),
       totalAmount: document.totalAmount,
       qrCodeUrl: extractXmlTag(document.protocolXml, 'qrCode') || extractXmlTag(document.requestXml, 'qrCode'),
       consultationUrl: extractXmlTag(document.protocolXml, 'urlChave') || extractXmlTag(document.requestXml, 'urlChave'),
-      issuer: config,
+      issuer: (document.paymentSnapshot as any)?.issuer || config,
       sale: document.sale,
       items: document.items,
     });
@@ -295,7 +299,7 @@ router.get('/documents/:id/xml', authenticateToken, async (req, res, next) => {
   try {
     const document = await prisma.fiscalDocument.findUnique({
       where: { id: req.params.id },
-      select: { status: true, protocolXml: true, series: true, number: true, statusMessage: true },
+      select: { status: true, protocolXml: true, series: true, number: true, model: true, statusMessage: true },
     });
     if (!document) return res.status(404).json({ error: 'Documento fiscal nao encontrado' });
     if (document.status !== 'AUTHORIZED' || !document.protocolXml) {
@@ -305,7 +309,7 @@ router.get('/documents/:id/xml', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const filename = `nfce-${document.series}-${document.number}.xml`;
+    const filename = `${document.model === 55 ? 'nfe' : 'nfce'}-${document.series}-${document.number}.xml`;
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Cache-Control', 'private, no-store');
@@ -330,6 +334,13 @@ router.post('/manual/issue-nfce', authenticateToken, authorizeRoles('ADMIN'), as
   } catch (error) {
     return errorResponse(res, next, error);
   }
+});
+
+router.post('/manual/issue-nfe', authenticateToken, authorizeRoles('ADMIN'), async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Usuario nao autenticado' });
+    return res.status(201).json(await issueManualNfe(req.body, req.user.id));
+  } catch (error) { return errorResponse(res, next, error); }
 });
 
 router.get('/ai/providers', authenticateToken, authorizeRoles('ADMIN'), async (_req, res, next) => {

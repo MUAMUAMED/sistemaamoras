@@ -170,6 +170,7 @@ export interface FiscalSettings {
 export interface InvoiceBuildData {
   /** Invoice model (55=NF-e, 65=NFC-e) [pt-BR] Modelo da nota (55=NF-e, 65=NFC-e) */
   model: InvoiceModel;
+  destination?: 1 | 2 | 3;
   /** Invoice series number [pt-BR] Número de série da nota */
   series: number;
   /** Invoice sequential number [pt-BR] Número sequencial da nota */
@@ -221,6 +222,7 @@ export interface InvoiceBuildData {
     stateCode?: string;
     /** State tax registration (IE) [pt-BR] Inscrição Estadual (IE) */
     stateTaxId?: string;
+    taxpayerIndicator?: '1' | '2' | '9';
     /** Street address (required for NF-e model 55) [pt-BR] Logradouro (obrigatório para NF-e modelo 55) */
     street?: string;
     /** Street number [pt-BR] Número do endereço */
@@ -467,6 +469,8 @@ export interface InvoiceBuildData {
  * [pt-BR] Dados do item para construção do XML
  */
 export interface InvoiceItemData {
+  icmsBase?: number;
+  icmsUfDest?: import('./tax-icms').IcmsData;
   /** Sequential item number [pt-BR] Número sequencial do item */
   itemNumber: number;
   /** Internal product code [pt-BR] Código interno do produto */
