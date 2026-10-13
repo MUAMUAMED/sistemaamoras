@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test, beforeEach } = require('node:test');
 require('ts-node').register({ transpileOnly: true });
-const { validateOperation, validateCfop, validateNfeTax } = require('../src/services/fiscal-operation');
+const { validateNfeSeries, validateOperation, validateCfop, validateNfeTax } = require('../src/services/fiscal-operation');
 const { XMLParser } = require('fast-xml-parser');
 const vendorPath = require.resolve('../src/vendor/finopenpos-fiscal');
 const actualVendor = require(vendorPath);
@@ -102,4 +102,10 @@ test('bloqueia tributação sem suporte, DIFAL incompleto e omissão sem fundame
  assert.throws(()=>validateOperation({...input(),difal:{applies:false}},'DF',1),/fundamento/);
  assert.throws(()=>validateOperation({...input(),difal:{applies:true}},'DF',1),/incompatível/);
  assert.throws(()=>validateCfop('6108',65,2),/NFC-e/);
+});
+
+test('bloqueia séries especiais antes de consumir numeração fiscal',async()=> {
+ validateNfeSeries(889);assert.throws(()=>validateNfeSeries(999),/série/);
+ config.nfeSeries=999;await assert.rejects(service.issueManualNfe(input(),'admin'),/série/);
+ assert.equal(writes,0);assert.equal(sent.length,0);
 });

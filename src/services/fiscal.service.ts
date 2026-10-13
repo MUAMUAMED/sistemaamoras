@@ -1,4 +1,4 @@
-import { validateCfop, validateOperation, validateNfeTax, type FiscalOperationInput } from './fiscal-operation';
+import { validateNfeSeries, validateCfop, validateOperation, validateNfeTax, type FiscalOperationInput } from './fiscal-operation';
 import { PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { decryptFiscalSecret } from './fiscal-crypto.service';
@@ -101,6 +101,7 @@ export const getPublicFiscalConfig = async () => publicConfig(await prisma.fisca
 const loadFiscalSettings = async (model: number = 65): Promise<FiscalSettings> => {
   const config = await prisma.fiscalConfig.findUnique({ where: { id: 'default' } });
   if (!config || !config.active) throw new Error('Emissao fiscal ainda nao esta ativada');
+  if (model === 55) validateNfeSeries(config.nfeSeries);
   if (!config.certificatePfxEncrypted || !config.certificatePasswordEncrypted) {
     throw new Error('Certificado digital A1 nao configurado');
   }

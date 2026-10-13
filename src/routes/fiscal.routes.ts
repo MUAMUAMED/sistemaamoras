@@ -1,3 +1,4 @@
+import { validateNfeSeries } from '../services/fiscal-operation';
 import { Router, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { prisma } from '../config/database';
@@ -97,6 +98,7 @@ router.put('/config', ...fiscalManagers, async (req: AuthenticatedRequest, res, 
       defaultCofinsCst,
     } = req.body;
 
+    validateNfeSeries(Number(nfeSeries));
     const required = { companyName, taxId, stateTaxId, stateCode, cityCode, cityName, street, streetNumber, district, zipCode };
     const missing = Object.entries(required).filter(([, value]) => !String(value || '').trim()).map(([key]) => key);
     if (missing.length) return res.status(400).json({ error: 'Dados obrigatorios', message: `Preencha: ${missing.join(', ')}` });

@@ -97,3 +97,9 @@ export function validateNfeTax(item: any, regime: number, difal: boolean) {
     if (internal < interstate) throw new Error('Alíquota interna inferior à interestadual; revise o tratamento do DIFAL');
   }
 }
+
+export function validateNfeSeries(series: number) {
+  if (!Number.isInteger(series) || series < 1 || series > 889) {
+    throw new Error('A série da NF-e deste emissor deve estar entre 1 e 889; séries especiais não são suportadas');
+  }
+}
