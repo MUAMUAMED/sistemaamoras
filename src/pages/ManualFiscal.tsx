@@ -1,3 +1,4 @@
+import FiscalDestination, { emptyFiscalOperation } from '../components/FiscalDestination';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -20,7 +21,6 @@ import {
 import toast from 'react-hot-toast';
 import { fiscalApi, productsApi } from '../services/api';
 import type { Product } from '../types';
-import { productDisplayName } from '../utils/productDisplayName';
 
 type PaymentMethod = 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
 type AiProvider = 'gemini' | 'groq' | 'openrouter';
@@ -34,6 +34,9 @@ interface ManualItem {
   ncm: string;
   cfop: string;
   advanced: boolean;
+  icmsCst?: string; icmsRate?: string; fiscalOrigin?: string;
+  pisCst?: string; pisRate?: string; cofinsCst?: string; cofinsRate?: string;
+  difalBase?: string; internalRate?: string; interstateRate?: string; fcpRate?: string;
 }
 
 const newItem = (): ManualItem => ({
@@ -62,6 +65,9 @@ const money = (value: number) =>
 export default function ManualFiscal() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [interstate, setInterstate] = useState(false);
+  const [operation, setOperation] = useState(emptyFiscalOperation);
+  const noteLabel = interstate ? 'NF-e' : 'NFC-e';
   const [recipientName, setRecipientName] = useState('');
   const [recipientTaxId, setRecipientTaxId] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
@@ -120,24 +126,34 @@ export default function ManualFiscal() {
   );
 
   const issueMutation = useMutation({
-    mutationFn: () =>
-      fiscalApi.issueManualNfce({
+    mutationFn: () => {
+      const data = {
         recipientName: recipientName.trim() || undefined,
         recipientTaxId: recipientTaxId.replace(/\D/g, '') || undefined,
-        paymentMethod,
-        notes: notes.trim() || undefined,
+        paymentMethod, notes: notes.trim() || undefined,
         items: items.map(({ id, advanced, ...item }) => ({
-          ...item,
           productCode: item.productCode.trim() || undefined,
-          description: item.description.trim(),
+          description: item.description.trim(), quantity: item.quantity, unitPrice: item.unitPrice,
           ncm: item.ncm.replace(/\D/g, '') || undefined,
           cfop: item.cfop.replace(/\D/g, '') || undefined,
+          ...(interstate ? {
+            icmsCst: item.icmsCst || configQuery.data?.defaultIcmsCst,
+            icmsRate: item.icmsRate ? Number(item.icmsRate) : undefined,
+            fiscalOrigin: item.fiscalOrigin || '0',
+            pisCst: item.pisCst || configQuery.data?.defaultPisCst,
+            pisRate: item.pisRate !== undefined && item.pisRate !== '' ? Number(item.pisRate) : undefined,
+            cofinsCst: item.cofinsCst || configQuery.data?.defaultCofinsCst,
+            cofinsRate: item.cofinsRate !== undefined && item.cofinsRate !== '' ? Number(item.cofinsRate) : undefined,
+            ...(operation.difal.applies ? { difal: { base: Number(item.difalBase), internalRate: Number(item.internalRate), interstateRate: Number(item.interstateRate), fcpRate: Number(item.fcpRate) } } : {}),
+          } : {}),
         })),
-      }),
+      };
+      return interstate ? fiscalApi.issueManualNfe({ ...data, ...operation }) : fiscalApi.issueManualNfce(data);
+    },
     onSuccess: (document) => {
       setConfirmOpen(false);
       if (document.status === 'AUTHORIZED') {
-        toast.success('NFC-e autorizada');
+        toast.success(`${noteLabel} autorizada`);
         navigate(`/erp/fiscal/${document.id}/danfe`, { state: { fromManualFiscal: true, shareFiscal: true } });
         return;
       }
@@ -146,7 +162,7 @@ export default function ManualFiscal() {
     },
     onError: (error: any) => {
       setConfirmOpen(false);
-      toast.error(error.response?.data?.message || error.response?.data?.error || 'Não foi possível emitir a NFC-e');
+      toast.error(error.response?.data?.message || error.response?.data?.error || `Não foi possível emitir a ${noteLabel}`);
     },
   });
 
@@ -260,6 +276,8 @@ export default function ManualFiscal() {
     if (items.some((item) => item.description.trim().length < 2)) return toast.error('Preencha a descrição de todos os itens');
     if (items.some((item) => Number(item.quantity) <= 0)) return toast.error('A quantidade deve ser maior que zero');
     if (items.some((item) => Number(item.unitPrice) <= 0)) return toast.error('O preço deve ser maior que zero');
+    if (interstate && (!recipientName.trim() || !cleanTaxId)) return toast.error('NF-e exige nome e CPF/CNPJ');
+    if (interstate && items.some(item => !/^6\d{3}$/.test(item.cfop))) return toast.error('Informe o CFOP interestadual iniciado com 6 em cada item');
     if (total <= 0) return toast.error('O total da nota deve ser maior que zero');
     setConfirmOpen(true);
   };
@@ -274,7 +292,7 @@ export default function ManualFiscal() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase text-indigo-700">Administração fiscal</p>
-          <h1 className="mt-1 text-2xl font-bold text-gray-950">Emissor avulso de NFC-e</h1>
+          <h1 className="mt-1 text-2xl font-bold text-gray-950">Emissor avulso de notas fiscais</h1>
           <p className="mt-1 text-sm text-gray-600">Emissão direta, sem cadastro de produto e sem movimentação de estoque.</p>
         </div>
         <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${production ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
@@ -283,6 +301,15 @@ export default function ManualFiscal() {
         </div>
       </header>
 
+      <section className="rounded-md border border-indigo-200 bg-white p-4">
+        <label className="text-sm font-semibold">Tipo de venda
+          <select className="mt-2 block w-full rounded-md border border-gray-300 p-2 sm:ml-3 sm:mt-0 sm:inline-block sm:w-auto" value={interstate ? 'INTERSTATE' : 'LOCAL'} onChange={e => { setInterstate(e.target.value === 'INTERSTATE'); setConfirmOpen(false); }}>
+            <option value="LOCAL">Venda local / retirada no DF — NFC-e</option>
+            <option value="INTERSTATE">Envio para outro estado — NF-e</option>
+          </select>
+        </label>
+        <p className="mt-2 text-xs text-gray-600">O CNPJ e o cadastro do emitente permanecem os mesmos. A UF de entrega define o destino da operação.</p>
+      </section>
       <form onSubmit={requestConfirmation} className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
           <section className="border border-indigo-200 bg-white">
@@ -369,11 +396,11 @@ export default function ManualFiscal() {
             <div className="grid gap-4 md:grid-cols-3">
               <label className="text-sm font-medium text-gray-700">
                 Nome do cliente
-                <input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} className={`${inputClass} mt-1.5`} placeholder="Consumidor não identificado" maxLength={120} />
+                <input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} className={`${inputClass} mt-1.5`} required={interstate} placeholder="Consumidor não identificado" maxLength={120} />
               </label>
               <label className="text-sm font-medium text-gray-700">
                 CPF ou CNPJ
-                <input value={recipientTaxId} onChange={(event) => setRecipientTaxId(event.target.value)} className={`${inputClass} mt-1.5`} placeholder="Opcional" inputMode="numeric" maxLength={18} />
+                <input value={recipientTaxId} onChange={(event) => setRecipientTaxId(event.target.value)} className={`${inputClass} mt-1.5`} required={interstate} placeholder="Opcional para NFC-e" inputMode="numeric" maxLength={18} />
               </label>
               <label className="text-sm font-medium text-gray-700">
                 Forma de pagamento
@@ -384,11 +411,12 @@ export default function ManualFiscal() {
             </div>
           </section>
 
+          {interstate && <FiscalDestination value={operation} onChange={setOperation} />}
           <section className="border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
                 <h2 className="font-semibold text-gray-950">Itens da nota</h2>
-                <p className="mt-0.5 text-xs text-gray-500">NCM e CFOP usam os padrões da Central Fiscal.</p>
+                <p className="mt-0.5 text-xs text-gray-500">{interstate ? 'Informe o CFOP de cada item conforme a orientação contábil; o padrão local não será convertido automaticamente.' : 'NCM e CFOP usam os padrões da Central Fiscal.'}</p>
               </div>
               <button type="button" onClick={() => setItems((current) => [...current, newItem()])} className="inline-flex items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
                 <Plus className="h-4 w-4" /> Adicionar item
@@ -426,7 +454,7 @@ export default function ManualFiscal() {
                       className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-indigo-50"
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-gray-950">{productDisplayName(product)}</span>
+                        <span className="block truncate text-sm font-semibold text-gray-950">{product.name}</span>
                         <span className="mt-0.5 block truncate text-xs text-gray-500">
                           {product.barcode || 'Sem código'} · {product.size?.name || 'Sem tamanho'} · estoque {product.stock}
                         </span>
@@ -477,7 +505,7 @@ export default function ManualFiscal() {
                     {item.advanced ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     Tributação avançada
                   </button>
-                  {item.advanced && (
+                  {(item.advanced || interstate) && (
                     <div className="mt-3 grid gap-3 border-l-2 border-indigo-100 pl-4 sm:grid-cols-2">
                       <label className="text-xs font-semibold text-gray-600">
                         NCM
@@ -485,8 +513,13 @@ export default function ManualFiscal() {
                       </label>
                       <label className="text-xs font-semibold text-gray-600">
                         CFOP
-                        <input value={item.cfop} onChange={(event) => updateItem(item.id, { cfop: event.target.value })} className={`${inputClass} mt-1`} placeholder={config?.defaultCfop || 'Padrão fiscal'} inputMode="numeric" maxLength={4} />
+                        <input value={item.cfop} onChange={(event) => updateItem(item.id, { cfop: event.target.value })} className={`${inputClass} mt-1`} required={interstate} placeholder={interstate ? '6xxx (contador)' : config?.defaultCfop || 'Padrão fiscal'} inputMode="numeric" maxLength={4} />
                       </label>
+                      {interstate && <>
+                        {([['icmsCst', 'CST/CSOSN ICMS', config?.defaultIcmsCst], ['icmsRate', 'Alíquota ICMS (%)', ''], ['fiscalOrigin', 'Origem da mercadoria', '0'], ['pisCst', 'CST PIS', config?.defaultPisCst], ['pisRate', 'Alíquota PIS (%)', ''], ['cofinsCst', 'CST COFINS', config?.defaultCofinsCst], ['cofinsRate', 'Alíquota COFINS (%)', '']] as const).map(([key, label, placeholder]) => <label key={key} className="text-xs font-medium text-gray-700">{label}<input className={`${inputClass} mt-1`} value={item[key] || ''} placeholder={placeholder || 'Conforme tributação'} onChange={e => updateItem(item.id, { [key]: e.target.value })} /></label>)}
+                        {operation.difal.applies && ([['difalBase', 'Base DIFAL (R$)'], ['internalRate', 'Alíquota interna destino (%)'], ['interstateRate', 'Alíquota interestadual (%)'], ['fcpRate', 'FCP (%)']] as const).map(([key, label]) => <label key={key} className="text-xs font-medium text-gray-700">{label}<input required type="number" min="0" step="0.0001" className={`${inputClass} mt-1`} value={item[key] || ''} onChange={e => updateItem(item.id, { [key]: e.target.value })} /></label>)}
+                      </>}
+
                     </div>
                   )}
                 </div>
@@ -510,7 +543,7 @@ export default function ManualFiscal() {
             <div className="flex justify-between gap-4"><dt className="text-gray-600">Pagamento</dt><dd className="text-right font-semibold">{paymentOptions.find((option) => option.value === paymentMethod)?.label}</dd></div>
           </dl>
           <div className="my-5 border-t border-gray-200 pt-5">
-            <p className="text-xs font-semibold uppercase text-gray-500">Total da NFC-e</p>
+            <p className="text-xs font-semibold uppercase text-gray-500">Total da {noteLabel}</p>
             <p className="mt-1 text-3xl font-bold text-gray-950">{money(total)}</p>
           </div>
           <button type="submit" disabled={issueMutation.isPending || configQuery.isLoading} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">
@@ -533,6 +566,8 @@ export default function ManualFiscal() {
             </div>
             <div className="space-y-3 p-5 text-sm">
               <div className="flex justify-between"><span className="text-gray-600">Destinatário</span><strong>{recipientName.trim() || 'Não identificado'}</strong></div>
+              <div className="flex justify-between"><span className="text-gray-600">Documento</span><strong>{noteLabel}{interstate ? ` — entrega em ${operation.recipientAddress.stateCode}` : ' — venda local'}</strong></div>
+              {interstate && <div className="flex justify-between"><span className="text-gray-600">Série / próximo número NF-e</span><strong>{config?.nfeSeries} / {config?.nextNfeNumber}</strong></div>}
               <div className="flex justify-between"><span className="text-gray-600">Itens</span><strong>{items.length}</strong></div>
               <div className="flex justify-between text-base"><span className="font-semibold">Total</span><strong>{money(total)}</strong></div>
               {production && <div className="flex gap-2 border border-rose-200 bg-rose-50 p-3 text-rose-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span>Esta é uma emissão real em ambiente de produção.</span></div>}
@@ -540,7 +575,7 @@ export default function ManualFiscal() {
             <div className="flex justify-end gap-3 border-t border-gray-200 p-5">
               <button type="button" onClick={() => setConfirmOpen(false)} className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Voltar</button>
               <button type="button" onClick={() => issueMutation.mutate()} disabled={issueMutation.isPending} className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
-                {issueMutation.isPending ? 'Transmitindo...' : 'Emitir NFC-e'}
+                {issueMutation.isPending ? 'Transmitindo...' : `Emitir ${noteLabel}`}
               </button>
             </div>
           </div>

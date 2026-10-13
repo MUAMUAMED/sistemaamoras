@@ -328,7 +328,7 @@ export default function SalesReport() {
       for (const t of calendarReport.timeline) {
         map.set(t.date, {
           itemsCount: t.itemsCount || 0,
-          totalSales: t.totalSales || 0,
+          totalSales: t.salesCount || 0,
           totalRevenue: t.totalRevenue || 0,
         });
       }

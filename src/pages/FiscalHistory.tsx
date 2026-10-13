@@ -143,7 +143,7 @@ export default function FiscalHistory() {
           </div>
           <h1 className="text-2xl font-bold text-gray-950">Histórico de notas fiscais</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Consulte NFC-e emitidas, rejeitadas e canceladas pelo PDV.
+            Consulte NF-e e NFC-e emitidas, rejeitadas e canceladas.
           </p>
         </div>
         <div className="flex gap-2">
@@ -234,7 +234,7 @@ export default function FiscalHistory() {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-white text-xs uppercase text-gray-500">
                   <tr>
-                    <th className="px-4 py-3 text-left">NFC-e</th>
+                    <th className="px-4 py-3 text-left">Nota fiscal</th>
                     <th className="px-4 py-3 text-left">Venda / cliente</th>
                     <th className="px-4 py-3 text-left">Emissão</th>
                     <th className="px-4 py-3 text-left">Valor</th>
@@ -262,7 +262,7 @@ export default function FiscalHistory() {
                 <article key={document.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-mono text-sm font-bold">NFC-e {document.series}/{document.number}</p>
+                      <p className="font-mono text-sm font-bold">{document.model === 55 ? 'NF-e' : 'NFC-e'} {document.series}/{document.number}</p>
                       <p className="mt-1 text-xs text-gray-500">Venda #{document.sale?.saleNumber || document.saleId}</p>
                     </div>
                     <StatusBadge status={document.status} />

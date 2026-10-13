@@ -3,6 +3,17 @@ export const createFiscalPdfFile = async (element: HTMLElement, fileName: string
     import('html2canvas'),
     import('jspdf'),
   ]);
+  const pages = Array.from(element.querySelectorAll<HTMLElement>('[data-nfe-page]'));
+  if (pages.length) {
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = await html2canvas(pages[i], { backgroundColor: '#ffffff', logging: false, scale: 2 });
+      if (i) pdf.addPage();
+      const width = Math.min(190, 277 * canvas.width / canvas.height);
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (210 - width) / 2, 10, width, canvas.height * width / canvas.width, undefined, 'FAST');
+    }
+    return new File([pdf.output('blob')], fileName.toLowerCase().endsWith('.pdf') ? fileName : `${fileName}.pdf`, { type: 'application/pdf' });
+  }
   const canvas = await html2canvas(element, {
     backgroundColor: '#ffffff',
     logging: false,

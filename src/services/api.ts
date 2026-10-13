@@ -1,3 +1,4 @@
+import type { FiscalOperation } from '../components/FiscalDestination';
 import axios from 'axios';
 import {
   User,
@@ -84,6 +85,8 @@ api.interceptors.response.use(
 
 // Serviços de autenticação
 export const authApi = {
+  checkFirstUser: async (): Promise<{ hasUsers: boolean; canCreateAccount: boolean }> => (await api.get('/auth/check-first-user')).data,
+  register: async (data: { name: string; email: string; password: string }): Promise<{ message: string; user: User; isFirstUser: boolean }> => (await api.post('/auth/register', data)).data,
   login: async (data: LoginData): Promise<LoginResponse> => {
     const response = await api.post('/auth/login', data);
     return response.data;
@@ -289,6 +292,8 @@ export const patternsApi = {
 
 // Serviços de produtos
 export const productsApi = {
+  deleteImage: async (id: string, imageId: string): Promise<void> => { await api.delete(`/products/${id}/images/${imageId}`); },
+  setMainImage: async (id: string, imageId: string): Promise<{ message: string; product: Product }> => (await api.put(`/products/${id}/images/${imageId}/set-main`)).data,
   list: async (filters?: ProductFilters): Promise<PaginatedResponse<Product>> => {
     const response = await api.get('/products', { params: filters });
     return response.data;
@@ -603,6 +608,8 @@ export const interactionsApi = {
 
 // Serviços de vendas
 export const salesApi = {
+  updateCustomerTaxId: async (id: string, data: { customerTaxId?: string; leadName?: string }): Promise<Sale> =>
+    (await api.patch(`/sales/${id}/customer-tax-id`, data)).data,
   list: async (filters?: SaleFilters): Promise<PaginatedResponse<Sale>> => {
     const response = await api.get('/sales', { params: filters });
     return response.data;
@@ -828,6 +835,23 @@ export const fiscalApi = {
       cfop?: string;
     }>;
   }): Promise<FiscalDocument> => (await api.post('/fiscal/manual/issue-nfce', data)).data,
+  issueManualNfe: async (data: FiscalOperation & {
+    recipientName?: string;
+    recipientTaxId?: string;
+    paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';
+    notes?: string;
+    items: Array<{
+      productCode?: string;
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      ncm?: string;
+      cfop?: string;
+      icmsCst?: string; icmsRate?: number; fiscalOrigin?: string;
+      pisCst?: string; pisRate?: number; cofinsCst?: string; cofinsRate?: number;
+      difal?: { base: number; internalRate: number; interstateRate: number; fcpRate: number };
+    }>;
+  }): Promise<FiscalDocument> => (await api.post('/fiscal/manual/issue-nfe', data)).data,
     getAiProviders: async (): Promise<{
       providers: Array<{
         id: 'gemini' | 'groq' | 'openrouter';
@@ -1062,6 +1086,7 @@ export const productService = {
 };
 
 export const saleService = {
+  updateCustomerTaxId: salesApi.updateCustomerTaxId,
   list: salesApi.list,
   getAll: salesApi.list, // Alias para compatibilidade
   getById: salesApi.getById,

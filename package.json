@@ -34,7 +34,8 @@
     "start": "vite",
     "build": "node node_modules/vite/bin/vite.js build",
     "preview": "vite preview",
-    "test": "echo \"Tests não configurados ainda\" && exit 0"
+    "test": "echo \"Tests não configurados ainda\" && exit 0",
+    "check:fiscal": "tsc -p tsconfig.fiscal-check.json"
   },
   "eslintConfig": {
     "extends": [

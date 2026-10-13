@@ -1,3 +1,4 @@
+import DanfeNfe from '../components/DanfeNfe';
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowDownTrayIcon, ArrowLeftIcon, DocumentTextIcon, PrinterIcon } from '@heroicons/react/24/outline';
@@ -195,9 +196,9 @@ export default function DanfeNfce() {
           <button onClick={() => print('a4')} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50">
             <PrinterIcon className="h-5 w-5" /> Imprimir A4
           </button>
-          <button onClick={() => print('80mm')} className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+          {document.model === 65 && <button onClick={() => print('80mm')} className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
             <PrinterIcon className="h-5 w-5" /> Imprimir 80 mm
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -245,7 +246,7 @@ export default function DanfeNfce() {
         </section>
       )}
 
-      <main id="danfe-document" className="danfe-print-root mx-auto bg-white text-black">
+      {document.model === 55 ? <DanfeNfe document={document} /> : <main id="danfe-document" className="danfe-print-root mx-auto bg-white text-black">
         <header className="border-b border-dashed border-black pb-2 text-center">
           <h1 className="text-base font-bold uppercase">{document.issuer.tradeName || document.issuer.companyName}</h1>
           <p className="text-[11px] font-medium">{document.issuer.companyName}</p>
@@ -296,7 +297,7 @@ export default function DanfeNfce() {
           {(document.recipientName || document.recipientTaxId) && <p className="border-t border-dashed border-black pt-2">Consumidor: {document.recipientName || 'Nao identificado'} {document.recipientTaxId ? `- ${formatTaxId(document.recipientTaxId)}` : ''}</p>}
           <p>Venda #{document.sale.saleNumber}</p>
         </footer>
-      </main>
+      </main>}
     </div>
   );
 }

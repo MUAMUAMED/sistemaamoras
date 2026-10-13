@@ -10,6 +10,13 @@ export default defineConfig(({ mode }) => {
 
   return {
   plugins: [react()],
+  define: {
+    'process.env': JSON.stringify({
+      NODE_ENV: mode === 'production' ? 'production' : 'development',
+      REACT_APP_API_URL: env.REACT_APP_API_URL || env.VITE_API_URL || 'https://amorasbackenddd.zeabur.app/api',
+      REACT_APP_API_TIMEOUT: env.REACT_APP_API_TIMEOUT || '30000',
+    }),
+  },
   
   // Servidor de desenvolvimento
   server: {

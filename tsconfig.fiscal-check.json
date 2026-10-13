@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/pages/ManualFiscal.tsx",
+    "src/pages/Fiscal.tsx",
+    "src/pages/FiscalHistory.tsx",
+    "src/pages/DanfeNfce.tsx",
+    "src/components/FiscalDestination.tsx",
+    "src/components/DanfeNfe.tsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

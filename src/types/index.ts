@@ -216,6 +216,15 @@ export interface Size {
 
 // Tipos de produto
 export interface Product {
+  isDraft?: boolean;
+  cest?: string;
+  fiscalOrigin?: string;
+  unitOfMeasure?: string;
+  icmsCst?: string;
+  icmsRate?: number;
+  pisCst?: string;
+  cofinsCst?: string;
+
   id: string;
   name: string;
   description?: string;
@@ -357,6 +366,7 @@ export interface Sale {
   leadId?: string;
   leadName?: string;
   leadPhone?: string;
+  customerTaxId?: string;
   total: number;
   discount: number;
   subtotal: number;
@@ -385,6 +395,9 @@ export interface SaleItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  manualDescription?: string;
+  manualCategoryName?: string;
+  manualSubcategoryName?: string;
   
   // Relações
   product?: Product;
@@ -481,6 +494,16 @@ export interface PaginatedResponse<T> {
 
 // Tipos para formulários
 export interface ProductFormData {
+  saveAsDraft?: boolean;
+  isDraft?: boolean;
+  cest?: string;
+  fiscalOrigin?: string;
+  unitOfMeasure?: string;
+  icmsCst?: string;
+  icmsRate?: number;
+  pisCst?: string;
+  cofinsCst?: string;
+
   name: string;
   description?: string;
   price: number;
@@ -657,6 +680,12 @@ export interface FiscalDanfe {
   authorizedAt?: string;
   recipientName?: string;
   recipientTaxId?: string;
+  fiscalTotals?: Record<string, number>;
+  fiscalSnapshot?: {
+    notes?: string;
+    operation?: { address: import('../components/FiscalDestination').FiscalOperation['recipientAddress']; destination: number; finalConsumer: boolean; freightMode: string; difal: { applies: boolean; reason: string } };
+    itemTaxes?: Array<{ pisRate?: number; cofinsRate?: number; difal?: { base: number; internalRate: number; interstateRate: number; fcpRate: number } }>;
+  };
   totalAmount: number;
   qrCodeUrl?: string;
   consultationUrl?: string;
@@ -693,6 +722,7 @@ export interface FiscalDanfe {
     quantity: number;
     unitPrice: number;
     totalPrice: number;
+    fiscalOrigin?: string; icmsCst?: string; icmsRate?: number;
   }>;
 }
 
