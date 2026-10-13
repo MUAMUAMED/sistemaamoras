@@ -125,7 +125,7 @@ export default function Fiscal() {
             <Field label="Senha do certificado"><input type="password" className={inputClass} value={secrets.certificatePassword} onChange={(e) => setSecrets((s) => ({ ...s, certificatePassword: e.target.value }))} placeholder={form.hasCertificate ? 'Deixe vazio para manter' : ''} /></Field>
             <Field label="ID do CSC"><input className={inputClass} value={form.cscId || ''} onChange={(e) => set('cscId', e.target.value)} /></Field>
             <Field label={`Token CSC ${form.hasCscToken ? '(configurado)' : ''}`}><input type="password" className={inputClass} value={secrets.cscToken} onChange={(e) => setSecrets((s) => ({ ...s, cscToken: e.target.value }))} placeholder={form.hasCscToken ? 'Deixe vazio para manter' : ''} /></Field>
-            <Field label="Série NF-e"><input type="number" min="1" max="999" className={inputClass} value={form.nfeSeries} onChange={e => set('nfeSeries', Number(e.target.value))} /></Field>
+            <Field label="Série NF-e"><input type="number" min="1" max="889" className={inputClass} value={form.nfeSeries} onChange={e => set('nfeSeries', Number(e.target.value))} /></Field>
             <Field label="Próximo número NF-e"><input type="number" min="1" max="999999999" className={inputClass} value={form.nextNfeNumber} onChange={e => set('nextNfeNumber', Number(e.target.value))} /></Field>
             <Field label="Serie NFC-e"><input type="number" min="1" className={inputClass} value={form.nfceSeries} onChange={(e) => set('nfceSeries', Number(e.target.value))} /></Field>
             <Field label="Proximo numero"><input type="number" min="1" className={inputClass} value={form.nextNfceNumber} onChange={(e) => set('nextNfceNumber', Number(e.target.value))} /></Field>
