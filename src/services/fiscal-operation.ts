@@ -15,6 +15,17 @@ export interface FiscalOperationInput {
 }
 
 const digits = (value: unknown) => String(value || '').replace(/\D/g, '');
+/** Resolve only the supported sale families configured in Central Fiscal. */
+export function resolveDefaultCfop(configured: string | undefined, destination: number, taxpayerIndicator?: string): string {
+  const code = String(configured || '').replace(/\D/g, '');
+  const production = ['5101', '6101', '6107'].includes(code);
+  const resale = ['5102', '6102', '6108'].includes(code);
+  if (!production && !resale) return '';
+  if (destination === 1) return production ? '5101' : '5102';
+  if (destination !== 2 || !['1', '2', '9'].includes(taxpayerIndicator || '')) return '';
+  return taxpayerIndicator === '9' ? (production ? '6107' : '6108') : (production ? '6101' : '6102');
+}
+
 export const validateCfop = (cfop: string, model: number, destination: number) => {
   if (!/^\d{4}$/.test(cfop)) throw new Error('CFOP deve ter quatro dígitos');
   if (model === 65 && !['5101', '5102', '5103', '5104', '5115', '5405', '5656', '5667', '5933'].includes(cfop)) {

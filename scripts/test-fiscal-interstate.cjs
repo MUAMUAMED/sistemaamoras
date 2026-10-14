@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { test, beforeEach } = require('node:test');
 require('ts-node').register({ transpileOnly: true });
-const { validateNfeSeries, validateOperation, validateCfop, validateNfeTax } = require('../src/services/fiscal-operation');
+const { resolveDefaultCfop, validateNfeSeries, validateOperation, validateCfop, validateNfeTax } = require('../src/services/fiscal-operation');
 const { XMLParser } = require('fast-xml-parser');
 const vendorPath = require.resolve('../src/vendor/finopenpos-fiscal');
 const actualVendor = require(vendorPath);
@@ -131,4 +131,17 @@ test('bloqueia séries especiais antes de consumir numeração fiscal',async()=>
  test('ICMS normal aceita alíquota interna explícita e mantém limites interestaduais',()=> {
  const item={icmsCst:'00',fiscalOrigin:'0',icmsRate:18,pisCst:'07',cofinsCst:'07'};
  validateNfeTax(item,3,false,1);assert.throws(()=>validateNfeTax(item,3,false,2),/alíquota/);
+ });
+
+ test('CFOP automático usa natureza configurada, destino e contribuinte sem adivinhar operações especiais',()=> {
+ assert.equal(resolveDefaultCfop('5102',1,'1'),'5102');assert.equal(resolveDefaultCfop('5102',2,'1'),'6102');assert.equal(resolveDefaultCfop('5102',2,'9'),'6108');
+ assert.equal(resolveDefaultCfop('5101',2,'1'),'6101');assert.equal(resolveDefaultCfop('5101',2,'9'),'6107');assert.equal(resolveDefaultCfop('6108',1,'1'),'5102');
+ assert.equal(resolveDefaultCfop('5405',2,'1'),'');assert.equal(resolveDefaultCfop('5102',2,''),'');assert.equal(resolveDefaultCfop('5102',0,'1'),'');
+ });
+ test('NF-e sem CFOP por item aplica padrão ajustado e preserva CFOP digitado explicitamente',async()=> {
+ const data=input();data.recipientAddress.taxpayerIndicator='1';data.recipientAddress.stateTaxId='201490145';data.finalConsumer=false;delete data.items[0].cfop;
+ const doc=await service.issueManualNfe(data,'admin');assert.equal(parsed(doc.requestXml).det.prod.CFOP,6102);
+ data.deliveryAddress={stateCode:'DF',cityCode:'5300108',cityName:'Brasília',street:'Rua da loja',streetNumber:'1',district:'Centro',zipCode:'70000000'};
+ const local=await service.issueManualNfe(data,'admin');assert.equal(parsed(local.requestXml).det.prod.CFOP,5102);
+ data.items[0].cfop='6102';await assert.rejects(service.issueManualNfe(data,'admin'),/CFOP/);
  });

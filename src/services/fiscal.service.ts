@@ -1,4 +1,4 @@
-import { validateNfeSeries, validateCfop, validateOperation, validateNfeTax, type FiscalOperationInput } from './fiscal-operation';
+import { resolveDefaultCfop, validateNfeSeries, validateCfop, validateOperation, validateNfeTax, type FiscalOperationInput } from './fiscal-operation';
 import { PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { decryptFiscalSecret } from './fiscal-crypto.service';
@@ -443,7 +443,8 @@ const issueManualDocument = async (input: ManualNfceInput, adminUserId: string, 
     const unitPrice = Number(rawItem.unitPrice);
     const ncm = onlyDigits(rawItem.ncm) || settings.defaultNcm;
     const cest = onlyDigits(rawItem.cest) || null;
-    const cfop = onlyDigits(rawItem.cfop) || settings.defaultCfop;
+    const cfop = onlyDigits(rawItem.cfop) || (operation ? resolveDefaultCfop(settings.defaultCfop, operation.destination, operation.address.taxpayerIndicator) : settings.defaultCfop);
+    if (!cfop) throw new Error(`Item ${index + 1}: informe CFOP ou configure um padrão de venda compatível na Central Fiscal`);
     const icmsCst = String(rawItem.icmsCst || settings.defaultIcmsCst || '').trim();
     const pisCst = String(rawItem.pisCst || settings.defaultPisCst || '').trim();
     const cofinsCst = String(rawItem.cofinsCst || settings.defaultCofinsCst || '').trim();
