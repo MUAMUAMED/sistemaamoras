@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM --platform=linux/arm64 node:20-alpine
 WORKDIR /app
 COPY server.cjs ./server.cjs
 EXPOSE 8080
