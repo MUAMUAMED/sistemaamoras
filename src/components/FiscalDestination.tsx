@@ -12,6 +12,7 @@ export interface FiscalOperation {
   deliveryAddress?: DeliveryAddress;
   finalConsumer: boolean | null;
   freightMode: string;
+  buyerPresence?: string;
   difal: { applies: boolean | null; reason: string };
 }
 
@@ -32,17 +33,18 @@ export default function FiscalDestination({ value, onChange, config }: { value: 
   return <section className="border border-gray-200 bg-white p-5 space-y-4">
     <h2 className="font-semibold">Destino e tributação da NF-e</h2>
     <p className="text-sm text-gray-600">Confira o endereço cadastral da cliente. Para revenda, utilize NF-e e informe abaixo se a entrega ocorrer em outro endereço.</p>
-    <button type="button" className="text-sm font-semibold text-indigo-700 underline" onClick={() => onChange({ ...value, finalConsumer: false, freightMode: '3', difal: { applies: false, reason: '' } })}>Revenda com transporte próprio e frete gratuito</button>
+    <button type="button" className="text-sm font-semibold text-indigo-700 underline" onClick={() => onChange({ ...value, finalConsumer: false, buyerPresence: '9', freightMode: '3', difal: { applies: false, reason: '' } })}>Revenda com transporte próprio e frete gratuito</button>
     {config && <button type="button" className="block text-sm font-semibold text-indigo-700 underline" onClick={() => {
       const { stateCode, cityCode, cityName, street, streetNumber, district, zipCode } = config;
-      onChange({ ...value, finalConsumer: false, freightMode: '3', difal: { applies: false, reason: '' }, deliveryAddress: { stateCode, cityCode, cityName, street, streetNumber, district, zipCode, complement: config.addressComplement || '' } });
-    }}>Revenda com entrega na loja e frete gratuito</button>}
+      onChange({ ...value, finalConsumer: false, buyerPresence: '1', freightMode: '9', difal: { applies: false, reason: '' }, deliveryAddress: { stateCode, cityCode, cityName, street, streetNumber, district, zipCode, complement: config.addressComplement || '' } });
+    }}>Revenda com retirada presencial na loja</button>}
     <div className="grid gap-4 md:grid-cols-3">
       <label className="text-sm">UF do destinatário<select required className={input} value={address.stateCode} onChange={e => setAddress('stateCode', e.target.value)}><option value="">Selecione</option>{'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ').map(uf => <option key={uf}>{uf}</option>)}</select></label>
       {([['cityName', 'Município'], ['cityCode', 'Código IBGE (7 dígitos)'], ['zipCode', 'CEP'], ['street', 'Logradouro'], ['streetNumber', 'Número'], ['district', 'Bairro'], ['complement', 'Complemento']] as const).map(([key, label]) => <label key={key} className="text-sm">{label}<input required={key !== 'complement'} className={input} value={address[key]} maxLength={key === 'zipCode' ? 9 : key === 'cityCode' ? 7 : 60} onChange={e => setAddress(key, ['zipCode', 'cityCode'].includes(key) ? e.target.value.replace(/\D/g, '') : e.target.value)} /></label>)}
       <label className="text-sm">Contribuinte de ICMS<select required className={input} value={address.taxpayerIndicator} onChange={e => onChange({ ...value, finalConsumer: e.target.value === '9' ? true : value.finalConsumer, recipientAddress: { ...address, taxpayerIndicator: e.target.value as '' | '1' | '2' | '9', stateTaxId: e.target.value === '1' ? address.stateTaxId : '' } })}><option value="">Selecione</option><option value="9">Não contribuinte</option><option value="1">Contribuinte com IE</option><option value="2">Contribuinte isento de IE</option></select></label>
       {address.taxpayerIndicator === '1' && <label className="text-sm">Inscrição estadual<input required className={input} value={address.stateTaxId} maxLength={14} onChange={e => setAddress('stateTaxId', e.target.value.replace(/\D/g, ''))} /></label>}
       <label className="text-sm">Finalidade da compra<select className={input} required value={value.finalConsumer === null ? '' : String(value.finalConsumer)} onChange={e => onChange({ ...value, finalConsumer: e.target.value === '' ? null : e.target.value === 'true' })}><option value="">Selecione</option><option value="true">Consumidor final</option>{address.taxpayerIndicator !== '9' && <option value="false">Revenda / industrialização</option>}</select></label>
+      <label className="text-sm">Presença na compra<select className={input} value={value.buyerPresence || '9'} onChange={e => onChange({ ...value, buyerPresence: e.target.value })}><option value="1">Presencial na loja</option><option value="2">Não presencial — internet</option><option value="3">Não presencial — teleatendimento</option><option value="4">Não presencial com entrega</option><option value="5">Presencial fora da loja</option><option value="9">Não presencial — outros</option></select></label>
       <label className="text-sm">Transporte<select required className={input} value={value.freightMode} onChange={e => onChange({ ...value, freightMode: e.target.value })}><option value="">Selecione</option><option value="0">Frete por conta do emitente</option><option value="1">Frete por conta do destinatário</option><option value="2">Frete por conta de terceiros</option><option value="3">Transporte próprio do emitente</option><option value="4">Transporte próprio do destinatário</option><option value="9">Sem transporte</option></select></label>
       {!noDifal && <label className="text-sm">DIFAL no XML<select className={input} required value={value.difal.applies === null ? '' : String(value.difal.applies)} onChange={e => onChange({ ...value, difal: { ...value.difal, applies: e.target.value === '' ? null : e.target.value === 'true' } })}><option value="">Selecione</option><option value="false">Não destacar, conforme enquadramento</option><option value="true">Destacar DIFAL e FCP</option></select></label>}
     </div>

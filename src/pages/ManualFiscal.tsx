@@ -383,6 +383,7 @@ export default function ManualFiscal() {
     if (items.some((item) => Number(item.quantity) <= 0)) return toast.error('A quantidade deve ser maior que zero');
     if (items.some((item) => Number(item.unitPrice) <= 0)) return toast.error('O preço deve ser maior que zero');
     if (interstate && (!operation.recipientAddress.taxpayerIndicator || operation.finalConsumer === null || !operation.freightMode || (!noDifal && operation.difal.applies === null))) return toast.error('Confirme contribuinte de ICMS, finalidade, transporte e DIFAL');
+    if (interstate && internalNfe && operation.recipientAddress.stateCode !== configQuery.data?.stateCode && operation.recipientAddress.taxpayerIndicator === '1' && !(operation.buyerPresence === '1' && operation.freightMode === '9')) return toast.error('Para contribuinte de outra UF, confirme retirada presencial sem transporte na loja ou o endereço real da entrega (regra 521)');
     if (interstate && (!recipientName.trim() || !cleanTaxId)) return toast.error('NF-e exige nome e CPF/CNPJ');
     if (interstate && items.some(item => !(internalNfe ? /^5\d{3}$/ : /^6\d{3}$/).test(effectiveCfop(item)))) return toast.error(`Informe o CFOP iniciado com ${internalNfe ? '5' : '6'} em cada item`);
     if (total <= 0) return toast.error('O total da nota deve ser maior que zero');
