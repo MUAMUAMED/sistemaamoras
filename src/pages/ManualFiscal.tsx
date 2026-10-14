@@ -131,6 +131,10 @@ export default function ManualFiscal() {
   const destinationState = operation.deliveryAddress?.stateCode || operation.recipientAddress.stateCode;
   const defaultCfop = interstate ? resolveDefaultCfop(configQuery.data?.defaultCfop, destinationState && configQuery.data ? (internalNfe ? 1 : 2) : 0, operation.recipientAddress.taxpayerIndicator) : configQuery.data?.defaultCfop || '';
   const effectiveCfop = (item: Pick<ManualItem, 'cfop'>) => item.cfop.replace(/\D/g, '') || defaultCfop;
+  const effectiveContributionRate = (item: Pick<ManualItem, 'pisRate' | 'pisCst' | 'cofinsRate' | 'cofinsCst'>, tax: 'pis' | 'cofins') => {
+    const cst = item[`${tax}Cst`] || (tax === 'pis' ? configQuery.data?.defaultPisCst : configQuery.data?.defaultCofinsCst);
+    return item[`${tax}Rate`] || (configQuery.data?.taxRegime === 1 && cst === '99' ? '0' : '');
+  };
   const noDifal = automaticDifal(operation, configQuery.data);
   useEffect(() => {
     if (noDifal) setOperation(current => current.difal.applies === false ? current : { ...current, difal: { applies: false, reason: '' } });
@@ -229,9 +233,9 @@ export default function ManualFiscal() {
             icmsRate: item.icmsRate ? Number(item.icmsRate) : undefined,
             fiscalOrigin: item.fiscalOrigin || '0',
             pisCst: item.pisCst || configQuery.data?.defaultPisCst,
-            pisRate: item.pisRate !== undefined && item.pisRate !== '' ? Number(item.pisRate) : undefined,
+            pisRate: effectiveContributionRate(item, 'pis') !== '' ? Number(effectiveContributionRate(item, 'pis')) : undefined,
             cofinsCst: item.cofinsCst || configQuery.data?.defaultCofinsCst,
-            cofinsRate: item.cofinsRate !== undefined && item.cofinsRate !== '' ? Number(item.cofinsRate) : undefined,
+            cofinsRate: effectiveContributionRate(item, 'cofins') !== '' ? Number(effectiveContributionRate(item, 'cofins')) : undefined,
             ...(operation.difal.applies ? { difal: { base: Number(item.difalBase), internalRate: Number(item.internalRate), interstateRate: Number(item.interstateRate), fcpRate: Number(item.fcpRate) } } : {}),
           } : {}),
         })),
@@ -530,6 +534,7 @@ export default function ManualFiscal() {
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
                 <h2 className="font-semibold text-gray-950">Itens da nota</h2>
+                {interstate && config?.taxRegime === 1 && <p className="mt-1 text-xs text-gray-600">PIS e COFINS com CST 99 usam base e alíquota zero automaticamente no XML do Simples Nacional.</p>}
                 <p className="mt-0.5 text-xs text-gray-500">{interstate ? 'O CFOP é preenchido pelo padrão da Central Fiscal, conforme o local de entrega e o cadastro do destinatário. Você pode editar por item.' : 'NCM e CFOP usam os padrões da Central Fiscal.'}</p>
               </div>
               <button type="button" onClick={() => setItems((current) => [...current, newItem()])} className="inline-flex items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
@@ -630,7 +635,7 @@ export default function ManualFiscal() {
                         <input value={effectiveCfop(item)} onChange={(event) => updateItem(item.id, { cfop: event.target.value })} className={`${inputClass} mt-1`} required={interstate} placeholder={interstate ? 'Configure o padrão ou informe CFOP' : 'Padrão fiscal'} inputMode="numeric" maxLength={4} />
                       </label>
                       {interstate && <>
-                        {([['icmsCst', 'CST/CSOSN ICMS', config?.defaultIcmsCst], ['icmsRate', 'Alíquota ICMS (%)', ''], ['fiscalOrigin', 'Origem da mercadoria', '0'], ['pisCst', 'CST PIS', config?.defaultPisCst], ['pisRate', 'Alíquota PIS (%)', ''], ['cofinsCst', 'CST COFINS', config?.defaultCofinsCst], ['cofinsRate', 'Alíquota COFINS (%)', '']] as const).map(([key, label, placeholder]) => <label key={key} className="text-xs font-medium text-gray-700">{label}<input className={`${inputClass} mt-1`} value={item[key] || ''} placeholder={placeholder || 'Conforme tributação'} onChange={e => updateItem(item.id, { [key]: e.target.value })} /></label>)}
+                        {([['icmsCst', 'CST/CSOSN ICMS', config?.defaultIcmsCst], ['icmsRate', 'Alíquota ICMS (%)', ''], ['fiscalOrigin', 'Origem da mercadoria', '0'], ['pisCst', 'CST PIS', config?.defaultPisCst], ['pisRate', 'Alíquota PIS (%)', ''], ['cofinsCst', 'CST COFINS', config?.defaultCofinsCst], ['cofinsRate', 'Alíquota COFINS (%)', '']] as const).map(([key, label, placeholder]) => <label key={key} className="text-xs font-medium text-gray-700">{label}<input className={`${inputClass} mt-1`} value={key === 'pisRate' ? effectiveContributionRate(item, 'pis') : key === 'cofinsRate' ? effectiveContributionRate(item, 'cofins') : item[key] || ''} placeholder={placeholder || 'Conforme tributação'} onChange={e => updateItem(item.id, { [key]: e.target.value })} /></label>)}
                         {operation.difal.applies && ([['difalBase', 'Base DIFAL (R$)'], ['internalRate', 'Alíquota interna destino (%)'], ['interstateRate', 'Alíquota interestadual (%)'], ['fcpRate', 'FCP (%)']] as const).map(([key, label]) => <label key={key} className="text-xs font-medium text-gray-700">{label}<input required type="number" min="0" step="0.0001" className={`${inputClass} mt-1`} value={item[key] || ''} onChange={e => updateItem(item.id, { [key]: e.target.value })} /></label>)}
                       </>}
 
