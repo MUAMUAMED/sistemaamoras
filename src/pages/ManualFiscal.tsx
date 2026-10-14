@@ -1,3 +1,4 @@
+import { resolveDefaultCfop } from '../utils/fiscalCfop';
 import FiscalDestination, { automaticDifal, emptyFiscalOperation } from '../components/FiscalDestination';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -127,6 +128,9 @@ export default function ManualFiscal() {
   }, [productSearch]);
 
   const internalNfe = (operation.deliveryAddress?.stateCode || operation.recipientAddress.stateCode) === configQuery.data?.stateCode;
+  const destinationState = operation.deliveryAddress?.stateCode || operation.recipientAddress.stateCode;
+  const defaultCfop = interstate ? resolveDefaultCfop(configQuery.data?.defaultCfop, destinationState && configQuery.data ? (internalNfe ? 1 : 2) : 0, operation.recipientAddress.taxpayerIndicator) : configQuery.data?.defaultCfop || '';
+  const effectiveCfop = (item: Pick<ManualItem, 'cfop'>) => item.cfop.replace(/\D/g, '') || defaultCfop;
   const noDifal = automaticDifal(operation, configQuery.data);
   useEffect(() => {
     if (noDifal) setOperation(current => current.difal.applies === false ? current : { ...current, difal: { applies: false, reason: '' } });
@@ -219,7 +223,7 @@ export default function ManualFiscal() {
           productCode: item.productCode.trim() || undefined,
           description: item.description.trim(), quantity: item.quantity, unitPrice: item.unitPrice,
           ncm: item.ncm.replace(/\D/g, '') || undefined,
-          cfop: item.cfop.replace(/\D/g, '') || undefined,
+          cfop: effectiveCfop(item) || undefined,
           ...(interstate ? {
             icmsCst: item.icmsCst || configQuery.data?.defaultIcmsCst,
             icmsRate: item.icmsRate ? Number(item.icmsRate) : undefined,
@@ -376,7 +380,7 @@ export default function ManualFiscal() {
     if (items.some((item) => Number(item.unitPrice) <= 0)) return toast.error('O preço deve ser maior que zero');
     if (interstate && (!operation.recipientAddress.taxpayerIndicator || operation.finalConsumer === null || !operation.freightMode || (!noDifal && operation.difal.applies === null))) return toast.error('Confirme contribuinte de ICMS, finalidade, transporte e DIFAL');
     if (interstate && (!recipientName.trim() || !cleanTaxId)) return toast.error('NF-e exige nome e CPF/CNPJ');
-    if (interstate && items.some(item => !(internalNfe ? /^5\d{3}$/ : /^6\d{3}$/).test(item.cfop || (internalNfe ? configQuery.data?.defaultCfop || '' : '')))) return toast.error(`Informe o CFOP iniciado com ${internalNfe ? '5' : '6'} em cada item`);
+    if (interstate && items.some(item => !(internalNfe ? /^5\d{3}$/ : /^6\d{3}$/).test(effectiveCfop(item)))) return toast.error(`Informe o CFOP iniciado com ${internalNfe ? '5' : '6'} em cada item`);
     if (total <= 0) return toast.error('O total da nota deve ser maior que zero');
     setConfirmOpen(true);
   };
@@ -526,7 +530,7 @@ export default function ManualFiscal() {
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
                 <h2 className="font-semibold text-gray-950">Itens da nota</h2>
-                <p className="mt-0.5 text-xs text-gray-500">{interstate ? 'A entrega define se o CFOP começa com 5 (interna) ou 6 (interestadual). Confira os códigos com a orientação contábil.' : 'NCM e CFOP usam os padrões da Central Fiscal.'}</p>
+                <p className="mt-0.5 text-xs text-gray-500">{interstate ? 'O CFOP é preenchido pelo padrão da Central Fiscal, conforme o local de entrega e o cadastro do destinatário. Você pode editar por item.' : 'NCM e CFOP usam os padrões da Central Fiscal.'}</p>
               </div>
               <button type="button" onClick={() => setItems((current) => [...current, newItem()])} className="inline-flex items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
                 <Plus className="h-4 w-4" /> Adicionar item
@@ -623,7 +627,7 @@ export default function ManualFiscal() {
                       </label>
                       <label className="text-xs font-semibold text-gray-600">
                         CFOP
-                        <input value={item.cfop} onChange={(event) => updateItem(item.id, { cfop: event.target.value })} className={`${inputClass} mt-1`} required={interstate && !internalNfe} placeholder={interstate && !internalNfe ? '6xxx (contador)' : config?.defaultCfop || 'Padrão fiscal'} inputMode="numeric" maxLength={4} />
+                        <input value={effectiveCfop(item)} onChange={(event) => updateItem(item.id, { cfop: event.target.value })} className={`${inputClass} mt-1`} required={interstate} placeholder={interstate ? 'Configure o padrão ou informe CFOP' : 'Padrão fiscal'} inputMode="numeric" maxLength={4} />
                       </label>
                       {interstate && <>
                         {([['icmsCst', 'CST/CSOSN ICMS', config?.defaultIcmsCst], ['icmsRate', 'Alíquota ICMS (%)', ''], ['fiscalOrigin', 'Origem da mercadoria', '0'], ['pisCst', 'CST PIS', config?.defaultPisCst], ['pisRate', 'Alíquota PIS (%)', ''], ['cofinsCst', 'CST COFINS', config?.defaultCofinsCst], ['cofinsRate', 'Alíquota COFINS (%)', '']] as const).map(([key, label, placeholder]) => <label key={key} className="text-xs font-medium text-gray-700">{label}<input className={`${inputClass} mt-1`} value={item[key] || ''} placeholder={placeholder || 'Conforme tributação'} onChange={e => updateItem(item.id, { [key]: e.target.value })} /></label>)}
