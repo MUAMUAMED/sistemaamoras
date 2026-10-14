@@ -683,7 +683,7 @@ export interface FiscalDanfe {
   fiscalTotals?: Record<string, number>;
   fiscalSnapshot?: {
     notes?: string;
-    operation?: { address: import('../components/FiscalDestination').FiscalOperation['recipientAddress']; destination: number; finalConsumer: boolean; freightMode: string; difal: { applies: boolean; reason: string } };
+    operation?: { deliveryAddress?: import('../components/FiscalDestination').FiscalOperation['deliveryAddress']; address: import('../components/FiscalDestination').FiscalOperation['recipientAddress']; destination: number; finalConsumer: boolean; freightMode: string; difal: { applies: boolean; reason: string } };
     itemTaxes?: Array<{ pisRate?: number; cofinsRate?: number; difal?: { base: number; internalRate: number; interstateRate: number; fcpRate: number } }>;
   };
   totalAmount: number;

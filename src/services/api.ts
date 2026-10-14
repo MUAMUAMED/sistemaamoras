@@ -807,7 +807,7 @@ export const salesApi = {
 };
 
 export const fiscalApi = {
-  lookupCnpj: async (cnpj: string): Promise<{ recipientName: string; recipientTaxId: string; source: string; address: Omit<FiscalOperation['recipientAddress'], 'stateTaxId' | 'taxpayerIndicator'> }> => (await api.get(`/fiscal/recipient/cnpj/${cnpj}`)).data,
+  lookupCnpj: async (cnpj: string): Promise<{ recipientName: string; recipientTaxId: string; source: string; stateRegistration?: { taxpayerIndicator: '1'; stateTaxId: string }; address: Omit<FiscalOperation['recipientAddress'], 'stateTaxId' | 'taxpayerIndicator'> }> => (await api.get(`/fiscal/recipient/cnpj/${cnpj}`)).data,
   lookupCep: async (cep: string): Promise<{ source: string; address: Omit<FiscalOperation['recipientAddress'], 'stateTaxId' | 'taxpayerIndicator'> }> => (await api.get(`/fiscal/recipient/cep/${cep}`)).data,
 
   getConfig: async (): Promise<FiscalConfig | null> => (await api.get('/fiscal/config')).data,

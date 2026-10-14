@@ -25,6 +25,7 @@ const Cell = ({ label, children }: { label: string; children?: React.ReactNode }
 export default function DanfeNfe({ document }: { document: FiscalDanfe }) {
   const snapshot = document.fiscalSnapshot;
   const a = snapshot?.operation?.address;
+  const delivery = snapshot?.operation?.deliveryAddress;
   const totals = document.fiscalTotals || {};
   const barcode = accessKeyBars(document.accessKey);
   const pages = Array.from({ length: Math.max(1, Math.ceil(document.items.length / 8)) }, (_, i) => document.items.slice(i * 8, (i + 1) * 8));
@@ -52,6 +53,7 @@ export default function DanfeNfe({ document }: { document: FiscalDanfe }) {
       {document.environment === 'HOMOLOGATION' && <p className="my-2 text-center font-bold">EMITIDA EM HOMOLOGAÇÃO — SEM VALOR FISCAL</p>}
       <h3 className="nfe-heading">Destinatário / remetente</h3>
       <div className="nfe-grid"><Cell label="Nome / razão social">{document.recipientName}</Cell><Cell label="CPF / CNPJ">{document.recipientTaxId}</Cell><Cell label="Data de emissão">{new Date(document.issuedAt).toLocaleString('pt-BR')}</Cell><Cell label="Endereço">{a && `${a.street}, ${a.streetNumber} ${a.complement || ''}`}</Cell><Cell label="Bairro">{a?.district}</Cell><Cell label="CEP">{a?.zipCode}</Cell><Cell label="Município / UF">{a && `${a.cityName}/${a.stateCode}`}</Cell><Cell label="Inscrição estadual">{a?.stateTaxId || (a?.taxpayerIndicator === '2' ? 'ISENTO' : 'NÃO CONTRIBUINTE')}</Cell><Cell label="Data / hora saída" /></div>
+      {delivery && <><h3 className="nfe-heading">Local de entrega</h3><div className="nfe-grid"><Cell label="Endereço da entrega">{delivery.street}, {delivery.streetNumber} {delivery.complement}</Cell><Cell label="Bairro / CEP">{delivery.district} / {delivery.zipCode}</Cell><Cell label="Município / UF">{delivery.cityName}/{delivery.stateCode}</Cell></div></>}
       <h3 className="nfe-heading">Cálculo do imposto</h3>
       <div className="nfe-grid">{[['vBC', 'Base ICMS'], ['vICMS', 'Valor ICMS'], ['vProd', 'Valor dos produtos'], ['vBCST', 'Base ICMS ST'], ['vST', 'Valor ICMS ST'], ['vIPI', 'Valor IPI'], ['vFrete', 'Frete'], ['vSeg', 'Seguro'], ['vDesc', 'Desconto'], ['vICMSUFDest', 'DIFAL destino'], ['vFCPUFDest', 'FCP destino'], ['vNF', 'Valor total da nota']].map(([key, label]) => <Cell key={key} label={label}>{number(totals[key])}</Cell>)}</div>
       <h3 className="nfe-heading">Transporte / volumes</h3>

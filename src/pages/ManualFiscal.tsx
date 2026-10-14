@@ -1,4 +1,4 @@
-import FiscalDestination, { emptyFiscalOperation } from '../components/FiscalDestination';
+import FiscalDestination, { automaticDifal, emptyFiscalOperation } from '../components/FiscalDestination';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -126,6 +126,13 @@ export default function ManualFiscal() {
     return () => window.clearTimeout(timer);
   }, [productSearch]);
 
+  const internalNfe = (operation.deliveryAddress?.stateCode || operation.recipientAddress.stateCode) === configQuery.data?.stateCode;
+  const noDifal = automaticDifal(operation, configQuery.data);
+  useEffect(() => {
+    if (noDifal) setOperation(current => current.difal.applies === false ? current : { ...current, difal: { applies: false, reason: '' } });
+    else setOperation(current => current.difal.applies === false && !current.difal.reason ? { ...current, difal: { applies: null, reason: '' } } : current);
+  }, [noDifal]);
+
   const total = useMemo(
     () => items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
     [items]
@@ -140,11 +147,12 @@ export default function ManualFiscal() {
       setOperation(current => {
         const a = current.recipientAddress;
         const empty = Object.keys(result.address).every(key => !a[key as keyof typeof a]);
-        if (!empty) return current;
+        const registration = result.stateRegistration && !a.taxpayerIndicator && !a.stateTaxId ? result.stateRegistration : {};
+        if (!empty) return { ...current, recipientAddress: { ...a, ...registration } };
         automaticAddress.current = { id: cnpj, address: result.address };
-        return { ...current, recipientAddress: { ...a, ...result.address } };
+        return { ...current, recipientAddress: { ...a, ...result.address, ...registration } };
       });
-      setAddressStatus(`Endereço cadastral consultado em ${result.source}. Confira se é o local de entrega; os dados já informados foram preservados.`);
+      setAddressStatus(`Cadastro consultado em ${result.source}.${result.stateRegistration ? ' Inscrição estadual ativa preenchida.' : ''} Confira os endereços; os dados já informados foram preservados.`);
     },
     onError: (error: any, cnpj) => {
       if (taxIdRef.current !== cnpj) return;
@@ -366,9 +374,9 @@ export default function ManualFiscal() {
     if (items.some((item) => item.description.trim().length < 2)) return toast.error('Preencha a descrição de todos os itens');
     if (items.some((item) => Number(item.quantity) <= 0)) return toast.error('A quantidade deve ser maior que zero');
     if (items.some((item) => Number(item.unitPrice) <= 0)) return toast.error('O preço deve ser maior que zero');
-    if (interstate && (!operation.recipientAddress.taxpayerIndicator || operation.finalConsumer === null || !operation.freightMode || operation.difal.applies === null)) return toast.error('Confirme contribuinte de ICMS, finalidade, transporte e DIFAL');
+    if (interstate && (!operation.recipientAddress.taxpayerIndicator || operation.finalConsumer === null || !operation.freightMode || (!noDifal && operation.difal.applies === null))) return toast.error('Confirme contribuinte de ICMS, finalidade, transporte e DIFAL');
     if (interstate && (!recipientName.trim() || !cleanTaxId)) return toast.error('NF-e exige nome e CPF/CNPJ');
-    if (interstate && items.some(item => !/^6\d{3}$/.test(item.cfop))) return toast.error('Informe o CFOP interestadual iniciado com 6 em cada item');
+    if (interstate && items.some(item => !(internalNfe ? /^5\d{3}$/ : /^6\d{3}$/).test(item.cfop || (internalNfe ? configQuery.data?.defaultCfop || '' : '')))) return toast.error(`Informe o CFOP iniciado com ${internalNfe ? '5' : '6'} em cada item`);
     if (total <= 0) return toast.error('O total da nota deve ser maior que zero');
     setConfirmOpen(true);
   };
@@ -395,8 +403,8 @@ export default function ManualFiscal() {
       <section className="rounded-md border border-indigo-200 bg-white p-4">
         <label className="text-sm font-semibold">Tipo de venda
           <select className="mt-2 block w-full rounded-md border border-gray-300 p-2 sm:ml-3 sm:mt-0 sm:inline-block sm:w-auto" value={interstate ? 'INTERSTATE' : 'LOCAL'} onChange={e => { setInterstate(e.target.value === 'INTERSTATE'); setConfirmOpen(false); }}>
-            <option value="LOCAL">Venda local / retirada no DF — NFC-e</option>
-            <option value="INTERSTATE">Envio para outro estado — NF-e</option>
+            <option value="LOCAL">Venda ao consumidor final no DF — NFC-e</option>
+            <option value="INTERSTATE">Revenda / entrega no DF ou em outro estado — NF-e</option>
           </select>
         </label>
         <p className="mt-2 text-xs text-gray-600">O CNPJ e o cadastro do emitente permanecem os mesmos. A UF de entrega define o destino da operação.</p>
@@ -508,17 +516,17 @@ export default function ManualFiscal() {
               {lookupCnpjMutation.isPending ? 'Consultando o endereço cadastral do CNPJ…' : addressStatus}
               {cnpjResult && cnpjResult.recipientTaxId === taxIdRef.current && !lookupCnpjMutation.isPending && <button type="button" className="ml-2 font-semibold underline" onClick={() => {
                 automaticAddress.current = { id: cnpjResult.recipientTaxId, address: cnpjResult.address };
-                setOperation(current => ({ ...current, recipientAddress: { ...current.recipientAddress, ...cnpjResult.address } }));
-                setAddressStatus('Endereço cadastral aplicado. Confira se corresponde ao local de entrega.');
+                setOperation(current => ({ ...current, recipientAddress: { ...current.recipientAddress, ...cnpjResult.address, ...(!current.recipientAddress.taxpayerIndicator && cnpjResult.stateRegistration ? cnpjResult.stateRegistration : {}) } }));
+                setAddressStatus('Endereço cadastral aplicado. Confira também o local da entrega abaixo.');
               }}>Usar endereço do CNPJ</button>}
             </div>}
-            <FiscalDestination value={operation} onChange={setOperation} />
+            <FiscalDestination value={operation} config={config} onChange={setOperation} />
           </>}
           <section className="border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
                 <h2 className="font-semibold text-gray-950">Itens da nota</h2>
-                <p className="mt-0.5 text-xs text-gray-500">{interstate ? 'Informe o CFOP de cada item conforme a orientação contábil; o padrão local não será convertido automaticamente.' : 'NCM e CFOP usam os padrões da Central Fiscal.'}</p>
+                <p className="mt-0.5 text-xs text-gray-500">{interstate ? 'A entrega define se o CFOP começa com 5 (interna) ou 6 (interestadual). Confira os códigos com a orientação contábil.' : 'NCM e CFOP usam os padrões da Central Fiscal.'}</p>
               </div>
               <button type="button" onClick={() => setItems((current) => [...current, newItem()])} className="inline-flex items-center gap-2 rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
                 <Plus className="h-4 w-4" /> Adicionar item
@@ -615,7 +623,7 @@ export default function ManualFiscal() {
                       </label>
                       <label className="text-xs font-semibold text-gray-600">
                         CFOP
-                        <input value={item.cfop} onChange={(event) => updateItem(item.id, { cfop: event.target.value })} className={`${inputClass} mt-1`} required={interstate} placeholder={interstate ? '6xxx (contador)' : config?.defaultCfop || 'Padrão fiscal'} inputMode="numeric" maxLength={4} />
+                        <input value={item.cfop} onChange={(event) => updateItem(item.id, { cfop: event.target.value })} className={`${inputClass} mt-1`} required={interstate && !internalNfe} placeholder={interstate && !internalNfe ? '6xxx (contador)' : config?.defaultCfop || 'Padrão fiscal'} inputMode="numeric" maxLength={4} />
                       </label>
                       {interstate && <>
                         {([['icmsCst', 'CST/CSOSN ICMS', config?.defaultIcmsCst], ['icmsRate', 'Alíquota ICMS (%)', ''], ['fiscalOrigin', 'Origem da mercadoria', '0'], ['pisCst', 'CST PIS', config?.defaultPisCst], ['pisRate', 'Alíquota PIS (%)', ''], ['cofinsCst', 'CST COFINS', config?.defaultCofinsCst], ['cofinsRate', 'Alíquota COFINS (%)', '']] as const).map(([key, label, placeholder]) => <label key={key} className="text-xs font-medium text-gray-700">{label}<input className={`${inputClass} mt-1`} value={item[key] || ''} placeholder={placeholder || 'Conforme tributação'} onChange={e => updateItem(item.id, { [key]: e.target.value })} /></label>)}
@@ -668,7 +676,7 @@ export default function ManualFiscal() {
             </div>
             <div className="space-y-3 p-5 text-sm">
               <div className="flex justify-between"><span className="text-gray-600">Destinatário</span><strong>{recipientName.trim() || 'Não identificado'}</strong></div>
-              <div className="flex justify-between"><span className="text-gray-600">Documento</span><strong>{noteLabel}{interstate ? ` — entrega em ${operation.recipientAddress.stateCode}` : ' — venda local'}</strong></div>
+              <div className="flex justify-between"><span className="text-gray-600">Documento</span><strong>{noteLabel}{interstate ? ` — entrega em ${operation.deliveryAddress?.stateCode || operation.recipientAddress.stateCode}` : ' — venda local'}</strong></div>
               {interstate && <div className="flex justify-between"><span className="text-gray-600">Série / próximo número NF-e</span><strong>{config?.nfeSeries} / {config?.nextNfeNumber}</strong></div>}
               <div className="flex justify-between"><span className="text-gray-600">Itens</span><strong>{items.length}</strong></div>
               <div className="flex justify-between text-base"><span className="font-semibold">Total</span><strong>{money(total)}</strong></div>

@@ -43,3 +43,14 @@ O CEP completa UF, município, código IBGE, bairro e logradouro pelo ViaCEP. N�
 A IA agora extrai o endereço de entrega e as escolhas fiscais explicitamente descritas. Contribuinte de ICMS, finalidade, transporte e DIFAL começam sem seleção; a emissão exige essas informações. CNPJ não implica contribuinte, e o endereço cadastral deve ser revisado como destino da mercadoria.
 
 Verificação adicional: `npm run test:fiscal:autofill` no backend, com cinco cenários de consulta, cache, validação, extração do endereço e ausência de inferências fiscais.
+
+
+### Revenda com entrega na loja (13/10/2026)
+- NF-e aceita operações internas e interestaduais; NFC-e fica no fluxo de consumidor final.
+- Endereço cadastral do destinatário e local da entrega são separados no XML e no DANFE.
+- A entrega explícita determina idDest e a família do CFOP. Entrega no DF para destinatário em GO usa grupo entrega/UF=DF, mantendo enderDest/UF=GO.
+- Consulta CNPJ preenche indIEDest=1 e IE somente quando há uma inscrição ativa e inequívoca na UF do cadastro. Ausência de IE não determina não contribuinte.
+- Atalho “Revenda com entrega na loja e frete gratuito” aplica indFinal=0, modFrete=3 e endereço do emitente; os campos continuam editáveis. Frete não é somado.
+- DIFAL no XML deixa de exigir escolha/fundamento para revenda, operação interna e CRT=1; regras para consumidor final não contribuinte em regime normal continuam explícitas. Isso não decide recolhimento por guia.
+- Referências oficiais: MOC, regra 521/exceção para entrega na UF do emitente: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=dgIA1+97QzE%3D ; NT 2024.001, regra 694/exceção CRT=1: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=kIiniiSkpKc%3D ; NT 2021.004, modalidade 3: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=i0rK6ogxnx8%3D .
+- Validação: 14 testes fiscais e 6 de preenchimento; teste de navegador com CNPJ e entrega separada, sem emitir nota em produção.
