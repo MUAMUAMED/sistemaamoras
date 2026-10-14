@@ -58,6 +58,18 @@ async function run() {
   await assert.rejects(embedImages(Array(7).fill(inputs[0])), /entre uma e seis/);
   pass('limite de fotos é validado antes do envio');
 
+  const webp = await require('sharp')({ create: { width: 4, height: 4, channels: 3, background: '#7c174f' } }).webp().toBuffer();
+  global.fetch = async (url, options) => {
+    const payload = JSON.parse(options.body);
+    const image = payload.content.parts[0].inlineData;
+    assert.equal(image.mimeType, 'image/png');
+    const converted = await require('sharp')(Buffer.from(image.data, 'base64')).metadata();
+    assert.equal(converted.format, 'png');
+    return new Response(JSON.stringify({ embedding: { values: Array(768).fill(0.1) } }), { status: 200 });
+  };
+  assert.equal((await embedImages([{ data: webp, mimeType: '/uploads/products/photo.webp' }])).length, 768);
+  pass('fotos WebP existentes são convertidas para PNG aceito pela Google');
+
   process.env.IMAGE_EMBEDDING_PROVIDER = 'openrouter';
   process.env.IMAGE_EMBEDDING_MODEL = 'google/gemini-embedding-2';
   global.fetch = async (url, options) => {

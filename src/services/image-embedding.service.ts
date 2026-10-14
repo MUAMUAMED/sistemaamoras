@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
+import sharp from 'sharp';
 
 export const IMAGE_EMBEDDING_DIMENSIONS = 768;
 
@@ -34,7 +35,8 @@ function configuredError(message: string): Error {
 function normalizeMimeType(value: string): string {
   if (value === 'image/jpg') return 'image/jpeg';
   if (value === 'image/jpeg' || value === 'image/png' || value === 'image/webp') return value;
-  return path.extname(value).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
+  const extension = path.extname(value).toLowerCase();
+  return extension === '.png' ? 'image/png' : extension === '.webp' ? 'image/webp' : 'image/jpeg';
 }
 
 /** Cria um vetor de imagem no mesmo espaço usado pelo catálogo. */
@@ -63,7 +65,11 @@ export async function embedImages(inputs: ImageInput[]): Promise<number[]> {
       }
     }
     if (!data) throw new Error('Não foi possível ler a foto para a busca visual.');
-    return { mimeType: normalizeMimeType(input.mimeType), data: data.toString('base64') };
+    const mimeType = normalizeMimeType(input.mimeType);
+    if (provider === 'google' && mimeType === 'image/webp') {
+      return { mimeType: 'image/png', data: (await sharp(data).png().toBuffer()).toString('base64') };
+    }
+    return { mimeType, data: data.toString('base64') };
   }));
   const google = provider === 'google';
   const response = await fetch(google
