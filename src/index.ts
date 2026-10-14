@@ -30,6 +30,8 @@ import fiscalRoutes from "./routes/fiscal.routes";
 import sizesRoutes from "./routes/sizes";
 import systemConfigRoutes from "./routes/system-config";
 import stockMovementsRoutes from "./routes/stock-movements";
+import mobileStockRoutes from "./routes/mobile-stock.routes";
+import { ensureMobileStockSetup } from "./services/mobile-stock-setup";
 import interactionsRoutes from "./routes/interactions";
 import barcodeRoutes from "./routes/barcode";
 import automationRoutes from "./routes/automation.routes";
@@ -435,6 +437,7 @@ app.use("/api/fiscal", fiscalRoutes);
 app.use("/api/sizes", sizesRoutes);
 app.use("/api/system-config", systemConfigRoutes);
 app.use("/api/stock-movements", stockMovementsRoutes);
+app.use("/api/mobile-stock", mobileStockRoutes);
 app.use("/api/interactions", interactionsRoutes);
 app.use("/api/barcode", barcodeRoutes);
 app.use("/api/automation", automationRoutes);
@@ -452,6 +455,7 @@ app.use(errorHandler);
 async function startServer() {
   try {
     await prisma.$connect();
+    await ensureMobileStockSetup();
     logger.info("Conexão com banco de dados estabelecida");
 
     if (!process.env.WHATSAPP_WORKER_URL) {

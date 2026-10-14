@@ -190,6 +190,7 @@ model Product {
   barcodeAliases    ProductBarcodeAlias[]
   saleItems         SaleItem[]
   stockMovements    StockMovement[]
+  inventoryItems    InventoryItem[]
   commercialProduct CommercialProduct?
 
   @@map("products")
@@ -424,6 +425,53 @@ model SaleItem {
 }
 
 // Movimentações de estoque
+model InventorySession {
+  id          String   @id @default(cuid())
+  userId      String
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?
+  result      Json?
+  items       InventoryItem[]
+  requests    InventoryRequest[]
+
+  @@index([userId, status])
+  @@map("inventory_sessions")
+}
+
+model InventoryItem {
+  sessionId        String
+  productId        String
+  expectedQuantity Int
+  countedQuantity  Int      @default(0)
+  snapshotUpdatedAt DateTime
+  session          InventorySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  product          Product @relation(fields: [productId], references: [id])
+
+  @@id([sessionId, productId])
+  @@map("inventory_items")
+}
+
+model InventoryRequest {
+  id        String @id
+  sessionId String
+  payload   String
+  session   InventorySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("inventory_requests")
+}
+
+model StockOperation {
+  id        String @id
+  userId    String
+  payload   String
+  result    Json
+  createdAt DateTime @default(now())
+
+  @@map("stock_operations")
+}
+
 model StockMovement {
   id           String            @id @default(cuid())
   productId    String
