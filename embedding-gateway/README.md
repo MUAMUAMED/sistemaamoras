@@ -10,4 +10,6 @@ Variáveis do backend: `IMAGE_EMBEDDING_PROVIDER=google`, `IMAGE_EMBEDDING_MODEL
 
 Rota: `POST /v1beta/models/gemini-embedding-2:embedContent` com `Authorization: Bearer ...`. Aceita uma a seis imagens JPEG/PNG, 768 dimensões, até 20 MB e duas chamadas simultâneas. O backend converte WebP para PNG. `GET /health` não exige autenticação. Erros de cota retornam 429; não há fallback pago.
 
-Validação local: `node test.cjs`. Publicação independente no branch `codex/google-embedding-gateway`; serviço `amoras-embedding-gateway` no projeto Oracle existente.
+Validação local: `node test.cjs`. Publicação independente no branch `codex/google-embedding-gateway`; serviço `amoras-embedding-gateway` no projeto Oracle existente. O Dockerfile usa ARM64, arquitetura do servidor Oracle. Configure `PORT=8080` no ambiente do serviço.
+
+Validação real em 14/10/2026: gateway `/health` HTTP 200, chamada sem token HTTP 401; embedding de foto do catálogo com 768 dimensões e cosseno 1 em relação ao vetor existente; busca autenticada de reposição HTTP 200 com 30 resultados, incluindo o produto fotografado. Nenhum saldo ajustado durante a verificação.
