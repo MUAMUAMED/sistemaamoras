@@ -99,7 +99,7 @@ test('cancelamento usa serviço da NF-e e não exige CSC',async()=> {
 });
 test('bloqueia tributação sem suporte, DIFAL incompleto e omissão sem fundamento',()=> {
  assert.throws(()=>validateNfeTax({icmsCst:'201'},1,false),/não suportados/);
- assert.throws(()=>validateOperation({...input(),difal:{applies:false}},'DF',1),/fundamento/);
+ assert.throws(()=>validateOperation({...input(),difal:{applies:false}},'DF',3),/fundamento/);
  assert.throws(()=>validateOperation({...input(),difal:{applies:true}},'DF',1),/incompatível/);
  assert.throws(()=>validateCfop('6108',65,2),/NFC-e/);
 });
@@ -109,3 +109,26 @@ test('bloqueia séries especiais antes de consumir numeração fiscal',async()=>
  config.nfeSeries=999;await assert.rejects(service.issueManualNfe(input(),'admin'),/série/);
  assert.equal(writes,0);assert.equal(sent.length,0);
 });
+
+ test('revenda para CNPJ de GO com entrega no DF usa NF-e interna e grupo entrega separado', async()=> {
+ const data=input(); data.recipientTaxId='55094731000135';data.recipientAddress.taxpayerIndicator='1';data.recipientAddress.stateTaxId='201490145';data.finalConsumer=false;data.freightMode='3';delete data.difal;data.items[0].cfop='5102';
+ data.deliveryAddress={stateCode:'DF',cityCode:'5300108',cityName:'Brasília',street:'Rua da loja',streetNumber:'1',district:'Centro',zipCode:'70000000'};
+ const doc=await service.issueManualNfe(data,'admin');const xml=parsed(doc.requestXml);
+ assert.equal(xml.ide.idDest,1);assert.equal(xml.ide.indFinal,0);assert.equal(xml.dest.enderDest.UF,'GO');assert.equal(xml.entrega.UF,'DF');assert.equal(xml.entrega.CNPJ,55094731000135);assert.equal(xml.entrega.xLgr,'Rua da loja');assert.equal(xml.transp.modFrete,3);assert.equal(xml.det.prod.CFOP,5102);assert.equal(xml.total.ICMSTot.vFrete,0);assert.equal(xml.det.imposto.ICMSUFDest,undefined);
+ config.cityName='Alterado';config.street='Mudou';status=999;doc.status='REJECTED';await service.transmitFiscalDocument(doc.id);assert.equal(parsed(doc.requestXml).entrega.xLgr,'Rua da loja');
+ });
+ test('destino considera entrega real e rejeita CFOP interestadual para entrega interna antes de gravar',async()=> {
+ const data=input();data.deliveryAddress={...baseAddress,stateCode:'DF',cityCode:'5300108',cityName:'Brasília',zipCode:'70000000'};
+ await assert.rejects(service.issueManualNfe(data,'admin'),/CFOP/);assert.equal(writes,0);
+ data.items[0].cfop='5102';data.deliveryAddress.cityCode='5208004';await assert.rejects(service.issueManualNfe(data,'admin'),/IBGE/);assert.equal(writes,0);
+ });
+ test('DIFAL no XML é resolvido sem confirmação para revenda e enquadramento Simples',()=> {
+ assert.equal(validateOperation({...input(),difal:undefined},'DF',1).difal.applies,false);
+ assert.equal(validateOperation({...input(),recipientAddress:{...baseAddress,taxpayerIndicator:'1',stateTaxId:'201490145'},finalConsumer:false,difal:undefined},'DF',3).difal.applies,false);
+ assert.throws(()=>validateOperation({...input(),difal:undefined},'DF',3),/tratamento/);
+ });
+
+ test('ICMS normal aceita alíquota interna explícita e mantém limites interestaduais',()=> {
+ const item={icmsCst:'00',fiscalOrigin:'0',icmsRate:18,pisCst:'07',cofinsCst:'07'};
+ validateNfeTax(item,3,false,1);assert.throws(()=>validateNfeTax(item,3,false,2),/alíquota/);
+ });

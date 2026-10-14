@@ -177,7 +177,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     remainingDiscount -= itemDiscount;
     validateCfop(item.cfop, document.model, operation?.destination ?? 1);
     const tax = snapshot.itemTaxes?.[index] || {};
-    if (document.model === 55) validateNfeTax({ ...item, ...tax }, settings.taxRegime, operation.difal.applies);
+    if (document.model === 55) validateNfeTax({ ...item, ...tax }, settings.taxRegime, operation.difal.applies, operation.destination);
     const base = totalPrice - itemDiscount;
     const uf = tax.difal;
     return {
@@ -234,6 +234,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     consumerType: operation ? (operation.finalConsumer ? '1' : '0') : '1',
     buyerPresence: document.model === 55 ? '9' : '1',
     printFormat: document.model === 55 ? '1' : '4',
+    delivery: operation?.deliveryAddress ? { ...operation.deliveryAddress, number: operation.deliveryAddress.streetNumber, taxId: document.recipientTaxId, name: document.recipientName } : undefined,
     transport: operation ? { freightMode: operation.freightMode } : undefined,
     additionalInfo: snapshot.notes || operation?.difal.reason ? { taxpayerNote: [snapshot.notes, operation?.difal.reason].filter(Boolean).join(' - ') } : undefined,
     issuer: {
@@ -416,7 +417,6 @@ export const issueManualNfe = (input: ManualNfceInput, adminUserId: string) => i
 const issueManualDocument = async (input: ManualNfceInput, adminUserId: string, model: 55 | 65) => {
   const settings = await loadFiscalSettings(model);
   const operation = model === 55 ? validateOperation(input, settings.stateCode, settings.taxRegime) : undefined;
-  if (model === 55 && operation?.destination !== 2) throw new Error('Este fluxo de NF-e é exclusivo para envio interestadual; para venda local use NFC-e');
   if (model === 65 && input.recipientAddress && input.recipientAddress.stateCode !== settings.stateCode) throw new Error('Envio interestadual exige NF-e');
   const recipientName = fiscalText(input.recipientName);
   const recipientTaxId = onlyDigits(input.recipientTaxId);
@@ -462,10 +462,10 @@ const issueManualDocument = async (input: ManualNfceInput, adminUserId: string, 
     if (!/^\d{8}$/.test(ncm)) throw new Error(`Item ${index + 1}: NCM invalido`);
     validateCfop(cfop, model, operation?.destination ?? 1);
     if (model === 55) {
-      const allowed = operation!.address.taxpayerIndicator === '9' ? ['6107', '6108'] : ['6101', '6102'];
+      const allowed = operation!.destination === 1 ? ['5101', '5102'] : operation!.address.taxpayerIndicator === '9' ? ['6107', '6108'] : ['6101', '6102'];
       if (!allowed.includes(cfop)) throw new Error('Este fluxo suporta venda de produção própria ou revenda: confira CFOP e condição de contribuinte com o contador');
     }
-    if (model === 55) validateNfeTax({ ...rawItem, icmsCst, pisCst, cofinsCst, fiscalOrigin }, settings.taxRegime, operation!.difal.applies);
+    if (model === 55) validateNfeTax({ ...rawItem, icmsCst, pisCst, cofinsCst, fiscalOrigin }, settings.taxRegime, operation!.difal.applies, operation!.destination);
     if (!icmsCst || !pisCst || !cofinsCst) {
       throw new Error(`Item ${index + 1}: tributacao incompleta na Central Fiscal`);
     }

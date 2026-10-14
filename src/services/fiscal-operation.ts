@@ -8,6 +8,7 @@ export interface RecipientAddress {
 
 export interface FiscalOperationInput {
   recipientAddress?: RecipientAddress;
+  deliveryAddress?: Omit<RecipientAddress, 'taxpayerIndicator' | 'stateTaxId'>;
   finalConsumer?: boolean;
   freightMode?: string;
   difal?: { applies: boolean; reason?: string };
@@ -54,17 +55,27 @@ export function validateOperation(input: FiscalOperationInput, issuerState: stri
   if (typeof input.finalConsumer !== 'boolean') throw new Error('Informe se o cliente é consumidor final');
   if (a.taxpayerIndicator === '9' && !input.finalConsumer) throw new Error('Não contribuinte deve ser consumidor final');
   if (!['0', '1', '2', '3', '4', '9'].includes(String(input.freightMode))) throw new Error('Informe a modalidade do transporte');
-  const destination = stateCode === issuerState ? 1 : 2;
-  if (!input.difal || typeof input.difal.applies !== 'boolean') throw new Error('Informe o tratamento do DIFAL confirmado com o contador');
+  let deliveryAddress: FiscalOperationInput['deliveryAddress'];
+  if (input.deliveryAddress) {
+    const d = input.deliveryAddress;
+    // Reuse address validation without treating the delivery location as a different taxpayer.
+    deliveryAddress = validateOperation({ recipientAddress: { ...d, taxpayerIndicator: '9' }, finalConsumer: true, freightMode: '9', difal: { applies: false, reason: 'Validação do endereço de entrega' } }, d.stateCode, taxRegime).address;
+    const { taxpayerIndicator, stateTaxId, ...location } = deliveryAddress as RecipientAddress;
+    deliveryAddress = location;
+  }
+  const destination = (deliveryAddress?.stateCode || stateCode) === issuerState ? 1 : 2;
   const eligibleDifal = destination === 2 && input.finalConsumer && a.taxpayerIndicator === '9';
-  if (input.difal.applies && (!eligibleDifal || taxRegime === 1)) {
+  const automatic = !eligibleDifal || taxRegime === 1;
+  if (!automatic && typeof input.difal?.applies !== 'boolean') throw new Error('Informe o tratamento do DIFAL confirmado com o contador');
+  const applies = input.difal?.applies === true;
+  if (applies && (!eligibleDifal || taxRegime === 1)) {
     throw new Error('Grupo ICMSUFDest incompatível com esta operação/regime tributário');
   }
-  if (!input.difal.applies && eligibleDifal && !String(input.difal.reason || '').trim()) {
+  if (!automatic && !applies && !String(input.difal?.reason || '').trim()) {
     throw new Error('Informe o fundamento para não destacar DIFAL nesta venda');
   }
-  return { address, destination: destination as 1 | 2, finalConsumer: input.finalConsumer,
-    freightMode: String(input.freightMode), difal: { applies: input.difal.applies, reason: String(input.difal.reason || '').trim().slice(0, 500) } };
+  return { address, deliveryAddress, destination: destination as 1 | 2, finalConsumer: input.finalConsumer,
+    freightMode: String(input.freightMode), difal: { applies, reason: String(input.difal?.reason || '').trim().slice(0, 500) } };
 }
 
 export const requireRate = (value: unknown, label: string, allowed?: number[]) => {
@@ -76,12 +87,12 @@ export const requireRate = (value: unknown, label: string, allowed?: number[]) =
   return rate;
 };
 
-export function validateNfeTax(item: any, regime: number, difal: boolean) {
+export function validateNfeTax(item: any, regime: number, difal: boolean, destination: number = 2) {
   // Outros CST exigem crédito, ST, redução ou desoneração que este fluxo não calcula.
   const supported = regime === 1 ? ['102', '103', '300', '400'] : ['00', '41'];
   if (!supported.includes(item.icmsCst)) throw new Error(`CST/CSOSN ${item.icmsCst} exige campos fiscais ainda não suportados neste emissor de NF-e`);
   if (!/^[0-8]$/.test(item.fiscalOrigin)) throw new Error('Origem da mercadoria inválida');
-  if (item.icmsCst === '00') requireRate(item.icmsRate, 'alíquota do ICMS', [4, 7, 12]);
+  if (item.icmsCst === '00') requireRate(item.icmsRate, 'alíquota do ICMS', destination === 2 ? [4, 7, 12] : undefined);
   for (const tax of ['pis', 'cofins']) {
     const cst = item[`${tax}Cst`];
     if (!['01', '02', '04', '05', '06', '07', '08', '09', '49', '99'].includes(cst)) throw new Error(`CST de ${tax.toUpperCase()} não suportado`);

@@ -36,7 +36,7 @@ export function buildInvoiceXml(data: InvoiceBuildData): {
   if (data.model === 65 && (data.destination ?? 1) !== 1) throw new Error('NFC-e não permite operação interestadual');
   if (data.model === 55) {
     if (!data.recipient || !['street', 'streetNumber', 'district', 'cityCode', 'cityName', 'stateCode', 'zipCode'].every(key => Boolean((data.recipient as any)[key]))) throw new Error('NF-e exige endereço completo do destinatário');
-    const expected = data.recipient.stateCode === data.issuer.stateCode ? 1 : 2;
+    const expected = (data.delivery?.stateCode || data.recipient.stateCode) === data.issuer.stateCode ? 1 : 2;
     if (data.destination !== expected) throw new Error('Destino incompatível com UF do destinatário');
   }
   for (const item of data.items) {

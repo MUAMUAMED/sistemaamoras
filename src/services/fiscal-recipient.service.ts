@@ -5,6 +5,11 @@ export interface LookupAddress {
   stateCode: string; cityCode: string; cityName: string; street: string;
   streetNumber: string; district: string; zipCode: string; complement: string;
 }
+export function activeStateRegistration(records: unknown, uf: string) {
+  if (!Array.isArray(records)) return undefined;
+  const matches = [...new Set(records.filter(r => r?.ativo === true && r?.estado?.sigla === uf).map(r => String(r.inscricao_estadual || '').replace(/\D/g, '')).filter(ie => /^\d{2,14}$/.test(ie)))];
+  return matches.length === 1 ? { taxpayerIndicator: '1' as const, stateTaxId: matches[0] } : undefined;
+}
 const digits = (value: unknown) => String(value || '').replace(/\D/g, '');
 const text = (value: unknown) => String(value || '').trim().slice(0, 60);
 const cache = new Map<string, { expires: number; value: any }>();
@@ -48,7 +53,7 @@ export async function lookupFiscalCnpj(input: string) {
       const { data } = await axios.get(`https://publica.cnpj.ws/cnpj/${cnpj}`, { timeout: 10000 });
       const e = data.estabelecimento;
       if (!e || digits(e.cnpj) !== cnpj) throw new Error('CNPJ não localizado');
-      return { recipientName: text(data.razao_social), recipientTaxId: cnpj, source: 'CNPJ.ws',
+      return { recipientName: text(data.razao_social), recipientTaxId: cnpj, source: 'CNPJ.ws', stateRegistration: activeStateRegistration(e.inscricoes_estaduais, e.estado?.sigla),
         address: address({ stateCode: e.estado?.sigla, cityCode: e.cidade?.ibge_id, cityName: e.cidade?.nome,
           street: [e.tipo_logradouro, e.logradouro].filter(Boolean).join(' '), streetNumber: e.numero,
           district: e.bairro, zipCode: e.cep, complement: e.complemento }),
