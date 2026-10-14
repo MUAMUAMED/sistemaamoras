@@ -145,3 +145,21 @@ test('bloqueia séries especiais antes de consumir numeração fiscal',async()=>
  const local=await service.issueManualNfe(data,'admin');assert.equal(parsed(local.requestXml).det.prod.CFOP,5102);
  data.items[0].cfop='6102';await assert.rejects(service.issueManualNfe(data,'admin'),/CFOP/);
  });
+
+ test('Simples Nacional com PIS/COFINS 99 resolve alíquotas ausentes e gera bases e valores zero',async()=> {
+ config.defaultPisCst='99';config.defaultCofinsCst='99';const data=input();
+ const doc=await service.issueManualNfe(data,'admin');const xml=parsed(doc.requestXml);
+ for(const [group,tag,rate,value] of [['PIS','PISOutr','pPIS','vPIS'],['COFINS','COFINSOutr','pCOFINS','vCOFINS']]) {
+ const tax=xml.det.imposto[group][tag];assert.equal(tax.CST,99);assert.equal(tax.vBC,0);assert.equal(tax[rate],0);assert.equal(tax[value],0);
+ }
+ assert.equal(xml.total.ICMSTot.vPIS,0);assert.equal(xml.total.ICMSTot.vCOFINS,0);assert.equal(xml.total.ICMSTot.vNF,100);
+ assert.deepEqual(doc.paymentSnapshot.itemTaxes[0],{pisRate:0,cofinsRate:0});
+ doc.status='REJECTED';config.defaultPisCst='01';config.defaultCofinsCst='01';const retried=await service.transmitFiscalDocument(doc.id);assert.equal(parsed(retried.requestXml).det.imposto.PIS.PISOutr.vBC,0);
+ });
+ test('zero automático não se estende ao regime normal ou a outros CSTs e preserva alíquota explícita',async()=> {
+ config.defaultPisCst='99';config.defaultCofinsCst='99';config.taxRegime=3;config.defaultIcmsCst='41';
+ await assert.rejects(service.issueManualNfe(input(),'admin'),/alíquota de PIS/);assert.equal(writes,0);
+ config.taxRegime=1;config.defaultIcmsCst='102';config.defaultPisCst='01';await assert.rejects(service.issueManualNfe(input(),'admin'),/alíquota de PIS/);assert.equal(writes,0);
+ config.defaultPisCst='99';const data=input();data.items[0].pisRate=1.65;data.items[0].cofinsRate=7.6;const doc=await service.issueManualNfe(data,'admin');const xml=parsed(doc.requestXml);
+ assert.equal(xml.det.imposto.PIS.PISOutr.pPIS,1.65);assert.equal(xml.det.imposto.COFINS.COFINSOutr.pCOFINS,7.6);
+ });

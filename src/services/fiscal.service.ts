@@ -1,4 +1,4 @@
-import { resolveDefaultCfop, validateNfeSeries, validateCfop, validateOperation, validateNfeTax, type FiscalOperationInput } from './fiscal-operation';
+import { contributionBase, resolveContributionRate, resolveDefaultCfop, validateNfeSeries, validateCfop, validateOperation, validateNfeTax, type FiscalOperationInput } from './fiscal-operation';
 import { PaymentMethod, Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { decryptFiscalSecret } from './fiscal-crypto.service';
@@ -180,11 +180,15 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     if (document.model === 55) validateNfeTax({ ...item, ...tax }, settings.taxRegime, operation.difal.applies, operation.destination);
     const base = totalPrice - itemDiscount;
     const uf = tax.difal;
+    const pisRate = document.model === 55 ? resolveContributionRate(item.pisCst, tax.pisRate, settings.taxRegime, 'PIS') : Number(tax.pisRate || 0);
+    const cofinsRate = document.model === 55 ? resolveContributionRate(item.cofinsCst, tax.cofinsRate, settings.taxRegime, 'COFINS') : Number(tax.cofinsRate || 0);
+    const pisBase = document.model === 55 ? contributionBase(base, item.pisCst, pisRate, settings.taxRegime) : base;
+    const cofinsBase = document.model === 55 ? contributionBase(base, item.cofinsCst, cofinsRate, settings.taxRegime) : base;
     return {
       icmsBase: base,
       icmsModBC: document.model === 55 ? 3 : undefined,
-      pisVBC: base, pisPPIS: Math.round(Number(tax.pisRate || 0) * 10000), pisVPIS: Math.round(base * Number(tax.pisRate || 0) / 100),
-      cofinsVBC: base, cofinsPCOFINS: Math.round(Number(tax.cofinsRate || 0) * 10000), cofinsVCOFINS: Math.round(base * Number(tax.cofinsRate || 0) / 100),
+      pisVBC: pisBase, pisPPIS: Math.round(pisRate * 10000), pisVPIS: Math.round(pisBase * pisRate / 100),
+      cofinsVBC: cofinsBase, cofinsPCOFINS: Math.round(cofinsRate * 10000), cofinsVCOFINS: Math.round(cofinsBase * cofinsRate / 100),
       icmsUfDest: operation?.difal.applies && uf ? {
         taxRegime: settings.taxRegime, orig: item.fiscalOrigin,
         vBCUFDest: moneyToCents(uf.base), vBCFCPUFDest: moneyToCents(uf.base),
@@ -541,9 +545,9 @@ const issueManualDocument = async (input: ManualNfceInput, adminUserId: string, 
           source: 'MANUAL_ADMIN',
           notes,
           issuer: Object.fromEntries(['companyName', 'tradeName', 'taxId', 'stateTaxId', 'taxRegime', 'stateCode', 'cityCode', 'cityName', 'street', 'streetNumber', 'district', 'zipCode', 'addressComplement'].map(key => [key, (settings as any)[key]])),
-          ...(operation ? { operation, itemTaxes: input.items.map(item => ({
-            ...(item.pisRate != null ? { pisRate: Number(item.pisRate) } : {}),
-            ...(item.cofinsRate != null ? { cofinsRate: Number(item.cofinsRate) } : {}),
+          ...(operation ? { operation, itemTaxes: input.items.map((item, index) => ({
+            pisRate: resolveContributionRate(items[index].pisCst, item.pisRate, settings.taxRegime, 'PIS'),
+            cofinsRate: resolveContributionRate(items[index].cofinsCst, item.cofinsRate, settings.taxRegime, 'COFINS'),
             ...(operation.difal.applies && item.difal ? { difal: item.difal } : {}),
           })) } : {}),
           issuedBy: adminUserId,

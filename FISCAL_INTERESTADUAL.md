@@ -14,7 +14,7 @@ Este fluxo é destinado a venda de produção própria ou revenda, sem cálculo 
 | CFOP de venda para não contribuinte | 6107 ou 6108, conforme a operação |
 | Simples Nacional (CRT 1) | CSOSN 102, 103, 300 ou 400 |
 | CRT 2 ou 3 | CST 00 com alíquota explícita, ou CST 41 |
-| PIS/COFINS | CST 01, 02, 04 a 09, 49 ou 99; alíquotas explícitas quando aplicáveis |
+| PIS/COFINS | CST 01, 02, 04 a 09, 49 ou 99; para CRT 1 + CST 99, campos ausentes usam zero no XML; nos demais casos tributados, alíquotas explícitas |
 | DIFAL/FCP no XML | Base e alíquotas por item informadas pelo operador; valores e totais calculados pelo sistema |
 | Sem destaque de DIFAL | Fundamento obrigatório para consumidor final não contribuinte em operação interestadual, regime normal |
 | Transporte | Modalidade informada, sem adicionar custo de frete à nota |
@@ -58,3 +58,9 @@ Verificação adicional: `npm run test:fiscal:autofill` no backend, com cinco ce
 
 ### CFOP automático (13/10/2026)
 O CFOP aparece como valor no formulário, é recalculado quando muda o destino/contribuinte e é enviado no payload. O backend aplica a mesma regra quando o item vier sem CFOP. Códigos editados manualmente são preservados; se incompatíveis, a emissão é bloqueada. O atalho de entrega na loja usa o destino interno, mantendo o cadastro da cliente em GO. Validação: 16 testes fiscais + 6 de preenchimento, além do navegador.
+
+
+### PIS e COFINS no Simples Nacional (13/10/2026)
+O cadastro da Amoras Capital usa CRT=1 e CST 99 para PIS/COFINS. Alíquotas não fornecidas nessa combinação são resolvidas como zero; bases e valores no XML também são zero. A interface mostra os valores e envia as alíquotas resolvidas, e o backend aplica a regra mesmo a clientes anteriores. O snapshot guarda as alíquotas resolvidas para reenvio. Alíquotas explícitas são preservadas; o regime normal e CST 01/02/49 continuam exigindo a informação fiscal aplicável. Isso trata o preenchimento da NF-e, não calcula nem altera a apuração do Simples.
+Referência oficial: Orientação de Preenchimento da NF-e, seção para ME/EPP optantes do Simples Nacional, grupos PIS/COFINS, https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=5W9aeeSeghM%3D .
+Validação: 18 testes fiscais + 6 de preenchimento, incluindo geração de XML com CST 99/base e tributos zero, reenvio e preservação de alíquotas explícitas.

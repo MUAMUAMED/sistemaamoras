@@ -98,6 +98,16 @@ export const requireRate = (value: unknown, label: string, allowed?: number[]) =
   return rate;
 };
 
+// NF-e filling guidance: Simples Nacional + CST 99 uses zero amounts in XML.
+export function resolveContributionRate(cst: string, value: unknown, regime: number, label: string): number {
+  if (!['01', '02', '49', '99'].includes(cst)) return 0;
+  if (regime === 1 && cst === '99' && (value === undefined || value === null || value === '')) return 0;
+  return requireRate(value, `alíquota de ${label}`);
+}
+export function contributionBase(base: number, cst: string, rate: number, regime: number): number {
+  return regime === 1 && cst === '99' && rate === 0 ? 0 : base;
+}
+
 export function validateNfeTax(item: any, regime: number, difal: boolean, destination: number = 2) {
   // Outros CST exigem crédito, ST, redução ou desoneração que este fluxo não calcula.
   const supported = regime === 1 ? ['102', '103', '300', '400'] : ['00', '41'];
@@ -107,7 +117,7 @@ export function validateNfeTax(item: any, regime: number, difal: boolean, destin
   for (const tax of ['pis', 'cofins']) {
     const cst = item[`${tax}Cst`];
     if (!['01', '02', '04', '05', '06', '07', '08', '09', '49', '99'].includes(cst)) throw new Error(`CST de ${tax.toUpperCase()} não suportado`);
-    if (['01', '02', '49', '99'].includes(cst)) requireRate(item[`${tax}Rate`], `alíquota de ${tax.toUpperCase()}`);
+    resolveContributionRate(cst, item[`${tax}Rate`], regime, tax.toUpperCase());
   }
   if (difal) {
     if (!item.difal) throw new Error('Preencha base e alíquotas do DIFAL em cada item');
