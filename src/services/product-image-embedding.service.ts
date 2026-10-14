@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { embedImages, vectorLiteral } from './image-embedding.service';
+import { embedImages, vectorLiteral, hasImageEmbeddingCredentials, imageEmbeddingModel } from './image-embedding.service';
 import { vectorDatabase } from '../config/vector-database';
 
 import { prisma } from '../config/database';
@@ -87,9 +87,8 @@ async function resolveImageBuffer(image: ProductImageForIndex): Promise<Buffer |
 
 /** Indexação idempotente: repetir não gera uma segunda linha no pgvector. */
 export async function indexProductImage(image: ProductImageForIndex): Promise<boolean> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const dbUrl = process.env.VECTOR_DATABASE_URL || process.env.DATABASE_URL;
-  if (!apiKey || !dbUrl) return false;
+  if (!hasImageEmbeddingCredentials() || !dbUrl) return false;
 
   await ensureVisualSearchSetup();
 
@@ -105,7 +104,7 @@ export async function indexProductImage(image: ProductImageForIndex): Promise<bo
 
   await vectorDatabase().$executeRawUnsafe(
     'INSERT INTO product_image_embeddings ("productImageId", embedding, model, dimensions) VALUES ($1, $2::vector, $3, 768) ON CONFLICT ("productImageId") DO UPDATE SET embedding = EXCLUDED.embedding, model = EXCLUDED.model, dimensions = EXCLUDED.dimensions, "updatedAt" = CURRENT_TIMESTAMP',
-    image.id, vectorLiteral(vector), process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2',
+    image.id, vectorLiteral(vector), imageEmbeddingModel(),
   );
   return true;
 }
@@ -140,10 +139,9 @@ export async function getOrIndexImageVector(image: ProductImageForIndex): Promis
     }
   }
 
-  // 2. Se não existir, gerar embedding usando a IA do OpenRouter
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    console.warn('[PGVECTOR] OPENROUTER_API_KEY ausente para busca visual.');
+  // 2. Se não existir, gerar embedding usando o provedor configurado.
+  if (!hasImageEmbeddingCredentials()) {
+    console.warn('[PGVECTOR] Credencial de embeddings ausente para busca visual.');
     return null;
   }
 
@@ -163,7 +161,7 @@ export async function getOrIndexImageVector(image: ProductImageForIndex): Promis
         'INSERT INTO product_image_embeddings ("productImageId", embedding, model, dimensions) VALUES ($1, $2::vector, $3, 768) ON CONFLICT ("productImageId") DO UPDATE SET embedding = EXCLUDED.embedding, model = EXCLUDED.model, dimensions = EXCLUDED.dimensions, "updatedAt" = CURRENT_TIMESTAMP',
         image.id,
         vectorLiteral(vector),
-        process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2',
+        imageEmbeddingModel(),
       );
     }
 
@@ -178,9 +176,8 @@ export async function getOrIndexImageVector(image: ProductImageForIndex): Promis
 let isAutoIndexing = false;
 export async function autoIndexCatalogImages(limit = 40): Promise<number> {
   if (isAutoIndexing) return 0;
-  const apiKey = process.env.OPENROUTER_API_KEY;
   const dbUrl = process.env.VECTOR_DATABASE_URL || process.env.DATABASE_URL;
-  if (!apiKey || !dbUrl) return 0;
+  if (!hasImageEmbeddingCredentials() || !dbUrl) return 0;
 
   isAutoIndexing = true;
   let indexedCount = 0;

@@ -9,7 +9,7 @@ import { vectorDatabase } from '../config/vector-database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { modelReferences } from '../data/modelReference';
-import { embedImages, vectorLiteral } from '../services/image-embedding.service';
+import { embedImages, vectorLiteral, hasImageEmbeddingCredentials } from '../services/image-embedding.service';
 import { indexProductImage } from '../services/product-image-embedding.service';
 
 const router = Router();
@@ -183,7 +183,7 @@ async function findVisualMatches(files: Express.Multer.File[]): Promise<VisualMa
 }
 
 async function indexPublishedImages(productId: string, images: DraftImage[]): Promise<void> {
-  if (!images.length || !process.env.OPENROUTER_API_KEY) return;
+  if (!images.length || !hasImageEmbeddingCredentials()) return;
   for (const image of images) {
     try {
       const record = await prisma.productImage.findFirst({ where: { productId, url: image.url }, select: { id: true, url: true, mimeType: true } });

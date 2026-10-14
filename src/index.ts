@@ -44,6 +44,7 @@ import paymentGatewayRoutes from "./routes/payment-gateway.service";
 
 // Busca visual e pgvector
 import { ensureVisualSearchSetup, autoIndexCatalogImages } from "./services/product-image-embedding.service";
+import { hasImageEmbeddingCredentials } from "./services/image-embedding.service";
 
 // Middlewares
 import { errorHandler } from "./middleware/errorHandler";
@@ -469,7 +470,7 @@ async function startServer() {
     ensureVisualSearchSetup()
       .then(async () => {
         logger.info("⚡ PGVector e tabela de embeddings verificados com sucesso.");
-        if (process.env.OPENROUTER_API_KEY) {
+        if (hasImageEmbeddingCredentials()) {
           autoIndexCatalogImages(50).catch((err) => {
             logger.warn("Auto-indexação pgvector em segundo plano:", err?.message || err);
           });

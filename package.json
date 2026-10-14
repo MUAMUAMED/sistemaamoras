@@ -15,6 +15,7 @@
     "visual:index": "ts-node src/scripts/backfill-image-embeddings.ts",
     "stock:setup": "ts-node src/scripts/setup-mobile-stock.ts",
     "test:stock": "node scripts/test-mobile-stock.cjs",
+    "test:embeddings": "node scripts/test-image-embeddings.cjs",
     "visual:verify": "ts-node src/scripts/verify-visual-search.ts",
     "test:smoke": "node scripts/smoke-check.mjs",
     "check:fiscal": "tsc -p tsconfig.fiscal-check.json",

@@ -20,6 +20,8 @@ Depois de selecionar, escolha **Loja** ou **Armazém**, **Aumentar** ou **Diminu
 
 As rotas autenticadas ficam em `/api/mobile-stock`. O backend cria somente as quatro novas tabelas aditivas na inicialização, sem sincronizar ou apagar estruturas existentes. Também é possível executar `npm run stock:setup` explicitamente. Gere o Prisma Client antes do build (`npx prisma generate && npm run build`).
 
+Embeddings diretos da Google: defina `IMAGE_EMBEDDING_PROVIDER=google`, `IMAGE_EMBEDDING_MODEL=google/gemini-embedding-2` e uma chave em `IMAGE_EMBEDDING_API_KEY` no serviço do backend. A chave dedicada não altera a configuração das demais IAs. O transporte usa `embedContent`, aceita até seis fotos em um único vetor de 768 dimensões e mantém o identificador já usado no pgvector. Uma resposta 429 informa a cota esgotada sem fallback automático para um provedor pago. `npm run test:embeddings` valida payload, autenticação, dimensão, tratamento de cota e proteção da chave com respostas simuladas.
+
 A reposição respeita `VECTOR_DATABASE_URL`: os vetores podem estar em outro PostgreSQL. Os dados do produto são carregados do ERP. Fotos enviadas só para consulta são removidas após a busca; não criam produtos ou estampas. Fotos do catálogo precisam estar indexadas com o mesmo modelo e as mesmas 768 dimensões. O provedor atual permanece configurado pelo servidor; nenhum segredo vai no APK.
 
 ## Validação

@@ -7,6 +7,7 @@ const dbUrl = new URL(process.env.DATABASE_URL || 'postgresql://stockqa@127.0.0.
 if (dbUrl.hostname !== '127.0.0.1' || dbUrl.port !== '55439') throw new Error('Teste permitido somente no PostgreSQL de QA, porta 55439.');
 process.env.DATABASE_URL = dbUrl.toString();
 process.env.JWT_SECRET = 'mobile-stock-local-integration-test';
+process.env.IMAGE_EMBEDDING_PROVIDER = 'openrouter';
 const { prisma } = require('../dist/config/database');
 const { ensureMobileStockSetup } = require('../dist/services/mobile-stock-setup');
 const router = require('../dist/routes/mobile-stock.routes').default;

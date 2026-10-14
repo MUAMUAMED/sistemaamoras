@@ -6,7 +6,7 @@ import { vectorDatabase } from '../config/vector-database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { BarcodeService } from '../services/barcode.service';
-import { embedImages, vectorLiteral } from '../services/image-embedding.service';
+import { embedImages, vectorLiteral, imageEmbeddingModel } from '../services/image-embedding.service';
 import { ensureVisualSearchSetup } from '../services/product-image-embedding.service';
 import { StockError, stockTransaction, stockProductInclude, ownedSession, sessionDetails, startInventory, countInventory,
   inventoryReview, refreshInventoryItem, finalizeInventory, adjustRestock } from '../services/mobile-stock.service';
@@ -76,7 +76,7 @@ router.post('/restock/search', uploadProductImage.array('images', 2), route(asyn
     if (!files.length) throw new StockError(400, 'Envie uma ou duas fotos da roupa.');
     const vector = vectorLiteral(await embedImages(files.map((file) => ({ path: file.path, mimeType: file.mimetype }))));
     await ensureVisualSearchSetup();
-    const model = process.env.OPENROUTER_EMBEDDING_MODEL || 'google/gemini-embedding-2';
+    const model = imageEmbeddingModel();
     // Os vetores podem estar em outro PostgreSQL; os produtos ficam no ERP.
     const rows = await vectorDatabase().$queryRaw<{ productImageId: string; score: number }[]>(Prisma.sql`
       SELECT "productImageId", 1 - (embedding <=> ${vector}::vector) AS score
