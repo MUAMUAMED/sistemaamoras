@@ -12,6 +12,8 @@ async function run() {
   process.env.IMAGE_EMBEDDING_API_KEY = 'test-google-secret';
   process.env.OPENROUTER_API_KEY = 'test-openrouter-secret';
   delete process.env.GEMINI_API_KEY;
+  delete process.env.IMAGE_EMBEDDING_GATEWAY_URL;
+  delete process.env.IMAGE_EMBEDDING_GATEWAY_TOKEN;
   assert.equal(imageEmbeddingModel(), 'google/gemini-embedding-2');
   assert.equal(hasImageEmbeddingCredentials(), true);
   global.fetch = async (url, options) => {
@@ -69,6 +71,29 @@ async function run() {
   };
   assert.equal((await embedImages([{ data: webp, mimeType: '/uploads/products/photo.webp' }])).length, 768);
   pass('fotos WebP existentes são convertidas para PNG aceito pela Google');
+
+  process.env.IMAGE_EMBEDDING_GATEWAY_URL = 'https://embedding.example.test/';
+  process.env.IMAGE_EMBEDDING_GATEWAY_TOKEN = 'test-gateway-secret';
+  global.fetch = async (url, options) => {
+    assert.equal(url, 'https://embedding.example.test/v1beta/models/gemini-embedding-2:embedContent');
+    assert.equal(options.headers.Authorization, 'Bearer test-gateway-secret');
+    assert.equal(options.headers['x-goog-api-key'], undefined);
+    assert.ok(!options.body.includes('test-google-secret'));
+    return new Response(JSON.stringify({ embedding: { values: Array(768).fill(0.1) } }), { status: 200 });
+  };
+  assert.equal((await embedImages(inputs)).length, 768);
+  pass('gateway HTTPS usa token privado sem encaminhar chave Google');
+  delete process.env.IMAGE_EMBEDDING_GATEWAY_TOKEN;
+  assert.equal(hasImageEmbeddingCredentials(), false);
+  await assert.rejects(embedImages(inputs), /IMAGE_EMBEDDING_GATEWAY_TOKEN/);
+  process.env.IMAGE_EMBEDDING_GATEWAY_TOKEN = 'test-gateway-secret';
+  for (const url of ['http://embedding.example.test', 'https://user:pass@embedding.example.test', 'https://embedding.example.test?key=secret']) {
+    process.env.IMAGE_EMBEDDING_GATEWAY_URL = url;
+    await assert.rejects(embedImages(inputs), /URL HTTPS/);
+  }
+  pass('gateway exige token próprio e endereço HTTPS sem credenciais');
+  delete process.env.IMAGE_EMBEDDING_GATEWAY_URL;
+  delete process.env.IMAGE_EMBEDDING_GATEWAY_TOKEN;
 
   process.env.IMAGE_EMBEDDING_PROVIDER = 'openrouter';
   process.env.IMAGE_EMBEDDING_MODEL = 'google/gemini-embedding-2';

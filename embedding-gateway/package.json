@@ -1,0 +1,6 @@
+{
+  "name": "amoras-image-embedding-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": { "start": "node server.cjs", "test": "node test.cjs" }
+}

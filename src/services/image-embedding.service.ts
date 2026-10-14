@@ -22,7 +22,7 @@ export function imageEmbeddingModel(): string {
 function embeddingKey(): string {
   // Chave dedicada: não modifica a seleção de IA do emissor fiscal.
   return embeddingProvider() === 'google'
-    ? (process.env.IMAGE_EMBEDDING_API_KEY || process.env.GEMINI_API_KEY || '').trim()
+    ? (process.env.IMAGE_EMBEDDING_GATEWAY_URL ? process.env.IMAGE_EMBEDDING_GATEWAY_TOKEN || '' : process.env.IMAGE_EMBEDDING_API_KEY || process.env.GEMINI_API_KEY || '').trim()
     : (process.env.OPENROUTER_API_KEY || '').trim();
 }
 
@@ -42,8 +42,13 @@ function normalizeMimeType(value: string): string {
 /** Cria um vetor de imagem no mesmo espaço usado pelo catálogo. */
 export async function embedImages(inputs: ImageInput[]): Promise<number[]> {
   const provider = embeddingProvider();
+  const gateway = provider === 'google' ? (process.env.IMAGE_EMBEDDING_GATEWAY_URL || '').trim() : '';
   const apiKey = embeddingKey();
-  if (!apiKey) throw configuredError(provider === 'google' ? 'defina IMAGE_EMBEDDING_API_KEY no backend.' : 'defina OPENROUTER_API_KEY no backend.');
+  if (!apiKey) throw configuredError(gateway ? 'defina IMAGE_EMBEDDING_GATEWAY_TOKEN no backend.' : provider === 'google' ? 'defina IMAGE_EMBEDDING_API_KEY no backend.' : 'defina OPENROUTER_API_KEY no backend.');
+  if (gateway) {
+    const url = new URL(gateway);
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw configuredError('o gateway deve usar uma URL HTTPS válida.');
+  }
   const model = imageEmbeddingModel();
   if (provider === 'google' && !/^google\/[a-zA-Z0-9._-]+$/.test(model)) throw configuredError('informe um modelo de embeddings Google válido.');
   if (!inputs.length || inputs.length > 6) throw new Error('Envie entre uma e seis imagens para a busca visual.');
@@ -73,10 +78,10 @@ export async function embedImages(inputs: ImageInput[]): Promise<number[]> {
   }));
   const google = provider === 'google';
   const response = await fetch(google
-    ? `https://generativelanguage.googleapis.com/v1beta/models/${model.slice(7)}:embedContent`
+    ? `${gateway ? gateway.replace(/\/+$/, '') : 'https://generativelanguage.googleapis.com'}/v1beta/models/${model.slice(7)}:embedContent`
     : 'https://openrouter.ai/api/v1/embeddings', {
     method: 'POST',
-    headers: google ? { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }
+    headers: google ? gateway ? { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } : { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' }
       : { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Title': 'Amoras Produção' },
     body: JSON.stringify(google
       ? { content: { parts: images.map((image) => ({ inlineData: image })) }, outputDimensionality: IMAGE_EMBEDDING_DIMENSIONS }
