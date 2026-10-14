@@ -236,7 +236,7 @@ const buildData = (document: any, settings: FiscalSettings): InvoiceBuildData =>
     intermediaryIndicator: '0',
     emissionProcess: '0',
     consumerType: operation ? (operation.finalConsumer ? '1' : '0') : '1',
-    buyerPresence: document.model === 55 ? '9' : '1',
+    buyerPresence: operation?.buyerPresence || (document.model === 55 ? '9' : '1'),
     printFormat: document.model === 55 ? '1' : '4',
     delivery: operation?.deliveryAddress ? { ...operation.deliveryAddress, number: operation.deliveryAddress.streetNumber, taxId: document.recipientTaxId, name: document.recipientName } : undefined,
     transport: operation ? { freightMode: operation.freightMode } : undefined,

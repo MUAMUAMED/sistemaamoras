@@ -111,14 +111,14 @@ test('bloqueia séries especiais antes de consumir numeração fiscal',async()=>
 });
 
  test('revenda para CNPJ de GO com entrega no DF usa NF-e interna e grupo entrega separado', async()=> {
- const data=input(); data.recipientTaxId='55094731000135';data.recipientAddress.taxpayerIndicator='1';data.recipientAddress.stateTaxId='201490145';data.finalConsumer=false;data.freightMode='3';delete data.difal;data.items[0].cfop='5102';
+ const data=input(); data.recipientTaxId='55094731000135';data.recipientAddress.taxpayerIndicator='1';data.recipientAddress.stateTaxId='201490145';data.finalConsumer=false;data.freightMode='9';data.buyerPresence='1';delete data.difal;data.items[0].cfop='5102';
  data.deliveryAddress={stateCode:'DF',cityCode:'5300108',cityName:'Brasília',street:'Rua da loja',streetNumber:'1',district:'Centro',zipCode:'70000000'};
  const doc=await service.issueManualNfe(data,'admin');const xml=parsed(doc.requestXml);
- assert.equal(xml.ide.idDest,1);assert.equal(xml.ide.indFinal,0);assert.equal(xml.dest.enderDest.UF,'GO');assert.equal(xml.entrega.UF,'DF');assert.equal(xml.entrega.CNPJ,55094731000135);assert.equal(xml.entrega.xLgr,'Rua da loja');assert.equal(xml.transp.modFrete,3);assert.equal(xml.det.prod.CFOP,5102);assert.equal(xml.total.ICMSTot.vFrete,0);assert.equal(xml.det.imposto.ICMSUFDest,undefined);
+ assert.equal(xml.ide.idDest,1);assert.equal(xml.ide.indFinal,0);assert.equal(xml.dest.enderDest.UF,'GO');assert.equal(xml.entrega.UF,'DF');assert.equal(xml.entrega.CNPJ,55094731000135);assert.equal(xml.entrega.xLgr,'Rua da loja');assert.equal(xml.transp.modFrete,9);assert.equal(xml.ide.indPres,1);assert.equal(xml.det.prod.CFOP,5102);assert.equal(xml.total.ICMSTot.vFrete,0);assert.equal(xml.det.imposto.ICMSUFDest,undefined);
  config.cityName='Alterado';config.street='Mudou';status=999;doc.status='REJECTED';await service.transmitFiscalDocument(doc.id);assert.equal(parsed(doc.requestXml).entrega.xLgr,'Rua da loja');
  });
  test('destino considera entrega real e rejeita CFOP interestadual para entrega interna antes de gravar',async()=> {
- const data=input();data.deliveryAddress={...baseAddress,stateCode:'DF',cityCode:'5300108',cityName:'Brasília',zipCode:'70000000'};
+ const data=input();data.buyerPresence='1';data.freightMode='9';data.deliveryAddress={...baseAddress,stateCode:'DF',cityCode:'5300108',cityName:'Brasília',zipCode:'70000000'};
  await assert.rejects(service.issueManualNfe(data,'admin'),/CFOP/);assert.equal(writes,0);
  data.items[0].cfop='5102';data.deliveryAddress.cityCode='5208004';await assert.rejects(service.issueManualNfe(data,'admin'),/IBGE/);assert.equal(writes,0);
  });
@@ -142,7 +142,7 @@ test('bloqueia séries especiais antes de consumir numeração fiscal',async()=>
  const data=input();data.recipientAddress.taxpayerIndicator='1';data.recipientAddress.stateTaxId='201490145';data.finalConsumer=false;delete data.items[0].cfop;
  const doc=await service.issueManualNfe(data,'admin');assert.equal(parsed(doc.requestXml).det.prod.CFOP,6102);
  data.deliveryAddress={stateCode:'DF',cityCode:'5300108',cityName:'Brasília',street:'Rua da loja',streetNumber:'1',district:'Centro',zipCode:'70000000'};
- const local=await service.issueManualNfe(data,'admin');assert.equal(parsed(local.requestXml).det.prod.CFOP,5102);
+ data.buyerPresence='1';data.freightMode='9';const local=await service.issueManualNfe(data,'admin');assert.equal(parsed(local.requestXml).det.prod.CFOP,5102);
  data.items[0].cfop='6102';await assert.rejects(service.issueManualNfe(data,'admin'),/CFOP/);
  });
 
@@ -162,4 +162,11 @@ test('bloqueia séries especiais antes de consumir numeração fiscal',async()=>
  config.taxRegime=1;config.defaultIcmsCst='102';config.defaultPisCst='01';await assert.rejects(service.issueManualNfe(input(),'admin'),/alíquota de PIS/);assert.equal(writes,0);
  config.defaultPisCst='99';const data=input();data.items[0].pisRate=1.65;data.items[0].cofinsRate=7.6;const doc=await service.issueManualNfe(data,'admin');const xml=parsed(doc.requestXml);
  assert.equal(xml.det.imposto.PIS.PISOutr.pPIS,1.65);assert.equal(xml.det.imposto.COFINS.COFINSOutr.pCOFINS,7.6);
+ });
+
+ test('regra 521 bloqueia entrega interna a contribuinte de outra UF sem retirada presencial verdadeira',async()=> {
+ const data=input();data.recipientAddress.taxpayerIndicator='1';data.recipientAddress.stateTaxId='201490145';data.finalConsumer=false;data.items[0].cfop='5102';data.deliveryAddress={stateCode:'DF',cityCode:'5300108',cityName:'Brasília',street:'Rua da loja',streetNumber:'1',district:'Centro',zipCode:'70000000'};
+ for(const [buyerPresence,freightMode] of [['9','3'],['9','9'],['1','3']]) {data.buyerPresence=buyerPresence;data.freightMode=freightMode;await assert.rejects(service.issueManualNfe(data,'admin'),/521/);}
+ assert.equal(writes,0);assert.equal(sent.length,0);
+ data.buyerPresence='1';data.freightMode='9';const doc=await service.issueManualNfe(data,'admin');assert.equal(parsed(doc.requestXml).ide.indPres,1);assert.equal(parsed(doc.requestXml).transp.modFrete,9);
  });

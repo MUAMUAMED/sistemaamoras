@@ -11,6 +11,7 @@ export interface FiscalOperationInput {
   deliveryAddress?: Omit<RecipientAddress, 'taxpayerIndicator' | 'stateTaxId'>;
   finalConsumer?: boolean;
   freightMode?: string;
+  buyerPresence?: string;
   difal?: { applies: boolean; reason?: string };
 }
 
@@ -75,6 +76,9 @@ export function validateOperation(input: FiscalOperationInput, issuerState: stri
     deliveryAddress = location;
   }
   const destination = (deliveryAddress?.stateCode || stateCode) === issuerState ? 1 : 2;
+  const buyerPresence = input.buyerPresence || '9';
+  if (!['1', '2', '3', '4', '5', '9'].includes(buyerPresence)) throw new Error('Indicador de presença da compra inválido');
+  if (destination === 1 && stateCode !== issuerState && a.taxpayerIndicator === '1' && !(buyerPresence === '1' && String(input.freightMode) === '9')) throw new Error('Operação interna para contribuinte de outra UF exige retirada presencial sem transporte (regra 521). Confirme o destino real e o transporte.');
   const eligibleDifal = destination === 2 && input.finalConsumer && a.taxpayerIndicator === '9';
   const automatic = !eligibleDifal || taxRegime === 1;
   if (!automatic && typeof input.difal?.applies !== 'boolean') throw new Error('Informe o tratamento do DIFAL confirmado com o contador');
@@ -85,7 +89,7 @@ export function validateOperation(input: FiscalOperationInput, issuerState: stri
   if (!automatic && !applies && !String(input.difal?.reason || '').trim()) {
     throw new Error('Informe o fundamento para não destacar DIFAL nesta venda');
   }
-  return { address, deliveryAddress, destination: destination as 1 | 2, finalConsumer: input.finalConsumer,
+  return { address, deliveryAddress, buyerPresence, destination: destination as 1 | 2, finalConsumer: input.finalConsumer,
     freightMode: String(input.freightMode), difal: { applies, reason: String(input.difal?.reason || '').trim().slice(0, 500) } };
 }
 

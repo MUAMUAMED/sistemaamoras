@@ -52,7 +52,7 @@ Verificação adicional: `npm run test:fiscal:autofill` no backend, com cinco ce
 - Consulta CNPJ preenche indIEDest=1 e IE somente quando há uma inscrição ativa e inequívoca na UF do cadastro. Ausência de IE não determina não contribuinte.
 - Atalho “Revenda com entrega na loja e frete gratuito” aplica indFinal=0, modFrete=3 e endereço do emitente; os campos continuam editáveis. Frete não é somado.
 - DIFAL no XML deixa de exigir escolha/fundamento para revenda, operação interna e CRT=1; regras para consumidor final não contribuinte em regime normal continuam explícitas. Isso não decide recolhimento por guia.
-- Referências oficiais: MOC, regra 521/exceção para entrega na UF do emitente: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=dgIA1+97QzE%3D ; NT 2024.001, regra 694/exceção CRT=1: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=kIiniiSkpKc%3D ; NT 2021.004, modalidade 3: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=i0rK6ogxnx8%3D .
+- Referências oficiais: MOC, exceções de endereço da regra 773 (não afastam a regra 521): https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=dgIA1+97QzE%3D ; NT 2024.001, regra 694/exceção CRT=1: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=kIiniiSkpKc%3D ; NT 2021.004, modalidade 3: https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=i0rK6ogxnx8%3D .
 - Validação: 14 testes fiscais e 6 de preenchimento; teste de navegador com CNPJ e entrega separada, sem emitir nota em produção.
 
 
@@ -64,3 +64,8 @@ O CFOP aparece como valor no formulário, é recalculado quando muda o destino/c
 O cadastro da Amoras Capital usa CRT=1 e CST 99 para PIS/COFINS. Alíquotas não fornecidas nessa combinação são resolvidas como zero; bases e valores no XML também são zero. A interface mostra os valores e envia as alíquotas resolvidas, e o backend aplica a regra mesmo a clientes anteriores. O snapshot guarda as alíquotas resolvidas para reenvio. Alíquotas explícitas são preservadas; o regime normal e CST 01/02/49 continuam exigindo a informação fiscal aplicável. Isso trata o preenchimento da NF-e, não calcula nem altera a apuração do Simples.
 Referência oficial: Orientação de Preenchimento da NF-e, seção para ME/EPP optantes do Simples Nacional, grupos PIS/COFINS, https://www.nfe.fazenda.gov.br/portal/exibirArquivo.aspx?conteudo=5W9aeeSeghM%3D .
 Validação: 18 testes fiscais + 6 de preenchimento, incluindo geração de XML com CST 99/base e tributos zero, reenvio e preservação de alíquotas explícitas.
+
+
+### Correção da regra 521 (14/10/2026)
+O endereço de entrega no DF não afasta, sozinho, a regra I08-70/521 para cliente contribuinte de outra UF. A exceção aplicável a retirada exige presença 1 e modalidade de transporte 9. Foi removido o atalho que combinava entrega na loja com transporte próprio e substituído por retirada presencial expressamente selecionada. O modelo 55 agora conserva o indicador de presença no snapshot e no XML. Backend, construtor XML e formulário bloqueiam a combinação rejeitada antes de enviar. Não se deve alterar UF, IE, presença ou transporte apenas para superar a rejeição. Referência oficial: MOC 7.0, página 91, https://www.confaz.fazenda.gov.br/legislacao/arquivo-manuais/moc7-anexo-i-leiaute-e-rv.pdf .
+Validação: 19 testes fiscais + 6 de preenchimento.
