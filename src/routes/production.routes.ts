@@ -5,12 +5,13 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { access, readFile } from 'fs/promises';
 import path from 'path';
 import { prisma } from '../config/database';
-import { vectorDatabase } from '../config/vector-database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { modelReferences } from '../data/modelReference';
-import { embedImages, vectorLiteral, hasImageEmbeddingCredentials } from '../services/image-embedding.service';
+import { hasImageEmbeddingCredentials } from '../services/image-embedding.service';
 import { indexProductImage } from '../services/product-image-embedding.service';
+import { existingProductByIdentity, modelFilters, patternByIdentity, ModelFilters } from '../services/catalog-identity.service';
+import { rankedProductImages } from '../services/visual-product-search.service';
 
 const router = Router();
 const IMAGE_LIMIT = 2;
@@ -157,26 +158,14 @@ async function createPatternSuggestion(files: Express.Multer.File[]): Promise<Pa
 
 type VisualMatch = { productId: string; productName: string; patternId: string; patternName: string; imageUrl: string; score: number };
 
-async function findVisualMatches(files: Express.Multer.File[]): Promise<VisualMatch[]> {
-  const vector = await embedImages(await Promise.all(files.map(async (file) => ({ path: file.path, mimeType: file.mimetype }))));
-  const rows = await vectorDatabase().$queryRawUnsafe<Array<{ productImageId: string; score: number | string }>>(
-    'SELECT "productImageId", 1 - (embedding <=> $1::vector) AS score FROM product_image_embeddings ORDER BY embedding <=> $1::vector LIMIT 80',
-    vectorLiteral(vector),
-  );
-  const scores = new Map<string, number>(rows
-    .map((row): [string, number] => [row.productImageId, Number(row.score)])
-    .filter((entry) => Number.isFinite(entry[1])));
-  if (!scores.size) return [];
-  const images = await (prisma as any).productImage.findMany({
-    where: { id: { in: [...scores.keys()] }, type: ProductImageType.ROUPA, product: { active: true, pattern: { active: true } } },
-    select: { id: true, url: true, product: { select: { id: true, name: true, pattern: { select: { id: true, name: true } } } } },
-  });
+async function findVisualMatches(files: Express.Multer.File[], filters: ModelFilters = {}): Promise<VisualMatch[]> {
+  const images = await rankedProductImages(files.map((file) => ({ path: file.path, mimeType: file.mimetype })), filters);
   const byPattern = new Map<string, VisualMatch>();
-  for (const image of images as Array<any>) {
+  for (const image of images) {
     const pattern = image.product.pattern;
-    const score = scores.get(image.id);
+    const score = image.score;
     if (!pattern || score === undefined) continue;
-    const match = { productId: image.product.id, productName: image.product.name || 'Roupa sem nome', patternId: pattern.id, patternName: pattern.name, imageUrl: image.url, score };
+    const match = { productId: image.product.id, productName: [image.product.subcategory?.name || image.product.category?.name, pattern.name].filter(Boolean).join(' · '), patternId: pattern.id, patternName: pattern.name, imageUrl: image.url, score };
     if (!byPattern.has(pattern.id) || byPattern.get(pattern.id)!.score < score) byPattern.set(pattern.id, match);
   }
   return [...byPattern.values()].sort((a, b) => b.score - a.score).slice(0, 12);
@@ -221,7 +210,8 @@ async function subcategoryFor(tx: Prisma.TransactionClient, categoryId: string, 
 }
 
 async function patternFor(tx: Prisma.TransactionClient, input: { id?: string; name?: string }) {
-  if (input.id) { const value = await tx.pattern.findFirst({ where: { id: input.id, active: true } }); if (!value) throw new Error('Estampa inválida.'); return { value, created: false }; }
+  const resolved = await patternByIdentity(tx, input);
+  if (resolved) return { value: resolved, created: false };
   const name = clean(input.name); if (!name) throw new Error('Informe uma estampa ou identidade visual.');
   const existing = await tx.pattern.findFirst({ where: { name, active: true } });
   if (existing) return { value: existing, created: false };
@@ -246,7 +236,7 @@ router.post('/visual-search', authenticateToken, uploadProductImage.array('image
     if (!files.length || files.length > IMAGE_LIMIT) return res.status(400).json({ error: 'Envie uma ou duas fotos da roupa.' });
     // Esta etapa é só a comparação visual. A análise/sugestão de IA é feita
     // apenas se a operadora decidir cadastrar uma estampa nova.
-    const matches = await findVisualMatches(files);
+    const matches = await findVisualMatches(files, modelFilters(req.body));
     const images = files.map((file) => { const url = `/uploads/products/${file.filename}`; return { url, token: imageToken(url) }; });
     return res.status(201).json({ images, matches });
   } catch (error) { return next(error); }
@@ -294,7 +284,7 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
       const size = await tx.size.findFirst({ where: { id: sizeId, active: true } }); if (!size) throw new Error('Tamanho inválido.');
       const categoryResult = await categoryFor(tx, category); const subcategoryResult = await subcategoryFor(tx, categoryResult.value.id, subcategory); const patternResult = await patternFor(tx, pattern);
       const barcode = `${size.code}${categoryResult.value.code}${subcategoryResult.value.code}${patternResult.value.code}`;
-      const existing = await tx.product.findUnique({ where: { barcode } });
+      const existing = await existingProductByIdentity(tx, { categoryId: categoryResult.value.id, subcategoryId: subcategoryResult.value.id, patternId: patternResult.value.id, sizeId }, barcode);
       if (existing && mergeWithExisting !== true) {
         return {
           conflict: true as const,
@@ -309,7 +299,7 @@ router.post('/publish', authenticateToken, async (req: AuthenticatedRequest, res
       // o resultado e imprimir a etiqueta. Evitar devolver o grafo completo do
       // Prisma (incluindo imagens) mantém a resposta estritamente serializável.
       return {
-        product: { id: product.id, barcode: product.barcode },
+        product: { id: product.id, barcode: product.barcode, name: product.name, patternId: patternResult.value.id, patternName: patternResult.value.name },
         created: { category: categoryResult.created, subcategory: subcategoryResult.created, pattern: patternResult.created },
         mergedIntoExisting: Boolean(existing),
       };

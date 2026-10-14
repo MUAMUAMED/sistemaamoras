@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
+import { operationalProductId } from './catalog-identity.service';
 
 export class StockError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -149,17 +150,23 @@ export async function adjustRestock(userId: string, productId: string, location:
     const previous = await tx.stockOperation.findUnique({ where: { id: requestId } });
     if (previous) {
       if (previous.userId !== userId || previous.payload !== payload) throw new StockError(409, 'Identificador de ajuste já utilizado com outros dados.');
+      const saved = previous.result as { product?: { id?: string } };
+      if (saved.product?.id) {
+        const id = await operationalProductId(tx, saved.product.id);
+        if (id !== saved.product.id) return { product: await tx.product.findUnique({ where: { id }, include: stockProductInclude }) };
+      }
       return previous.result;
     }
-    await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
-    const p = await tx.product.findUnique({ where: { id: productId } });
+    const resolvedId = await operationalProductId(tx, productId);
+    await tx.$queryRaw`SELECT id FROM products WHERE id = ${resolvedId} FOR UPDATE`;
+    const p = await tx.product.findUnique({ where: { id: resolvedId } });
     if (!p || !p.active || p.isDraft) throw new StockError(404, 'Roupa não encontrada ou inativa.');
     const field = location === 'LOJA' ? 'stockLoja' : 'stockArmazem';
     if (p[field] + delta < 0) throw new StockError(409, `Saldo insuficiente: há ${p[field]} unidades neste local.`);
-    const product = await tx.product.update({ where: { id: productId }, data: {
+    const product = await tx.product.update({ where: { id: resolvedId }, data: {
       [field]: { increment: delta }, stock: p.stockLoja + p.stockArmazem + delta,
     }, include: stockProductInclude });
-    await tx.stockMovement.create({ data: { productId, userId, location, type: delta > 0 ? 'ENTRY' : 'EXIT',
+    await tx.stockMovement.create({ data: { productId: resolvedId, userId, location, type: delta > 0 ? 'ENTRY' : 'EXIT',
       quantity: delta, reference: requestId, reason: `Reposição: ${reason}` } });
     const result = JSON.parse(JSON.stringify({ product })) as Prisma.InputJsonValue;
     await tx.stockOperation.create({ data: { id: requestId, userId, payload, result } });

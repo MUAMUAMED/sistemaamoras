@@ -1,13 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
 import { unlink } from 'fs/promises';
 import { prisma } from '../config/database';
-import { vectorDatabase } from '../config/vector-database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { BarcodeService } from '../services/barcode.service';
-import { embedImages, vectorLiteral, imageEmbeddingModel } from '../services/image-embedding.service';
-import { ensureVisualSearchSetup } from '../services/product-image-embedding.service';
+import { modelFilters, operationalProductId } from '../services/catalog-identity.service';
+import { rankedProductImages } from '../services/visual-product-search.service';
 import { StockError, stockTransaction, stockProductInclude, ownedSession, sessionDetails, startInventory, countInventory,
   inventoryReview, refreshInventoryItem, finalizeInventory, adjustRestock } from '../services/mobile-stock.service';
 
@@ -74,28 +72,16 @@ router.post('/restock/search', uploadProductImage.array('images', 2), route(asyn
   const files = (req.files || []) as Express.Multer.File[];
   try {
     if (!files.length) throw new StockError(400, 'Envie uma ou duas fotos da roupa.');
-    const vector = vectorLiteral(await embedImages(files.map((file) => ({ path: file.path, mimeType: file.mimetype }))));
-    await ensureVisualSearchSetup();
-    const model = imageEmbeddingModel();
-    // Os vetores podem estar em outro PostgreSQL; os produtos ficam no ERP.
-    const rows = await vectorDatabase().$queryRaw<{ productImageId: string; score: number }[]>(Prisma.sql`
-      SELECT "productImageId", 1 - (embedding <=> ${vector}::vector) AS score
-      FROM product_image_embeddings
-      WHERE model IN (${model}, ${model.replace(/^google\//, '')})
-      ORDER BY embedding <=> ${vector}::vector LIMIT 500
-    `);
-    const images = await prisma.productImage.findMany({ where: {
-      id: { in: rows.map((r) => r.productImageId) }, type: 'ROUPA',
-      product: { active: true, isDraft: false },
-    }, select: { id: true, productId: true, product: { select: { patternId: true, categoryId: true, subcategoryId: true } } } });
-    const scores = new Map(rows.map((row) => [row.productImageId, Number(row.score)]));
+    const filters = modelFilters(req.body);
+    const images = await rankedProductImages(files.map((file) => ({ path: file.path, mimeType: file.mimetype })), filters);
+    const scores = new Map(images.map((image) => [image.id, image.score]));
     const ranking = new Map<string, number>();
-    images.forEach((image) => ranking.set(image.productId, Math.max(ranking.get(image.productId) ?? -1, scores.get(image.id) ?? -1)));
+    images.forEach((image) => ranking.set(image.product.id, Math.max(ranking.get(image.product.id) ?? -1, scores.get(image.id) ?? -1)));
     // Uma variante sem foto própria também aparece ao lado dos tamanhos da mesma roupa.
     const families = images.filter((image) => image.product?.patternId).map((image) => ({
       patternId: image.product!.patternId, categoryId: image.product!.categoryId, subcategoryId: image.product!.subcategoryId,
     }));
-    const products = await prisma.product.findMany({ where: { active: true, isDraft: false,
+    const products = await prisma.product.findMany({ where: { active: true, isDraft: false, ...filters,
       OR: [{ id: { in: [...ranking.keys()] } }, ...families],
     }, include: stockProductInclude });
     const matches = products.map((product) => ({ product, score: ranking.get(product.id) ?? Math.max(-1, ...images.filter((image) =>
@@ -105,7 +91,8 @@ router.post('/restock/search', uploadProductImage.array('images', 2), route(asyn
   } finally { await Promise.allSettled(files.map((file) => unlink(file.path))); }
 }));
 router.get('/products/:id', route(async (req, res) => {
-  const product = await prisma.product.findFirst({ where: { id: req.params.id, active: true, isDraft: false }, include: stockProductInclude });
+  const id = await operationalProductId(prisma, req.params.id);
+  const product = await prisma.product.findFirst({ where: { id, active: true, isDraft: false }, include: stockProductInclude });
   if (!product) throw new StockError(404, 'Roupa não encontrada.');
   return res.json(product);
 }));

@@ -5,6 +5,7 @@ import { authenticateToken } from '../middleware/auth';
 import { BarcodeService } from '../services/barcode.service';
 import { vectorDatabase } from '../config/vector-database';
 import { vectorLiteral } from '../services/image-embedding.service';
+import { consolidateDuplicateProducts } from '../services/catalog-maintenance.service';
 import {
   ensureVisualSearchSetup,
   getOrIndexImageVector,
@@ -1062,7 +1063,7 @@ router.post('/merge', authenticateToken, async (req, res, next) => {
         where: { id: principalPatternId }
       });
 
-      if (!principal) {
+      if (!principal || !principal.active || principal.canonicalPatternId) {
         throw new Error('A estampa principal selecionada não foi encontrada.');
       }
 
@@ -1119,14 +1120,14 @@ router.post('/merge', authenticateToken, async (req, res, next) => {
       // 4. Localizar todos os produtos que usavam as estampas secundárias
       const affectedProducts = await tx.product.findMany({
         where: { patternId: { in: mergedPatternIds } },
-        select: { id: true, barcode: true, name: true, patternId: true }
+        select: { id: true, barcode: true, name: true, patternId: true, active: true }
       });
 
       // 5. Para cada produto afetado:
       //    a) Gravar o código de barras atual em product_barcode_aliases (garantindo que qualquer etiqueta impressa resolva)
       //    b) Atualizar o patternId para a estampa principal
       for (const prod of affectedProducts) {
-        if (prod.barcode) {
+        if (prod.barcode && prod.active) {
           await tx.productBarcodeAlias.upsert({
             where: { barcode: prod.barcode },
             create: {
@@ -1145,8 +1146,10 @@ router.post('/merge', authenticateToken, async (req, res, next) => {
         });
       }
 
+      const consolidation = await consolidateDuplicateProducts(tx, [principal.id]);
       return {
         principalPattern: principal,
+        consolidation,
         secondaryPatternsCount: secondaryPatterns.length,
         productsUpdatedCount: affectedProducts.length,
         redirectedCodes: secondaryPatterns.map(p => ({
@@ -1156,7 +1159,7 @@ router.post('/merge', authenticateToken, async (req, res, next) => {
           toName: principal.name
         }))
       };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 60000 });
 
     return res.json({
       success: true,

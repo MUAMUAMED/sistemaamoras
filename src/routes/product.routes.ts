@@ -6,6 +6,7 @@ import { prisma } from '../config/database';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { uploadProductImage } from '../middleware/upload';
 import { indexProductImage } from '../services/product-image-embedding.service';
+import { modelFilters } from '../services/catalog-identity.service';
 
 const router = Router();
 
@@ -158,6 +159,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
             contains: searchTerm,
           },
         },
+        { barcodeAliases: { some: { barcode: { contains: searchTerm } } } },
         {
           description: {
             contains: searchTerm,
@@ -202,6 +204,8 @@ router.get('/', authenticateToken, async (req, res, next) => {
     if (barcode) {
       where.barcode = barcode as string;
     }
+
+    Object.assign(where, modelFilters(req.query as Record<string, unknown>));
 
     if (category) {
       where.categoryId = category as string;

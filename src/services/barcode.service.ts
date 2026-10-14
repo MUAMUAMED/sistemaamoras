@@ -249,7 +249,7 @@ export class BarcodeService {
       });
 
       // 2. Se não encontrar, verificar se é um código antigo registrado em aliases
-      if (!product) {
+      if (!product || !product.active) {
         const alias = await prisma.productBarcodeAlias.findUnique({
           where: { barcode: code },
           include: {
@@ -265,7 +265,7 @@ export class BarcodeService {
           }
         });
 
-        if (alias?.product) {
+        if (alias?.product?.active) {
           product = alias.product;
         }
       }
@@ -384,4 +384,4 @@ export class BarcodeService {
     // Formatar com zeros à esquerda
     return cleanCode.padStart(maxLength, '0');
   }
-} 
+}
