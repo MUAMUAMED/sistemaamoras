@@ -36,7 +36,7 @@ function createGateway({ apiKey, accessToken, transport = fetch }) {
       }
       const response = await transport(`https://generativelanguage.googleapis.com${PATH}`, {
         method: 'POST', headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: { parts }, outputDimensionality: 768 }), signal: AbortSignal.timeout(30000),
+        body: JSON.stringify({ content: { parts: parts.map((p) => ({ inlineData: { mimeType: p.inlineData.mimeType, data: p.inlineData.data } })) }, outputDimensionality: 768 }), signal: AbortSignal.timeout(30000),
       });
       const raw = (await response.text()).split(apiKey).join('[REDACTED]').split(accessToken).join('[REDACTED]');
       res.writeHead(response.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(raw);
