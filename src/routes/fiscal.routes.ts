@@ -1,3 +1,4 @@
+import { lookupFiscalCnpj, lookupFiscalCep } from '../services/fiscal-recipient.service';
 import { validateNfeSeries } from '../services/fiscal-operation';
 import { Router, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
@@ -343,6 +344,16 @@ router.post('/manual/issue-nfe', authenticateToken, authorizeRoles('ADMIN'), asy
     if (!req.user) return res.status(401).json({ error: 'Usuario nao autenticado' });
     return res.status(201).json(await issueManualNfe(req.body, req.user.id));
   } catch (error) { return errorResponse(res, next, error); }
+});
+
+const lookupLimiter = rateLimit({ windowMs: 60_000, limit: 20, standardHeaders: true, legacyHeaders: false });
+router.get('/recipient/cnpj/:cnpj', ...fiscalManagers, lookupLimiter, async (req, res, next) => {
+  try { res.setHeader('Cache-Control', 'private, no-store'); return res.json(await lookupFiscalCnpj(req.params.cnpj)); }
+  catch (error) { return errorResponse(res, next, error); }
+});
+router.get('/recipient/cep/:cep', ...fiscalManagers, lookupLimiter, async (req, res, next) => {
+  try { res.setHeader('Cache-Control', 'private, no-store'); return res.json(await lookupFiscalCep(req.params.cep)); }
+  catch (error) { return errorResponse(res, next, error); }
 });
 
 router.get('/ai/providers', authenticateToken, authorizeRoles('ADMIN'), async (_req, res, next) => {

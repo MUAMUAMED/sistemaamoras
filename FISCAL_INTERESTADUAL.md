@@ -33,3 +33,13 @@ Os dados de destino, tributos e emitente ficam preservados no snapshot do docume
 As pendências de compilação do backend e do frontend foram corrigidas. A versão de publicação foi preparada a partir dos commits que estavam em execução na Zeabur, preservando as demais funcionalidades. Os dez testes fiscais e a validação do emissor no navegador passaram. A consulta do serviço de NF-e em homologação retornou cStat 107 (Serviço em Operação). A NF-e interestadual de teste foi autorizada pela SEFAZ em homologação com cStat 100 e protocolo 353260000099367. A configuração permaneceu em produção com série e próximo número inalterados. O emissor aceita séries comuns de 1 a 889 e bloqueia séries especiais. Backend e frontend são publicados pelos serviços existentes na Zeabur.
 
 Referências: [MOC NF-e/NFC-e](https://www.confaz.fazenda.gov.br/legislacao/arquivo-manuais/moc7-anexo-i-leiaute-e-rv.pdf), [tabela CFOP](https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/acoes-e-programas/facilitacao/anexo-ecf-cfop), [notas técnicas vigentes](https://www.nfe.fazenda.gov.br/Portal/listaConteudo.aspx?tipoConteudo=04BIflQt1aY%3D).
+
+## Preenchimento do destinatário
+
+O CNPJ completo consulta automaticamente o endereço cadastral pela API pública CNPJ.ws, com alternativa BrasilAPI. Os campos já digitados ou informados pela IA são preservados; o botão “Usar endereço do CNPJ” aplica o cadastro quando a entrega for naquele endereço. CPF não dispara consulta de CNPJ. Falhas de consulta permitem continuar com preenchimento manual.
+
+O CEP completa UF, município, código IBGE, bairro e logradouro pelo ViaCEP. Número e complemento continuam dependentes da informação de entrega. Respostas antigas são descartadas quando o documento ou CEP mudam.
+
+A IA agora extrai o endereço de entrega e as escolhas fiscais explicitamente descritas. Contribuinte de ICMS, finalidade, transporte e DIFAL começam sem seleção; a emissão exige essas informações. CNPJ não implica contribuinte, e o endereço cadastral deve ser revisado como destino da mercadoria.
+
+Verificação adicional: `npm run test:fiscal:autofill` no backend, com cinco cenários de consulta, cache, validação, extração do endereço e ausência de inferências fiscais.

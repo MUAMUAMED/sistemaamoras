@@ -16,7 +16,8 @@
     "visual:verify": "ts-node src/scripts/verify-visual-search.ts",
     "test:smoke": "node scripts/smoke-check.mjs",
     "check:fiscal": "tsc -p tsconfig.fiscal-check.json",
-    "test:fiscal": "node scripts/test-fiscal-interstate.cjs"
+    "test:fiscal": "node scripts/test-fiscal-interstate.cjs",
+    "test:fiscal:autofill": "node scripts/test-fiscal-autofill.cjs"
   },
   "prisma": {
     "seed": "ts-node src/scripts/seed.ts"
