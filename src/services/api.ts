@@ -807,6 +807,9 @@ export const salesApi = {
 };
 
 export const fiscalApi = {
+  lookupCnpj: async (cnpj: string): Promise<{ recipientName: string; recipientTaxId: string; source: string; address: Omit<FiscalOperation['recipientAddress'], 'stateTaxId' | 'taxpayerIndicator'> }> => (await api.get(`/fiscal/recipient/cnpj/${cnpj}`)).data,
+  lookupCep: async (cep: string): Promise<{ source: string; address: Omit<FiscalOperation['recipientAddress'], 'stateTaxId' | 'taxpayerIndicator'> }> => (await api.get(`/fiscal/recipient/cep/${cep}`)).data,
+
   getConfig: async (): Promise<FiscalConfig | null> => (await api.get('/fiscal/config')).data,
   updateConfig: async (data: Partial<FiscalConfig> & { cscToken?: string; certificatePfxBase64?: string; certificatePassword?: string }): Promise<FiscalConfig> =>
     (await api.put('/fiscal/config', data)).data,
@@ -897,6 +900,10 @@ export const fiscalApi = {
     model: string;
     warnings: string[];
     draft: {
+      recipientAddress?: FiscalOperation['recipientAddress'];
+      finalConsumer?: boolean | null;
+      freightMode?: string;
+      difal?: FiscalOperation['difal'];
       recipientName: string;
       recipientTaxId: string;
       paymentMethod: 'CASH' | 'PIX' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_SLIP' | 'BANK_TRANSFER';

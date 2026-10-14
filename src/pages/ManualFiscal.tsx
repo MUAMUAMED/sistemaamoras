@@ -1,5 +1,5 @@
 import FiscalDestination, { emptyFiscalOperation } from '../components/FiscalDestination';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -67,9 +67,15 @@ export default function ManualFiscal() {
   const queryClient = useQueryClient();
   const [interstate, setInterstate] = useState(false);
   const [operation, setOperation] = useState(emptyFiscalOperation);
+  const [addressStatus, setAddressStatus] = useState('');
+  const [cnpjResult, setCnpjResult] = useState<Awaited<ReturnType<typeof fiscalApi.lookupCnpj>> | null>(null);
+  const taxIdRef = useRef('');
+
   const noteLabel = interstate ? 'NF-e' : 'NFC-e';
   const [recipientName, setRecipientName] = useState('');
   const [recipientTaxId, setRecipientTaxId] = useState('');
+  taxIdRef.current = recipientTaxId.replace(/\D/g, '');
+  const automaticAddress = useRef<{ id: string; address: any } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<ManualItem[]>([newItem()]);
@@ -125,6 +131,76 @@ export default function ManualFiscal() {
     [items]
   );
 
+  const lookupCnpjMutation = useMutation({
+    mutationFn: fiscalApi.lookupCnpj,
+    onSuccess: (result, cnpj) => {
+      if (taxIdRef.current !== cnpj) return;
+      setCnpjResult(result);
+      setRecipientName(current => current.trim() ? current : result.recipientName);
+      setOperation(current => {
+        const a = current.recipientAddress;
+        const empty = Object.keys(result.address).every(key => !a[key as keyof typeof a]);
+        if (!empty) return current;
+        automaticAddress.current = { id: cnpj, address: result.address };
+        return { ...current, recipientAddress: { ...a, ...result.address } };
+      });
+      setAddressStatus(`Endereço cadastral consultado em ${result.source}. Confira se é o local de entrega; os dados já informados foram preservados.`);
+    },
+    onError: (error: any, cnpj) => {
+      if (taxIdRef.current !== cnpj) return;
+      setAddressStatus(error.response?.data?.message || 'Consulta do CNPJ indisponível. Você pode preencher o endereço manualmente.');
+    },
+  });
+  const lookupCnpj = lookupCnpjMutation.mutate;
+  useEffect(() => {
+    if (!interstate || !/^\d{14}$/.test(taxIdRef.current)) return;
+    const cnpj = taxIdRef.current;
+    const timer = window.setTimeout(() => lookupCnpj(cnpj), 650);
+    return () => window.clearTimeout(timer);
+  }, [interstate, recipientTaxId, lookupCnpj]);
+
+  useEffect(() => {
+    const cep = operation.recipientAddress.zipCode;
+    if (!interstate || !/^\d{8}$/.test(cep)) return;
+    if (operation.recipientAddress.cityCode && operation.recipientAddress.street) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setAddressStatus('Consultando CEP…');
+      fiscalApi.lookupCep(cep).then(result => {
+        if (cancelled) return;
+        setOperation(current => {
+          if (current.recipientAddress.zipCode !== cep) return current;
+          if (current.recipientAddress.stateCode && current.recipientAddress.stateCode !== result.address.stateCode) return current;
+          const address = { ...current.recipientAddress };
+          for (const key of ['stateCode', 'cityCode', 'cityName', 'street', 'district'] as const) {
+            if (!address[key]) address[key] = result.address[key];
+          }
+          return { ...current, recipientAddress: address };
+        });
+        setAddressStatus('CEP consultado. Confira o endereço de entrega e informe o número.');
+      }).catch((error: any) => {
+        if (!cancelled) setAddressStatus(error.response?.data?.message || 'Consulta do CEP indisponível. Preencha manualmente.');
+      });
+    }, 500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+    // A consulta acompanha o CEP. Alterações manuais nos outros campos são preservadas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interstate, operation.recipientAddress.zipCode]);
+
+  const changeRecipientTaxId = (value: string) => {
+    const cnpj = value.replace(/\D/g, '');
+    const auto = automaticAddress.current;
+    if (cnpj !== taxIdRef.current) {
+      setCnpjResult(null); setAddressStatus('');
+      setOperation(current => {
+        const sameAddress = auto && Object.entries(auto.address).every(([key, field]) => current.recipientAddress[key as keyof typeof current.recipientAddress] === field);
+        return { ...current, finalConsumer: null, difal: { applies: null, reason: '' },
+          recipientAddress: sameAddress ? { ...emptyFiscalOperation.recipientAddress } : { ...current.recipientAddress, taxpayerIndicator: '', stateTaxId: '' } };
+      });
+    }
+    setRecipientTaxId(value);
+  };
+
   const issueMutation = useMutation({
     mutationFn: () => {
       const data = {
@@ -172,6 +248,20 @@ export default function ManualFiscal() {
       prompt: aiPrompt.trim(),
     }),
     onSuccess: ({ draft, warnings, model }) => {
+      const sameRecipient = draft.recipientTaxId.replace(/\D/g, '') === taxIdRef.current;
+      if (!sameRecipient) { setCnpjResult(null); setAddressStatus(''); automaticAddress.current = null; }
+      setOperation(current => {
+        const base = sameRecipient ? current : emptyFiscalOperation;
+        const address = { ...base.recipientAddress };
+        for (const [key, value] of Object.entries(draft.recipientAddress || {})) {
+          if (value) (address as any)[key] = value;
+        }
+        return { ...base, recipientAddress: address,
+          finalConsumer: draft.finalConsumer ?? base.finalConsumer,
+          freightMode: draft.freightMode || base.freightMode,
+          difal: { applies: draft.difal?.applies ?? base.difal.applies, reason: draft.difal?.reason || base.difal.reason },
+        };
+      });
       setRecipientName(draft.recipientName);
       setRecipientTaxId(draft.recipientTaxId);
       setPaymentMethod(draft.paymentMethod);
@@ -276,6 +366,7 @@ export default function ManualFiscal() {
     if (items.some((item) => item.description.trim().length < 2)) return toast.error('Preencha a descrição de todos os itens');
     if (items.some((item) => Number(item.quantity) <= 0)) return toast.error('A quantidade deve ser maior que zero');
     if (items.some((item) => Number(item.unitPrice) <= 0)) return toast.error('O preço deve ser maior que zero');
+    if (interstate && (!operation.recipientAddress.taxpayerIndicator || operation.finalConsumer === null || !operation.freightMode || operation.difal.applies === null)) return toast.error('Confirme contribuinte de ICMS, finalidade, transporte e DIFAL');
     if (interstate && (!recipientName.trim() || !cleanTaxId)) return toast.error('NF-e exige nome e CPF/CNPJ');
     if (interstate && items.some(item => !/^6\d{3}$/.test(item.cfop))) return toast.error('Informe o CFOP interestadual iniciado com 6 em cada item');
     if (total <= 0) return toast.error('O total da nota deve ser maior que zero');
@@ -400,7 +491,8 @@ export default function ManualFiscal() {
               </label>
               <label className="text-sm font-medium text-gray-700">
                 CPF ou CNPJ
-                <input value={recipientTaxId} onChange={(event) => setRecipientTaxId(event.target.value)} className={`${inputClass} mt-1.5`} required={interstate} placeholder="Opcional para NFC-e" inputMode="numeric" maxLength={18} />
+                <input value={recipientTaxId} onChange={(event) => changeRecipientTaxId(event.target.value)} className={`${inputClass} mt-1.5`} required={interstate} placeholder="Opcional para NFC-e" inputMode="numeric" maxLength={18} />
+                {interstate && <button type="button" disabled={lookupCnpjMutation.isPending || taxIdRef.current.length !== 14} onClick={() => lookupCnpjMutation.mutate(taxIdRef.current)} className="mt-2 text-xs font-semibold text-indigo-700 disabled:text-gray-400">{lookupCnpjMutation.isPending ? 'Consultando CNPJ…' : 'Consultar endereço pelo CNPJ'}</button>}
               </label>
               <label className="text-sm font-medium text-gray-700">
                 Forma de pagamento
@@ -411,7 +503,17 @@ export default function ManualFiscal() {
             </div>
           </section>
 
-          {interstate && <FiscalDestination value={operation} onChange={setOperation} />}
+          {interstate && <>
+            {(addressStatus || lookupCnpjMutation.isPending) && <div className="border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900" role="status">
+              {lookupCnpjMutation.isPending ? 'Consultando o endereço cadastral do CNPJ…' : addressStatus}
+              {cnpjResult && cnpjResult.recipientTaxId === taxIdRef.current && !lookupCnpjMutation.isPending && <button type="button" className="ml-2 font-semibold underline" onClick={() => {
+                automaticAddress.current = { id: cnpjResult.recipientTaxId, address: cnpjResult.address };
+                setOperation(current => ({ ...current, recipientAddress: { ...current.recipientAddress, ...cnpjResult.address } }));
+                setAddressStatus('Endereço cadastral aplicado. Confira se corresponde ao local de entrega.');
+              }}>Usar endereço do CNPJ</button>}
+            </div>}
+            <FiscalDestination value={operation} onChange={setOperation} />
+          </>}
           <section className="border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
               <div>
